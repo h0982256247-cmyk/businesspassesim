@@ -4,11 +4,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export interface PlatformSessionPayload extends JWTPayload {
   adminId: string
-  role: string
-  tenantAdminId: string | null
-  /** Set when a Super Admin has switched into a Platform Admin's view */
-  impersonatorId?:   string | null
-  impersonatorName?: string | null
+  role: string // AdminRole: SUPER_ADMIN | COMPANY_ADMIN
+  /** COMPANY_ADMIN 所屬企業；SUPER_ADMIN 為 null */
+  groupId?: string | null
 }
 
 export const PLATFORM_COOKIE = 'platform_session'

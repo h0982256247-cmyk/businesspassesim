@@ -34,3 +34,11 @@ export interface MarginGuard {
 }
 
 export const DEFAULT_MARGIN_GUARD: MarginGuard = { enabled: false, rate: 0.40 }
+
+// 企業福利價（PRD 五）：福利價 = 成本 × 倍率。倍率單一來源為 PlatformSetting.benefitMarkupRate，
+// 預設 1.5。商品匯入/新增/後台計算一律走這支，不要在各處寫死 ×1.5。
+export const DEFAULT_BENEFIT_MARKUP = 1.5
+
+export function benefitPriceFromCost(cost: number, markup: number = DEFAULT_BENEFIT_MARKUP): number {
+  return Math.round(cost * markup)
+}

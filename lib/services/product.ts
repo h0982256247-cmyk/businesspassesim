@@ -3,16 +3,15 @@ import { Prisma, ProductStatus, SupplierProductStatus, SupplierProductType } fro
 import type { SupplierProductMap } from './esim'
 import { resolveCountry, resolveCountryByPlanCode } from '@/lib/utils/country'
 import { parseCapacityFromName } from '@/lib/utils/capacity'
-import { sellPriceForCostChange, DEFAULT_MARGIN_GUARD, type MarginGuard } from '@/lib/utils/pricing'
+import { sellPriceForCostChange, benefitPriceFromCost, DEFAULT_MARGIN_GUARD, type MarginGuard } from '@/lib/utils/pricing'
 
-export async function getActiveProducts(countryCode?: string, tenantAdminId?: string | null) {
+export async function getActiveProducts(countryCode?: string) {
   return prisma.product.findMany({
     where: {
       status: ProductStatus.ACTIVE,
       // 雙重保險：供應商側下架的方案也不應出現在前台
       supplierProduct: { status: SupplierProductStatus.ACTIVE },
       ...(countryCode ? { countryCode } : {}),
-      ...(tenantAdminId != null ? { tenantAdminId } : {}),
     },
     orderBy: [{ countryCode: 'asc' }, { displayDays: 'asc' }],
     select: {
@@ -33,17 +32,13 @@ export async function getActiveProducts(countryCode?: string, tenantAdminId?: st
   })
 }
 
-// 多租戶隔離：購買/查詢單一商品時，商品必須屬於買家的租戶（tenantAdminId）。
-// 否則 A 白牌帳號可拿 B 白牌的 productId 下單 → 售價/成本/世界移動發卡設定/分潤
-// 全部歸屬錯亂。同時要求 status=ACTIVE 且 supplierProduct=ACTIVE（不可買下架品）。
-// tenantAdminId 為 null（未登入訪客瀏覽）時不限租戶；下單路徑一律帶入買家租戶。
-export async function getProductById(id: string, tenantAdminId?: string | null) {
+// 購買/查詢單一商品：要求 status=ACTIVE 且 supplierProduct=ACTIVE（不可買下架品）。
+export async function getProductById(id: string) {
   return prisma.product.findFirst({
     where: {
       id,
       status: ProductStatus.ACTIVE,
       supplierProduct: { status: SupplierProductStatus.ACTIVE },
-      ...(tenantAdminId != null ? { tenantAdminId } : {}),
     },
     select: {
       id: true,
@@ -57,6 +52,7 @@ export async function getProductById(id: string, tenantAdminId?: string | null) 
       isNativeSim: true,
       description: true,
       sellPrice: true,
+      benefitPrice: true, // 企業會員成交價；下單時寫入 OrderItem.unitBenefit 快照
       costPrice: true,    // 下單時寫入 OrderItem.unitCost 作為成本快照
       status: true,
       supplierSkuId: true,
@@ -64,12 +60,11 @@ export async function getProductById(id: string, tenantAdminId?: string | null) 
   })
 }
 
-export async function getAvailableCountries(tenantAdminId?: string | null) {
+export async function getAvailableCountries() {
   const products = await prisma.product.findMany({
     where: {
       status: ProductStatus.ACTIVE,
       supplierProduct: { status: SupplierProductStatus.ACTIVE },
-      ...(tenantAdminId != null ? { tenantAdminId } : {}),
     },
     select: {
       countryCode: true,
@@ -85,11 +80,10 @@ export async function getAvailableCountries(tenantAdminId?: string | null) {
 
 // 主頁「熱門目的地」專用：只回國家清單 + 各國最低售價（約數十筆），不撈全部商品。
 // 原本主頁打 /api/products（上萬筆）只為了算每國最低價，載入很慢；改用此聚合查詢。
-export async function getCountriesWithMinPrice(tenantAdminId?: string | null) {
+export async function getCountriesWithMinPrice() {
   const where: Prisma.ProductWhereInput = {
     status: ProductStatus.ACTIVE,
     supplierProduct: { status: SupplierProductStatus.ACTIVE },
-    ...(tenantAdminId != null ? { tenantAdminId } : {}),
   }
   const [countries, mins] = await Promise.all([
     prisma.product.findMany({
@@ -111,7 +105,6 @@ export async function getCountriesWithMinPrice(tenantAdminId?: string | null) {
 // ─── Admin operations ────────────────────────────────────────────
 
 export interface GetAllProductsAdminOptions {
-  tenantAdminId?: string | null
   page?: number      // 1-based
   pageSize?: number  // default 100
   q?: string         // 跨欄位搜尋（國家名/代碼/供應商 SKU/流量）
@@ -124,7 +117,6 @@ export async function getAllProductsAdmin(opts: GetAllProductsAdminOptions = {})
 
   // Prisma where 條件組合
   const where: import('@prisma/client').Prisma.ProductWhereInput = {
-    ...(opts.tenantAdminId ? { tenantAdminId: opts.tenantAdminId } : {}),
     ...(q
       ? {
           OR: [
@@ -171,15 +163,18 @@ export type ProductUpsertInput = {
   isNativeSim?: boolean
   sellPrice: number
   costPrice: number
+  benefitPrice?: number   // 未提供則以 costPrice × 倍率自動計算
   sortOrder?: number
-  tenantAdminId?: string | null
 }
 
 export async function upsertProduct(id: string | undefined, input: ProductUpsertInput) {
+  // 福利價：後台未明確給值時，以成本 × 全域倍率自動帶出（單一來源 benefitPriceFromCost）
+  const benefitPrice = input.benefitPrice ?? benefitPriceFromCost(input.costPrice)
+  const data = { ...input, benefitPrice }
   if (id) {
-    return prisma.product.update({ where: { id }, data: input })
+    return prisma.product.update({ where: { id }, data })
   }
-  return prisma.product.create({ data: input })
+  return prisma.product.create({ data })
 }
 
 export async function setProductStatus(id: string, status: ProductStatus) {
@@ -232,20 +227,14 @@ const WM_PRODUCT_TYPE_MAP: Record<number, SupplierProductType> = {
 //
 // 為什麼 update 既有 Product 而非 delete+create：OrderItem.productId 是 FK，
 // 砍掉重練會破壞訂單關聯。保留 id 是唯一安全做法。
-// 取得租戶的毛利保護設定（驗證套用 / 匯入共用）。tenant 不明或查無 → 預設關閉。
-export async function getMarginGuard(tenantAdminId?: string | null): Promise<MarginGuard> {
-  if (!tenantAdminId) return { ...DEFAULT_MARGIN_GUARD }
-  const a = await prisma.platformAdmin.findUnique({
-    where: { id: tenantAdminId },
-    select: { marginGuardEnabled: true, minMarginRate: true },
-  })
-  if (!a) return { ...DEFAULT_MARGIN_GUARD }
-  return { enabled: a.marginGuardEnabled, rate: Number(a.minMarginRate) }
+// 毛利保護設定（驗證套用 / 匯入共用）。單一品牌改造後暫以全域預設（關閉）回傳；
+// 若要恢復可調整，改讀 PlatformSetting（見 ROADMAP，Phase 5 併入）。
+export async function getMarginGuard(): Promise<MarginGuard> {
+  return { ...DEFAULT_MARGIN_GUARD }
 }
 
 export async function batchCreateProducts(
   rows: CsvProductRow[],
-  tenantAdminId?: string | null,
   supplierMap?: SupplierProductMap,
   marginGuard: MarginGuard = DEFAULT_MARGIN_GUARD,
 ): Promise<{ count: number; created: number; updated: number }> {
@@ -318,7 +307,6 @@ export async function batchCreateProducts(
   ))
   const existingProducts = await prisma.product.findMany({
     where: {
-      tenantAdminId: tenantAdminId ?? null,
       OR: [
         { planCode: { in: planCodesForRows } },
         { supplierSkuId: { in: supplierIdsForRows } },
@@ -347,7 +335,7 @@ export async function batchCreateProducts(
       oldCost: row.costPrice, oldSell: row.sellPrice, newCost: wmCost,
       guardEnabled: marginGuard.enabled, minMarginRate: marginGuard.rate,
     })
-    const data = buildProductData(row, supplierId, tenantAdminId ?? null, { costPrice: wmCost, sellPrice: sell })
+    const data = buildProductData(row, supplierId, { costPrice: wmCost, sellPrice: sell })
     const existingId = row.planCode
       ? existingByPlan.get(row.planCode)
       : existingBySkuNoPlan.get(supplierId)
@@ -449,9 +437,9 @@ async function bulkUpdateProducts(
 function buildProductData(
   row: CsvProductRow,
   supplierId: string,
-  tenantAdminId: string | null,
   priceOverride?: { costPrice: number; sellPrice: number },
 ) {
+  const costPrice = priceOverride?.costPrice ?? row.costPrice
   // 只挑 Product 真實欄位；**不可**用 `...row`：匯入端會在 row 上臨時掛
   // _rawProductName / _matchedByName（國家補強用），一旦被 spread 進
   // prisma.product.createMany() 就會被當成未知參數，整批匯入失敗。
@@ -471,9 +459,9 @@ function buildProductData(
     networkType:   row.networkType ?? null,
     isNativeSim:   row.isNativeSim ?? false,
     sellPrice:     priceOverride?.sellPrice ?? row.sellPrice,
-    costPrice:     priceOverride?.costPrice ?? row.costPrice,
+    costPrice,
+    benefitPrice:  benefitPriceFromCost(costPrice),
     sortOrder:     row.sortOrder ?? 0,
-    tenantAdminId,
   }
 }
 
@@ -485,11 +473,8 @@ function buildProductData(
 //
 // 流程：select Product join SupplierProduct → 跑 resolveCountry 與
 // parseCapacityFromName → bulk UPDATE FROM VALUES。只更新真的有變化的 row。
-export async function recomputeMetaFromSupplier(
-  tenantAdminId?: string | null,
-): Promise<{ total: number; countryUpdated: number; capacityUpdated: number; updated: number }> {
+export async function recomputeMetaFromSupplier(): Promise<{ total: number; countryUpdated: number; capacityUpdated: number; updated: number }> {
   const products = await prisma.product.findMany({
-    where: tenantAdminId != null ? { tenantAdminId } : {},
     select: {
       id: true,
       countryCode: true,

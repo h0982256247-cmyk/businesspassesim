@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/db/prisma'
-import { issueCoupon } from '@/lib/services/coupon'
 import { encrypt } from '@/lib/utils/crypto'
 import type { LineUserInfo } from '@/lib/auth/line'
 
@@ -10,18 +9,9 @@ export interface UpdateProfileInput {
   birthday: Date
 }
 
-export async function findOrCreateUser(lineInfo: LineUserInfo, tenantAdminId?: string) {
-  // 多租戶：同一 lineUid 在不同白牌＝不同 User，查詢必須帶租戶範圍。
-  let existing = await prisma.user.findFirst({
-    where: { lineUid: lineInfo.sub, ...(tenantAdminId ? { tenantAdminId } : {}) },
-  })
-  // 相容遷移：舊資料可能 tenantAdminId 為 null，首次帶租戶登入時認領它（補上租戶），
-  // 不另開新列。下方 update 會把 tenantAdminId 寫進去。
-  if (!existing && tenantAdminId) {
-    existing = await prisma.user.findFirst({
-      where: { lineUid: lineInfo.sub, tenantAdminId: null },
-    })
-  }
+export async function findOrCreateUser(lineInfo: LineUserInfo) {
+  // 單一品牌：lineUid 全域唯一，直接以 lineUid 查。
+  const existing = await prisma.user.findUnique({ where: { lineUid: lineInfo.sub } })
 
   if (existing) {
     const updated = await prisma.user.update({
@@ -29,8 +19,6 @@ export async function findOrCreateUser(lineInfo: LineUserInfo, tenantAdminId?: s
       data: {
         displayName: lineInfo.name,
         avatarUrl: lineInfo.picture ?? existing.avatarUrl,
-        // 只在尚未設定租戶時才寫入（防止跨租戶登入覆蓋）
-        ...(tenantAdminId && !existing.tenantAdminId ? { tenantAdminId } : {}),
       },
     })
     return { user: updated, isNewUser: false }
@@ -41,7 +29,6 @@ export async function findOrCreateUser(lineInfo: LineUserInfo, tenantAdminId?: s
       lineUid: lineInfo.sub,
       displayName: lineInfo.name,
       avatarUrl: lineInfo.picture,
-      tenantAdminId: tenantAdminId ?? null,
     },
   })
 
@@ -49,10 +36,6 @@ export async function findOrCreateUser(lineInfo: LineUserInfo, tenantAdminId?: s
 }
 
 export async function updateProfile(userId: string, input: UpdateProfileInput) {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } })
-
-  const isFirstUpdate = !user.phone && !user.email
-
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
@@ -65,17 +48,6 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
     },
   })
 
-  // 首次填寫個資 → 發放官方歡迎券（C 級 9 折）
-  if (isFirstUpdate) {
-    await issueCoupon({
-      ownerId: userId,
-      ownerUid: updated.lineUid,
-      type: 'OFFICIAL_WELCOME',
-      discount: 0.9,
-      isOfficial: true,
-    })
-  }
-
   return updated
 }
 
@@ -84,7 +56,6 @@ export async function getUserById(userId: string) {
     where: { id: userId },
     include: {
       groupMembership: { include: { group: true } },
-      ownedGroup: true,
     },
   })
 }

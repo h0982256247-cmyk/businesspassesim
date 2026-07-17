@@ -3,10 +3,6 @@ import { SignJWT, jwtVerify, type JWTPayload } from 'jose'
 export interface SessionPayload extends JWTPayload {
   userId: string
   lineUid: string
-  // 使用者所屬租戶。註冊後幾乎不會變動（findOrCreateUser 只在尚未設定時寫入），
-  // 故可安全嵌入 JWT，省掉 /api 每次的 prisma.user.findUnique 查租戶 round-trip。
-  // 舊版 token 沒有此欄位 → API 端 fallback 回 DB 查。
-  tenantAdminId?: string | null
 }
 
 function getSecret() {

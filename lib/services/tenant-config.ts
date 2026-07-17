@@ -1,17 +1,22 @@
 import { prisma } from '@/lib/db/prisma'
 import { encrypt, safeDecrypt } from '@/lib/utils/crypto'
 
+// 單一品牌全域整合設定（世界移動 eSIM / TapPay 金流）。
+// 原白標版是 per-tenant（by adminId），改單品牌後收斂為 singleton 設定表：
+// EsimConfig 固定單列（id="singleton"）、PaymentConfig 以 gateway 唯一。
+
 // ─── eSIM 供應商設定 ──────────────────────────────────────────────
 
+const ESIM_CONFIG_ID = 'singleton'
+
 /** Returns config with decrypted token (for internal server use only) */
-export async function getEsimConfig(adminId: string) {
-  const cfg = await prisma.tenantEsimConfig.findUnique({ where: { adminId } })
+export async function getEsimConfig() {
+  const cfg = await prisma.esimConfig.findUnique({ where: { id: ESIM_CONFIG_ID } })
   if (!cfg) return null
   return { ...cfg, token: safeDecrypt(cfg.token) }
 }
 
 export async function upsertEsimConfig(
-  adminId: string,
   input: {
     provider?: string
     apiUrl: string
@@ -22,10 +27,10 @@ export async function upsertEsimConfig(
 ) {
   const encryptedToken = encrypt(input.token)
   // 拆 upsert：適配 @prisma/adapter-pg 回傳異常
-  const existing = await prisma.tenantEsimConfig.findUnique({ where: { adminId } })
+  const existing = await prisma.esimConfig.findUnique({ where: { id: ESIM_CONFIG_ID } })
   if (existing) {
-    return prisma.tenantEsimConfig.update({
-      where: { adminId },
+    return prisma.esimConfig.update({
+      where: { id: ESIM_CONFIG_ID },
       data: {
         provider: input.provider,
         apiUrl: input.apiUrl,
@@ -36,9 +41,9 @@ export async function upsertEsimConfig(
       },
     })
   }
-  return prisma.tenantEsimConfig.create({
+  return prisma.esimConfig.create({
     data: {
-      adminId,
+      id: ESIM_CONFIG_ID,
       provider: input.provider ?? 'worldmove',
       apiUrl: input.apiUrl,
       merchantId: input.merchantId,
@@ -51,8 +56,8 @@ export async function upsertEsimConfig(
 // ─── 金流設定 ─────────────────────────────────────────────────────
 
 /** Returns configs with decrypted keys (for internal server use only) */
-export async function getPaymentConfigs(adminId: string) {
-  const cfgs = await prisma.tenantPaymentConfig.findMany({ where: { adminId } })
+export async function getPaymentConfigs() {
+  const cfgs = await prisma.paymentConfig.findMany()
   return cfgs.map(c => ({
     ...c,
     partnerKey: safeDecrypt(c.partnerKey),
@@ -61,8 +66,8 @@ export async function getPaymentConfigs(adminId: string) {
 }
 
 /** Returns single config with decrypted keys (for internal server use only) */
-export async function getPaymentConfig(adminId: string, gateway: string) {
-  const c = await prisma.tenantPaymentConfig.findFirst({ where: { adminId, gateway } })
+export async function getPaymentConfig(gateway: string) {
+  const c = await prisma.paymentConfig.findUnique({ where: { gateway } })
   if (!c) return null
   return {
     ...c,
@@ -72,7 +77,6 @@ export async function getPaymentConfig(adminId: string, gateway: string) {
 }
 
 export async function upsertPaymentConfig(
-  adminId: string,
   input: {
     gateway: string
     partnerKey: string
@@ -86,22 +90,20 @@ export async function upsertPaymentConfig(
   const encryptedAppKey = input.appKey ? encrypt(input.appKey) : undefined
 
   // 拆 upsert：適配 @prisma/adapter-pg
-  const existing = await prisma.tenantPaymentConfig.findUnique({
-    where: { adminId_gateway: { adminId, gateway: input.gateway } },
-  })
+  const existing = await prisma.paymentConfig.findUnique({ where: { gateway: input.gateway } })
   if (existing) {
     // 換 Partner Key（等同換 TapPay 帳號）：舊 partner 綁的記憶卡（card token）在新 partner
-    // 無法代扣，一次清除該租戶所有綁卡，使用者下次付款會重新綁定。僅信用卡 gateway 觸發
+    // 無法代扣，一次清除所有綁卡，使用者下次付款會重新綁定。僅信用卡 gateway 觸發
     // （LINE Pay 無記憶卡）。partner key 以「遮罩沿用現有」傳入時，解密後相等 → 不誤清。
     // 清卡與更新設定包成同一 transaction，避免只成一半。
     const partnerKeyChanged =
       input.gateway === 'tappay_credit' && safeDecrypt(existing.partnerKey) !== input.partnerKey
     return prisma.$transaction(async tx => {
       if (partnerKeyChanged) {
-        await tx.savedCard.deleteMany({ where: { user: { tenantAdminId: adminId } } })
+        await tx.savedCard.deleteMany({})
       }
-      return tx.tenantPaymentConfig.update({
-        where: { adminId_gateway: { adminId, gateway: input.gateway } },
+      return tx.paymentConfig.update({
+        where: { gateway: input.gateway },
         data: {
           partnerKey: encryptedPartnerKey,
           merchantId: input.merchantId,
@@ -114,9 +116,8 @@ export async function upsertPaymentConfig(
       })
     })
   }
-  return prisma.tenantPaymentConfig.create({
+  return prisma.paymentConfig.create({
     data: {
-      adminId,
       gateway: input.gateway,
       partnerKey: encryptedPartnerKey,
       merchantId: input.merchantId,
@@ -128,9 +129,9 @@ export async function upsertPaymentConfig(
 }
 
 /** 切換某金流前台啟用狀態（前端是否顯示此支付）。只動 isActive，不碰金鑰。 */
-export async function setPaymentConfigActive(adminId: string, gateway: string, isActive: boolean) {
-  return prisma.tenantPaymentConfig.update({
-    where: { adminId_gateway: { adminId, gateway } },
+export async function setPaymentConfigActive(gateway: string, isActive: boolean) {
+  return prisma.paymentConfig.update({
+    where: { gateway },
     data: { isActive },
   })
 }
