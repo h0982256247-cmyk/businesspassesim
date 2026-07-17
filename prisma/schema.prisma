@@ -1,0 +1,402 @@
+// 商務通 eSIM 平台 — Prisma Schema
+// B2B2C 企業福利平台（單一品牌，不含儲值/錢包/點數/優惠券/分潤）
+// 技術棧：Next.js + Supabase (PostgreSQL) + Prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// 會員系統（LIFF 登入的 LINE 用戶）
+// ============================================================
+
+model User {
+  id          String    @id @default(cuid())
+  lineUid     String    @unique @map("line_uid")
+  displayName String    @map("display_name")
+  realName    String?   @map("real_name")
+  phone       String? // 加密儲存
+  email       String? // 加密儲存
+  birthday    DateTime? @db.Date
+  avatarUrl   String?   @map("avatar_url")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // 關聯
+  groupMembership GroupMember? // 一人最多屬於一個企業
+  orders          Order[]
+  notifications   Notification[]
+  savedCard       SavedCard?
+
+  @@map("users")
+}
+
+// ============================================================
+// 企業系統（沿用 Group model；一家公司＝一個企業社群）
+// ============================================================
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  inviteCode  String   @unique @map("invite_code") // 企業邀請碼
+  inviteLink  String?  @map("invite_link")
+  isActive    Boolean  @default(true) @map("is_active") // 企業本身啟用/停權（由 Super Admin 控制）
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  members GroupMember[]
+  admins  AdminUser[] // 企業管理員（後台帳號）
+  orders  Order[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id           String       @id @default(cuid())
+  groupId      String       @map("group_id")
+  userId       String       @unique @map("user_id") // 一人只能屬於一個企業
+  status       MemberStatus @default(PENDING) // 加入需企業管理員審核
+  joinedAt     DateTime     @default(now()) @map("joined_at")
+  reviewedAt   DateTime?    @map("reviewed_at")
+  reviewedById String?      @map("reviewed_by_id") // 審核的 AdminUser
+  leftAt       DateTime?    @map("left_at")
+
+  group      Group      @relation(fields: [groupId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  reviewedBy AdminUser? @relation("MemberReviewer", fields: [reviewedById], references: [id])
+
+  @@index([groupId])
+  @@map("group_members")
+}
+
+enum MemberStatus {
+  PENDING // 審核中
+  APPROVED // 已核准（可享福利價）
+  REJECTED // 已拒絕
+
+  @@map("member_status")
+}
+
+// ============================================================
+// 商品系統
+// ============================================================
+
+model SupplierProduct {
+  id            String                @id @default(cuid())
+  wmProductId   String                @unique @map("wm_product_id") // 世界移動唯一商品編號 WM_000001
+  productId     String?               @map("product_id") // 供應商自身商品編號
+  productName   String                @map("product_name")
+  productRegion String?               @map("product_region")
+  productType   SupplierProductType   @map("product_type")
+  costPrice     Int                   @map("cost_price") // 台幣，經銷商成本價
+  isEsim        Boolean               @default(true) @map("is_esim")
+  status        SupplierProductStatus @default(ACTIVE)
+  lastSyncAt    DateTime?             @map("last_sync_at")
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("supplier_products")
+}
+
+enum SupplierProductType {
+  ESIM // 0
+  SIM // 1
+  SIM_TOPUP // 2 充值 SIM 卡
+
+  @@map("supplier_product_type")
+}
+
+enum SupplierProductStatus {
+  ACTIVE
+  INACTIVE // 人工下架
+  AUTO_INACTIVE // 系統偵測供應商下架
+
+  @@map("supplier_product_status")
+}
+
+model Product {
+  id                String        @id @default(cuid())
+  supplierSkuId     String        @map("supplier_sku_id")
+  countryCode       String        @map("country_code") // ISO 3166-1 alpha-2
+  countryNameZh     String        @map("country_name_zh")
+  countryNameEn     String        @map("country_name_en")
+  countryFlag       String?       @map("country_flag")
+  displayDays       Int           @map("display_days")
+  dataCapacity      String?       @map("data_capacity")
+  coverageCountries String?       @map("coverage_countries")
+  planCode          String?       @map("plan_code")
+  networkType       String?       @map("network_type")
+  isNativeSim       Boolean       @default(false) @map("is_native_sim")
+  description       String?
+  // 三段定價（PRD 五）
+  costPrice         Int           @map("cost_price") // 供應商成本價（同步自 API，僅後台可見）
+  benefitPrice      Int           @map("benefit_price") // 企業福利價（預設＝成本×全域倍率，可個別覆寫）
+  sellPrice         Int           @map("sell_price") // 一般售價（商務通自訂，含稅）
+  status            ProductStatus @default(ACTIVE)
+  sortOrder         Int           @default(0) @map("sort_order")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  supplierProduct SupplierProduct @relation(fields: [supplierSkuId], references: [id])
+  orderItems      OrderItem[]
+
+  @@map("products")
+}
+
+enum ProductStatus {
+  ACTIVE
+  INACTIVE
+  AUTO_INACTIVE
+
+  @@map("product_status")
+}
+
+// ============================================================
+// 訂單系統
+// ============================================================
+
+model Order {
+  id     String      @id @default(cuid())
+  userId String      @map("user_id")
+  status OrderStatus @default(PENDING)
+
+  // 購買身分與企業歸屬（PRD 七：訂單保存會員、企業）
+  companyId String?   @map("company_id") // 下單當下所屬企業；null＝一般會員
+  priceTier PriceTier @default(GENERAL) @map("price_tier") // GENERAL＝一般售價 / BENEFIT＝福利價
+
+  // 金額
+  subtotal  Int // 含稅金額（台幣）
+  totalPaid Int @map("total_paid") // 實付含稅金額
+  taxAmount Int @default(0) @map("tax_amount")
+
+  // 系統訂單號
+  orderNumber String? @unique @map("order_number")
+
+  // 多品項一次結帳：同批次共用 bundleId
+  bundleId  String? @map("bundle_id")
+  bundleSeq Int?    @map("bundle_seq")
+
+  // 金流
+  paymentMethod    PaymentMethod @map("payment_method")
+  tapPayOrderId    String?       @unique @map("tappay_order_id")
+  tapPayRecTradeId String?       @map("tappay_rec_trade_id")
+  paidAt           DateTime?     @map("paid_at")
+
+  // 世界移動
+  wmOrderId   String? @unique @map("wm_order_id")
+  wmOrderSn   String? @map("wm_order_sn")
+  wmOrderTime String? @map("wm_order_time")
+
+  // eSIM 啟動碼（明文存 DB，嚴禁寫入 log）
+  esimRcode       String?   @map("esim_rcode")
+  esimQrcode      String?   @map("esim_qrcode")
+  esimLpa         String?   @map("esim_lpa")
+  esimPin1        String?   @map("esim_pin1")
+  esimPin2        String?   @map("esim_pin2")
+  esimPuk1        String?   @map("esim_puk1")
+  esimPuk2        String?   @map("esim_puk2")
+  esimCfCode      String?   @map("esim_cf_code")
+  esimApnExplain  String?   @map("esim_apn_explain")
+  esimIccid       String?   @map("esim_iccid")
+  activationStart DateTime? @map("activation_start")
+  activationEnd   DateTime? @map("activation_end")
+  redeemedAt      DateTime? @map("redeemed_at")
+  activatedAt     DateTime? @map("activated_at")
+
+  // Retry 機制
+  retryCount  Int       @default(0) @map("retry_count")
+  lastRetryAt DateTime? @map("last_retry_at")
+
+  // 失敗 / 取消原因
+  failureReason String? @map("failure_reason")
+  cancelReason  String? @map("cancel_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user       User        @relation(fields: [userId], references: [id])
+  company    Group?      @relation(fields: [companyId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([bundleId])
+  @@index([companyId])
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING // 建立中
+  PROCESSING // 處理中（金流進行中）
+  PAID // 付款成功
+  COMPLETED // 完成（啟動碼已交付）
+  FAILED // 付款失敗
+  ESIM_PENDING // 付款成功但啟動碼未取得（補發中）
+  REFUNDED // 已退款
+  CANCELLED // 已取消
+
+  @@map("order_status")
+}
+
+enum PriceTier {
+  GENERAL // 一般售價
+  BENEFIT // 企業福利價
+
+  @@map("price_tier")
+}
+
+enum PaymentMethod {
+  CREDIT_CARD
+  LINE_PAY
+
+  @@map("payment_method")
+}
+
+model OrderItem {
+  id          String @id @default(cuid())
+  orderId     String @map("order_id")
+  productId   String @map("product_id")
+  productName String @map("product_name") // 快照
+  qty         Int    @default(1)
+  // 下單當下的三價 + 成交價快照（PRD 七）
+  unitCost    Int    @map("unit_cost") // 成本
+  unitBenefit Int    @map("unit_benefit") // 福利價
+  unitSell    Int    @map("unit_sell") // 一般售價
+  unitPrice   Int    @map("unit_price") // 成交單價（實際收費）
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// ============================================================
+// 後台帳號（Super Admin ＋ 企業管理員）
+// ============================================================
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         AdminRole
+  groupId      String?   @map("group_id") // COMPANY_ADMIN 所屬企業；SUPER_ADMIN 為 null
+  isActive     Boolean   @default(true) @map("is_active")
+  createdById  String?   @map("created_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  group           Group?        @relation(fields: [groupId], references: [id])
+  createdBy       AdminUser?    @relation("AdminCreated", fields: [createdById], references: [id])
+  created         AdminUser[]   @relation("AdminCreated")
+  reviewedMembers GroupMember[] @relation("MemberReviewer")
+
+  @@index([groupId])
+  @@map("admin_users")
+}
+
+enum AdminRole {
+  SUPER_ADMIN // 商務通平台管理者
+  COMPANY_ADMIN // 企業管理員
+
+  @@map("admin_role")
+}
+
+// ============================================================
+// 全域設定與整合（單一品牌，取代原白牌 per-tenant 設定）
+// ============================================================
+
+// 單列設定表；benefitMarkupRate = 福利價預設倍率（PRD 五：成本×1.5）
+model PlatformSetting {
+  id                String   @id @default("singleton")
+  benefitMarkupRate Decimal  @default(1.50) @map("benefit_markup_rate") @db.Decimal(4, 2)
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
+// 世界移動 eSIM 設定（單列；token 加密儲存）
+model EsimConfig {
+  id         String   @id @default("singleton")
+  provider   String   @default("worldmove")
+  apiUrl     String   @map("api_url")
+  merchantId String   @map("merchant_id")
+  deptId     String   @map("dept_id")
+  token      String // 加密儲存
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("esim_config")
+}
+
+// TapPay 設定（信用卡 / LINE Pay 各一列；partnerKey/appKey 加密儲存）
+model PaymentConfig {
+  id         String   @id @default(cuid())
+  gateway    String   @unique // "tappay_credit" | "tappay_linepay"
+  partnerKey String   @map("partner_key") // 加密儲存
+  merchantId String   @map("merchant_id")
+  appId      String?  @map("app_id")
+  appKey     String?  @map("app_key") // 加密儲存
+  env        String   @default("sandbox") // "sandbox" | "production"
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_config")
+}
+
+// ============================================================
+// 儲存卡片
+// ============================================================
+
+model SavedCard {
+  id            String   @id @default(cuid())
+  userId        String   @unique @map("user_id")
+  cardKeyEnc    String   @map("card_key_enc")
+  cardTokenEnc  String   @map("card_token_enc")
+  lastFour      String   @map("last_four")
+  cardType      Int      @default(1) @map("card_type")
+  funding       Int      @default(0)
+  cardExpiresAt String?  @map("card_expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_cards")
+}
+
+// ============================================================
+// 通知系統
+// ============================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String?
+  content   String
+  metadata  Json?
+  sentAt    DateTime?        @map("sent_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  ORDER_PAID // 訂單付款成功
+  ORDER_ESIM_READY // 啟動碼已就緒
+  ORDER_ESIM_PENDING // 啟動碼處理中
+  MEMBER_APPROVED // 企業加入審核通過
+  MEMBER_REJECTED // 企業加入審核拒絕
+
+  @@map("notification_type")
+}
