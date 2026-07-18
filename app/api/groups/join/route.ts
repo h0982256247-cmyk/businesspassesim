@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySession, SESSION_COOKIE } from '@/lib/auth/session'
-import { joinGroup } from '@/lib/services/group'
+import { joinByInviteCode } from '@/lib/services/group'
 
 // POST /api/groups/join
-// Body: { inviteCode }
+// Body: { inviteCode } — 員工輸入企業邀請碼送出加入申請（進入待審核 PENDING）
 export async function POST(req: NextRequest) {
   const token = req.cookies.get(SESSION_COOKIE)?.value
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,11 +16,12 @@ export async function POST(req: NextRequest) {
   const { inviteCode } = await req.json()
   if (!inviteCode?.trim()) return NextResponse.json({ error: 'inviteCode 必填' }, { status: 400 })
 
-  const result = await joinGroup(session.userId, session.lineUid, inviteCode.trim().toUpperCase())
+  const result = await joinByInviteCode(session.userId, inviteCode.trim().toUpperCase())
 
   if (!result.ok) {
     return NextResponse.json({ error: result.reason }, { status: 422 })
   }
 
-  return NextResponse.json({ ok: true, groupName: result.groupName, couponDiscount: result.couponDiscount })
+  // 加入申請已送出，待企業管理員審核
+  return NextResponse.json({ ok: true, companyName: result.companyName, status: result.status })
 }

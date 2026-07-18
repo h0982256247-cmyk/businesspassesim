@@ -1,22 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
-import { getAllGroups } from '@/lib/services/group'
-import { GroupStatus } from '@prisma/client'
+import { getAllCompanies, createCompany, getCompanyById } from '@/lib/services/group'
 
-// GET /api/admin/groups?status=PENDING
+// GET /api/admin/groups — 企業列表。SUPER_ADMIN 看全部；COMPANY_ADMIN 只看自己企業。
 export async function GET(req: NextRequest) {
   const auth = await requirePlatformAuth(req)
   if (auth instanceof NextResponse) return auth
 
-  const statusParam = req.nextUrl.searchParams.get('status')
-  const status = statusParam && Object.values(GroupStatus).includes(statusParam as GroupStatus)
-    ? (statusParam as GroupStatus)
-    : undefined
+  if (auth.role === 'COMPANY_ADMIN') {
+    const company = auth.groupId ? await getCompanyById(auth.groupId) : null
+    return NextResponse.json({ companies: company ? [company] : [] })
+  }
 
-  const tenantAdminId = auth.role === 'SUPER_ADMIN'
-    ? (req.nextUrl.searchParams.get('tenantAdminId') || null)
-    : auth.tenantAdminId
+  const companies = await getAllCompanies()
+  return NextResponse.json({ companies })
+}
 
-  const groups = await getAllGroups(status, tenantAdminId)
-  return NextResponse.json({ groups })
+// POST /api/admin/groups — 建立企業（僅 SUPER_ADMIN；自動產生邀請碼）
+export async function POST(req: NextRequest) {
+  const auth = await requirePlatformAuth(req)
+  if (auth instanceof NextResponse) return auth
+  if (auth.role !== 'SUPER_ADMIN') return NextResponse.json({ error: '無權限' }, { status: 403 })
+
+  const { name, description } = await req.json()
+  if (!name?.trim()) return NextResponse.json({ error: 'name 必填' }, { status: 400 })
+
+  const company = await createCompany({ name: name.trim(), description })
+  return NextResponse.json({ company }, { status: 201 })
 }
