@@ -22,7 +22,6 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   const products = await prisma.product.findMany({
-    where: auth.tenantAdminId ? { tenantAdminId: auth.tenantAdminId } : undefined,
     select: {
       id: true,
       costPrice: true,
@@ -41,7 +40,7 @@ export async function GET(req: NextRequest) {
     .reduce<Date | null>((max, d) => (max == null || d > max ? d : max), null)
 
   // 一次取回全部供應商方案清單，再批次比對（避免逐筆呼叫被鎖 IP）
-  const supplierMap = await fetchSupplierProductMap(auth.tenantAdminId)
+  const supplierMap = await fetchSupplierProductMap()
 
   const notFound: IssueBase[] = []
   const priceMismatch: PriceMismatchIssue[] = []

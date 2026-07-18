@@ -16,8 +16,6 @@ import { tapPayCharge, tapPayChargeByToken, tapPayChargeLinePay } from '@/lib/se
 import { buildLiffOrderUrl } from '@/lib/utils/liff-url'
 import { getTenantById } from '@/lib/services/tenant'
 import { triggerEsimActivation } from '@/lib/services/esim'
-import { calculateAndSaveCommission } from '@/lib/services/commission'
-import { issueRepurchaseCouponForOrder } from '@/lib/services/coupon'
 import { getUserById } from '@/lib/services/user'
 import { notifyOrderPaid } from '@/lib/services/notification'
 import { upsertSavedCard } from '@/lib/services/saved-card'
@@ -159,7 +157,7 @@ export async function POST(req: NextRequest) {
   // 舊 URL 變成 404。
   let frontendRedirectUrl = returnUrl
   if (!frontendRedirectUrl) {
-    const tenant = user.tenantAdminId ? await getTenantById(user.tenantAdminId) : null
+    const tenant = await getTenantById('default')
     frontendRedirectUrl = buildLiffOrderUrl({
       origin,
       tenantSlug: tenant?.slug ?? null,
@@ -185,7 +183,6 @@ export async function POST(req: NextRequest) {
         cardholder,
         resultUrl,
       },
-      user.tenantAdminId,
     )
   } else if (useToken) {
     const saved = await prisma.savedCard.findUnique({ where: { userId: session.userId } })
@@ -204,7 +201,6 @@ export async function POST(req: NextRequest) {
         cardholder,
         resultUrl,
       },
-      user.tenantAdminId,
     )
   } else {
     charge = await tapPayCharge(
@@ -217,7 +213,6 @@ export async function POST(req: NextRequest) {
         remember: remember ?? false,
         resultUrl,
       },
-      user.tenantAdminId,
     )
   }
 
@@ -260,20 +255,14 @@ export async function POST(req: NextRequest) {
     const orders = await markBundlePaid(bundleId!, charge.recTradeId)
     for (const o of orders) {
       fireAndLog('triggerEsimActivation', o.id, triggerEsimActivation(o.id))
-      // 分潤/回購券要 await：fire-and-forget 在回應後會被 Vercel 中斷而漏跑（偶發沒發回購券）。兩者皆冪等。
-      try { await calculateAndSaveCommission(o.id) } catch (e) { console.error('[tappay] commission failed', o.id, e) }
-      try { await issueRepurchaseCouponForOrder(o.id) } catch (e) { console.error('[tappay] repurchase coupon failed', o.id, e) }
     }
-    fireAndLog('notifyOrderPaid', session.userId, notifyOrderPaid(session.userId, paidItems, amount, user.tenantAdminId))
+    fireAndLog('notifyOrderPaid', session.userId, notifyOrderPaid(session.userId, paidItems, amount))
     return NextResponse.json({ ok: true, bundleId, orderIds: orders.map(o => o.id) })
   }
 
   await markOrderPaid(anchor.id, charge.recTradeId)
   fireAndLog('triggerEsimActivation', anchor.id, triggerEsimActivation(anchor.id))
-  // 分潤/回購券要 await：fire-and-forget 在回應後會被 Vercel 中斷而漏跑（偶發沒發回購券）。兩者皆冪等。
-  try { await calculateAndSaveCommission(anchor.id) } catch (e) { console.error('[tappay] commission failed', anchor.id, e) }
-  try { await issueRepurchaseCouponForOrder(anchor.id) } catch (e) { console.error('[tappay] repurchase coupon failed', anchor.id, e) }
-  fireAndLog('notifyOrderPaid', session.userId, notifyOrderPaid(session.userId, paidItems, amount, user.tenantAdminId))
+  fireAndLog('notifyOrderPaid', session.userId, notifyOrderPaid(session.userId, paidItems, amount))
 
   return NextResponse.json({ ok: true, orderId: anchor.id })
 }

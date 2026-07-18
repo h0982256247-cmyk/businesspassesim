@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json()
-  const { productId, couponIds = [], paymentMethod } = body
+  const { productId, paymentMethod } = body
 
   if (!productId) return NextResponse.json({ error: 'productId 必填' }, { status: 400 })
   if (!Object.values(PaymentMethod).includes(paymentMethod)) {
@@ -38,14 +38,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '請先完成基本資料填寫', code: 'PROFILE_INCOMPLETE' }, { status: 422 })
   }
 
-  // 多租戶隔離：帶入買家租戶，商品必須屬於同租戶才能下單
   const result = await createOrder({
     userId: auth.userId,
-    lineUid: auth.lineUid,
     productId,
-    couponIds,
     paymentMethod,
-    tenantAdminId: auth.tenantAdminId,
   })
 
   if (!result.ok) {

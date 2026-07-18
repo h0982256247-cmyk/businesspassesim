@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // 共用 schema 語意）— bundle 用 markBundleFailed 內已 reset coupons
   if (order.bundleId) {
     const bundleOrders = await prisma.order.findMany({
-      where: { bundleId: order.bundleId, currentOwnerId: auth.userId },
+      where: { bundleId: order.bundleId, userId: auth.userId },
       select: { id: true, status: true },
     })
     if (bundleOrders.some(o => !(CANCELLABLE as readonly string[]).includes(o.status))) {
@@ -46,18 +46,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         { status: 409 },
       )
     }
-    // Bundle 也走 CANCELLED 語意（手動取消 ≠ 付款失敗），用 markOrderCancelled
-    // 個別處理，並寫入 cancelReason
-    await prisma.$transaction(async tx => {
-      await tx.order.updateMany({
-        where: { bundleId: order.bundleId!, status: { in: CANCELLABLE } },
-        data: { status: OrderStatus.CANCELLED, cancelReason: reason },
-      })
-      const ids = bundleOrders.map(o => o.id)
-      await tx.coupon.updateMany({
-        where: { usedOrderId: { in: ids } },
-        data: { usedAt: null, usedOrderId: null },
-      })
+    // Bundle 也走 CANCELLED 語意（手動取消 ≠ 付款失敗），寫入 cancelReason
+    await prisma.order.updateMany({
+      where: { bundleId: order.bundleId, status: { in: CANCELLABLE } },
+      data: { status: OrderStatus.CANCELLED, cancelReason: reason },
     })
   } else {
     await markOrderCancelled(order.id, reason)

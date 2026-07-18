@@ -21,14 +21,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '操作過於頻繁，請稍後再試' }, { status: 429 })
   }
 
-  let body: { lines?: BundleCartLine[]; paymentMethod?: PaymentMethod; couponIds?: string[] }
+  let body: { lines?: BundleCartLine[]; paymentMethod?: PaymentMethod }
   try {
     body = await req.json()
   } catch {
     return NextResponse.json({ error: '請求格式錯誤' }, { status: 400 })
   }
   const { lines, paymentMethod } = body
-  const couponIds = Array.isArray(body.couponIds) ? body.couponIds.filter(x => typeof x === 'string') : []
 
   if (!Array.isArray(lines) || lines.length === 0) {
     return NextResponse.json({ error: 'lines 必填' }, { status: 400 })
@@ -55,14 +54,10 @@ export async function POST(req: NextRequest) {
   // JSON (not a 500 HTML page). A non-JSON 500 makes the client's .json()
   // throw and surfaces a misleading「網路錯誤，請重試」.
   try {
-    // 多租戶隔離：帶入買家租戶，每張商品都必須屬於同租戶才能下單
     const result = await createBundleOrders({
       userId: auth.userId,
-      lineUid: auth.lineUid,
       lines: cleaned,
       paymentMethod,
-      couponIds,
-      tenantAdminId: auth.tenantAdminId,
     })
 
     if (!result.ok) {

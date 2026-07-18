@@ -18,7 +18,6 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   const products = await prisma.product.findMany({
-    where: auth.tenantAdminId ? { tenantAdminId: auth.tenantAdminId } : undefined,
     select: {
       id: true,
       costPrice: true,
@@ -31,14 +30,14 @@ export async function POST(req: NextRequest) {
   // 取得供應商最新清單；失敗則整批回滾，不擅自下架
   let supplierMap: Awaited<ReturnType<typeof fetchSupplierProductMap>>
   try {
-    supplierMap = await fetchSupplierProductMap(auth.tenantAdminId)
+    supplierMap = await fetchSupplierProductMap()
   } catch (err) {
     const msg = err instanceof Error ? err.message : '無法連線至供應商'
     return NextResponse.json({ error: msg }, { status: 502 })
   }
 
-  // 毛利保護設定（per-tenant；售價跟漲與門檻補價共用同一條規則，見 lib/utils/pricing）
-  const guard = await getMarginGuard(auth.tenantAdminId)
+  // 毛利保護設定（售價跟漲與門檻補價共用同一條規則，見 lib/utils/pricing）
+  const guard = await getMarginGuard()
 
   const toDisable: { productId: string; supplierProductId: string }[] = []
   const toReprice: { productId: string; supplierProductId: string; newCost: number; newSell: number }[] = []
