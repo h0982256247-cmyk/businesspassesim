@@ -9,10 +9,7 @@ export async function GET(req: NextRequest) {
 
   const admin = await prisma.adminUser.findUnique({
     where: { id: auth.adminId },
-    select: {
-      id: true, name: true, email: true, role: true, groupId: true,
-      group: { select: { id: true, name: true } },
-    },
+    select: { id: true, name: true, email: true, role: true },
   })
 
   if (!admin) return NextResponse.json({ error: 'Not found' }, { status: 404 })

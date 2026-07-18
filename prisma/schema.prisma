@@ -28,6 +28,8 @@ model User {
 
   // 關聯
   groupMembership GroupMember? // 一人最多屬於一個企業
+  managedCompany  Group?         @relation("CompanyAdmin") // 若為某企業的管理員（在 LIFF 審核成員）
+  reviewedMembers GroupMember[]  @relation("MemberReviewer") // 我（企業管理員）審核過的成員
   orders          Order[]
   notifications   Notification[]
   savedCard       SavedCard?
@@ -46,12 +48,13 @@ model Group {
   inviteCode  String   @unique @map("invite_code") // 企業邀請碼
   inviteLink  String?  @map("invite_link")
   isActive    Boolean  @default(true) @map("is_active") // 企業本身啟用/停權（由 Super Admin 控制）
+  adminUserId String?  @unique @map("admin_user_id") // 企業管理員（LINE User，在 LIFF 審核成員；由 Super Admin 指派）
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  members GroupMember[]
-  admins  AdminUser[] // 企業管理員（後台帳號）
-  orders  Order[]
+  adminUser User?         @relation("CompanyAdmin", fields: [adminUserId], references: [id])
+  members   GroupMember[]
+  orders    Order[]
 
   @@map("groups")
 }
@@ -63,12 +66,12 @@ model GroupMember {
   status       MemberStatus @default(PENDING) // 加入需企業管理員審核
   joinedAt     DateTime     @default(now()) @map("joined_at")
   reviewedAt   DateTime?    @map("reviewed_at")
-  reviewedById String?      @map("reviewed_by_id") // 審核的 AdminUser
+  reviewedById String?      @map("reviewed_by_id") // 審核的企業管理員（User）
   leftAt       DateTime?    @map("left_at")
 
-  group      Group      @relation(fields: [groupId], references: [id])
-  user       User       @relation(fields: [userId], references: [id])
-  reviewedBy AdminUser? @relation("MemberReviewer", fields: [reviewedById], references: [id])
+  group      Group @relation(fields: [groupId], references: [id])
+  user       User  @relation(fields: [userId], references: [id])
+  reviewedBy User? @relation("MemberReviewer", fields: [reviewedById], references: [id])
 
   @@index([groupId])
   @@map("group_members")
@@ -276,7 +279,8 @@ model OrderItem {
 }
 
 // ============================================================
-// 後台帳號（Super Admin ＋ 企業管理員）
+// 後台帳號（商務通平台管理者）
+// 企業管理員不是後台帳號，而是被指派的 LINE User（Group.adminUserId），在 LIFF 操作。
 // ============================================================
 
 model AdminUser {
@@ -284,25 +288,20 @@ model AdminUser {
   email        String    @unique
   passwordHash String    @map("password_hash")
   name         String
-  role         AdminRole
-  groupId      String?   @map("group_id") // COMPANY_ADMIN 所屬企業；SUPER_ADMIN 為 null
+  role         AdminRole @default(SUPER_ADMIN)
   isActive     Boolean   @default(true) @map("is_active")
   createdById  String?   @map("created_by_id")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  group           Group?        @relation(fields: [groupId], references: [id])
-  createdBy       AdminUser?    @relation("AdminCreated", fields: [createdById], references: [id])
-  created         AdminUser[]   @relation("AdminCreated")
-  reviewedMembers GroupMember[] @relation("MemberReviewer")
+  createdBy AdminUser?  @relation("AdminCreated", fields: [createdById], references: [id])
+  created   AdminUser[] @relation("AdminCreated")
 
-  @@index([groupId])
   @@map("admin_users")
 }
 
 enum AdminRole {
   SUPER_ADMIN // 商務通平台管理者
-  COMPANY_ADMIN // 企業管理員
 
   @@map("admin_role")
 }

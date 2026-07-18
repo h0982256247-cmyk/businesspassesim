@@ -8,11 +8,8 @@ export async function GET(req: NextRequest) {
   const auth = await requirePlatformAuth(req)
   if (auth instanceof NextResponse) return auth
 
-  // 企業管理員只看自己企業的待審成員；Super Admin 看全部
-  const groupScope = auth.role === 'COMPANY_ADMIN' && auth.groupId ? { groupId: auth.groupId } : {}
-
   const [pendingMembers, paidOrders] = await Promise.all([
-    prisma.groupMember.count({ where: { status: MemberStatus.PENDING, leftAt: null, ...groupScope } }),
+    prisma.groupMember.count({ where: { status: MemberStatus.PENDING, leftAt: null } }),
     prisma.order.count({ where: { status: OrderStatus.PAID } }),
   ])
 

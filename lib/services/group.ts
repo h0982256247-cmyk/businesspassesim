@@ -139,37 +139,69 @@ export async function getCompanyMembers(groupId: string, status?: MemberStatus) 
   })
 }
 
-// 審核：企業管理員只能審自己企業（groupId 需與成員所屬企業相符）；adminId 記錄審核人。
-async function reviewMember(userId: string, groupId: string, adminId: string, approve: boolean) {
+// 驗證 actingUserId 是 targetUser 所屬企業的管理員（Group.adminUserId）。
+// 企業管理員在 LIFF 操作，用 LIFF session 的 userId 當 actingUserId。
+async function assertCompanyAdmin(actingUserId: string, targetUserId: string) {
   const membership = await prisma.groupMember.findUnique({
-    where: { userId },
-    select: { groupId: true, leftAt: true, group: { select: { name: true } } },
+    where: { userId: targetUserId },
+    select: { groupId: true, leftAt: true, group: { select: { name: true, adminUserId: true } } },
   })
   if (!membership || membership.leftAt) throw new Error('找不到此成員')
-  if (membership.groupId !== groupId) throw new Error('無權審核此成員')
+  if (membership.group.adminUserId !== actingUserId) throw new Error('無權操作此成員')
+  return membership
+}
+
+async function reviewMember(actingUserId: string, targetUserId: string, approve: boolean) {
+  const membership = await assertCompanyAdmin(actingUserId, targetUserId)
 
   const updated = await prisma.groupMember.update({
-    where: { userId },
+    where: { userId: targetUserId },
     data: {
       status: approve ? MemberStatus.APPROVED : MemberStatus.REJECTED,
       reviewedAt: new Date(),
-      reviewedById: adminId,
+      reviewedById: actingUserId,
     },
   })
 
   const companyName = membership.group.name
-  if (approve) notifyMemberApproved(userId, companyName).catch(() => {})
-  else notifyMemberRejected(userId, companyName).catch(() => {})
+  if (approve) notifyMemberApproved(targetUserId, companyName).catch(() => {})
+  else notifyMemberRejected(targetUserId, companyName).catch(() => {})
 
   return updated
 }
 
-export async function approveMember(userId: string, groupId: string, adminId: string) {
-  return reviewMember(userId, groupId, adminId, true)
+export async function approveMember(actingUserId: string, targetUserId: string) {
+  return reviewMember(actingUserId, targetUserId, true)
 }
 
-export async function rejectMember(userId: string, groupId: string, adminId: string) {
-  return reviewMember(userId, groupId, adminId, false)
+export async function rejectMember(actingUserId: string, targetUserId: string) {
+  return reviewMember(actingUserId, targetUserId, false)
+}
+
+// 移除成員（企業管理員）：標記離開，該員恢復成一般會員（看一般售價）
+export async function removeMember(actingUserId: string, targetUserId: string) {
+  await assertCompanyAdmin(actingUserId, targetUserId)
+  return prisma.groupMember.update({ where: { userId: targetUserId }, data: { leftAt: new Date() } })
+}
+
+// LIFF company-admin 頁：取某 LINE User 管理的企業 + 成員清單（PENDING 在前）
+export async function getManagedCompany(actingUserId: string) {
+  const company = await prisma.group.findUnique({
+    where: { adminUserId: actingUserId },
+    select: { id: true, name: true, description: true, inviteCode: true, isActive: true },
+  })
+  if (!company) return null
+  const members = await prisma.groupMember.findMany({
+    where: { groupId: company.id, leftAt: null },
+    include: { user: { select: { id: true, displayName: true, avatarUrl: true, createdAt: true } } },
+    orderBy: [{ status: 'asc' }, { joinedAt: 'desc' }],
+  })
+  return { company, members }
+}
+
+// Super Admin 後台：指派 / 變更企業管理員（傳 LINE User id；null 為取消指派）
+export async function setCompanyAdmin(groupId: string, adminUserId: string | null) {
+  return prisma.group.update({ where: { id: groupId }, data: { adminUserId } })
 }
 
 // ─── 查詢 ────────────────────────────────────────────────────────

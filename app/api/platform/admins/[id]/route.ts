@@ -18,10 +18,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await prisma.adminUser.findUnique({
     where: { id },
-    select: {
-      id: true, email: true, name: true, role: true, isActive: true, createdAt: true,
-      groupId: true, group: { select: { id: true, name: true } },
-    },
+    select: { id: true, email: true, name: true, role: true, isActive: true, createdAt: true },
   })
 
   if (!admin) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -47,12 +44,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   if (body.newPassword) {
     await updateAdminPassword(id, body.newPassword)
-    return NextResponse.json({ ok: true })
-  }
-
-  // 重新指派企業管理員所屬企業
-  if (body.groupId !== undefined) {
-    await prisma.adminUser.update({ where: { id }, data: { groupId: body.groupId || null } })
     return NextResponse.json({ ok: true })
   }
 

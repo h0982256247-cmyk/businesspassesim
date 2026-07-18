@@ -7,7 +7,7 @@ import { Prisma, AdminRole, MemberStatus } from '@prisma/client'
 export async function verifyAdminCredentials(email: string, password: string) {
   const admin = await prisma.adminUser.findUnique({
     where: { email },
-    select: { id: true, email: true, passwordHash: true, name: true, role: true, isActive: true, groupId: true },
+    select: { id: true, email: true, passwordHash: true, name: true, role: true, isActive: true },
   })
 
   if (!admin || !admin.isActive) return null
@@ -15,17 +15,16 @@ export async function verifyAdminCredentials(email: string, password: string) {
   const valid = await bcrypt.compare(password, admin.passwordHash)
   if (!valid) return null
 
-  return { id: admin.id, email: admin.email, name: admin.name, role: admin.role, groupId: admin.groupId }
+  return { id: admin.id, email: admin.email, name: admin.name, role: admin.role }
 }
 
-// ─── 建立帳號（Super Admin 建 Super Admin / 企業管理員）──────────────
+// ─── 建立後台帳號（Super Admin）──────────────────────────────────
+// 企業管理員不是後台帳號，改由 Super Admin 指派 LINE User（Group.adminUserId），在 LIFF 操作。
 
 export interface CreateAdminInput {
   email: string
   password: string
   name: string
-  role: AdminRole
-  groupId?: string | null   // COMPANY_ADMIN 綁定的企業
   createdById?: string
 }
 
@@ -36,8 +35,7 @@ export async function createAdmin(input: CreateAdminInput) {
       email: input.email,
       passwordHash,
       name: input.name,
-      role: input.role,
-      groupId: input.role === AdminRole.COMPANY_ADMIN ? (input.groupId ?? null) : null,
+      role: AdminRole.SUPER_ADMIN,
       createdById: input.createdById,
     },
   })
@@ -63,8 +61,7 @@ export async function getAllAdmins() {
     orderBy: { createdAt: 'asc' },
     select: {
       id: true, email: true, name: true, role: true,
-      isActive: true, createdAt: true, groupId: true,
-      group: { select: { name: true } },
+      isActive: true, createdAt: true,
     },
   })
 }

@@ -23,11 +23,10 @@ export async function POST(req: NextRequest) {
   const token = await createPlatformSession({
     adminId: admin.id,
     role: admin.role,
-    groupId: admin.groupId,   // COMPANY_ADMIN 綁定的企業；SUPER_ADMIN 為 null
   })
 
   const res = NextResponse.json({
-    admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, groupId: admin.groupId },
+    admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
   })
 
   res.cookies.set(PLATFORM_COOKIE, token, {

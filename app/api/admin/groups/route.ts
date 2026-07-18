@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
-import { getAllCompanies, createCompany, getCompanyById } from '@/lib/services/group'
+import { getAllCompanies, createCompany } from '@/lib/services/group'
 
-// GET /api/admin/groups — 企業列表。SUPER_ADMIN 看全部；COMPANY_ADMIN 只看自己企業。
+// GET /api/admin/groups — 企業列表（Super Admin 後台）
 export async function GET(req: NextRequest) {
   const auth = await requirePlatformAuth(req)
   if (auth instanceof NextResponse) return auth
-
-  if (auth.role === 'COMPANY_ADMIN') {
-    const company = auth.groupId ? await getCompanyById(auth.groupId) : null
-    return NextResponse.json({ companies: company ? [company] : [] })
-  }
 
   const companies = await getAllCompanies()
   return NextResponse.json({ companies })
