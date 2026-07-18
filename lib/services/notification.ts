@@ -1,27 +1,19 @@
 import { prisma } from '@/lib/db/prisma'
 import { NotificationType } from '@prisma/client'
-import { safeDecrypt } from '@/lib/utils/crypto'
 
 // ─── LINE Messaging API Push Message ─────────────────────────────
+// 單一品牌：LINE OA access token 與品牌設定一律取自 env（原白標版是 per-tenant）。
 
-async function getLineToken(tenantAdminId?: string | null): Promise<string> {
-  if (tenantAdminId) {
-    const admin = await prisma.platformAdmin.findUnique({
-      where: { id: tenantAdminId },
-      select: { lineAccessToken: true },
-    })
-    if (admin?.lineAccessToken) return safeDecrypt(admin.lineAccessToken)
-  }
+function getLineToken(): string {
   return process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
 }
 
 async function sendLineMessage(
   lineUid: string,
   text: string,
-  tenantAdminId?: string | null,
   extra?: { button?: { label: string; uri: string }; flex?: object },
 ): Promise<void> {
-  const token = await getLineToken(tenantAdminId)
+  const token = getLineToken()
   if (!token) return // 金鑰未設定時靜默跳過
 
   const altText = (text.split('\n')[0] || 'eSIM 通知').slice(0, 400)
@@ -51,24 +43,14 @@ async function sendLineMessage(
 }
 
 // ─── Flex Message 版型 ────────────────────────────────────────────
-// 品牌主色缺省值：租戶未設 primaryColor 時的 fallback（與 LIFF 預設主色一致）。
+// 品牌主色：單一品牌，取 env（未設用預設）。
 const DEFAULT_PRIMARY = '#635BFF'
 
-// 取租戶品牌資訊：主色（header/按鈕用）＋ liffId（深連結用）。env 只當 fallback。
-async function getTenantBrand(
-  tenantAdminId?: string | null,
-): Promise<{ primaryColor: string; liffId: string | null }> {
-  let primaryColor = DEFAULT_PRIMARY
-  let liffId: string | null = null
-  if (tenantAdminId) {
-    const admin = await prisma.platformAdmin.findUnique({
-      where: { id: tenantAdminId },
-      select: { primaryColor: true, liffId: true },
-    })
-    if (admin?.primaryColor) primaryColor = admin.primaryColor
-    liffId = admin?.liffId ?? null
+function getBrand(): { primaryColor: string; liffId: string | null } {
+  return {
+    primaryColor: process.env.NEXT_PUBLIC_BRAND_COLOR || DEFAULT_PRIMARY,
+    liffId: process.env.NEXT_PUBLIC_LIFF_ID || null,
   }
-  return { primaryColor, liffId }
 }
 
 // 品牌色 header：小 label（半透明白）＋ 大標題（白）。
@@ -194,11 +176,6 @@ function buildOrderPaidFlex(opts: {
 }
 
 // 付款成功訊息的「訂單內容」區塊：同方案合併計量。
-//   單一方案 → 內嵌一行「訂單：日本 5天 總量3GB（2 張）」
-//   多方案   → 條列，header 帶總張數，避免擠成一團：
-//     訂單內容（共 2 張）
-//     ・日本 5天 總量3GB ×1
-//     ・日本 5天 總量5GB ×1
 export function formatPaidItemsBlock(items: { productName: string; qty: number }[]): string {
   const map = new Map<string, number>()
   for (const it of items) {
@@ -220,9 +197,6 @@ export function formatPaidItemsBlock(items: { productName: string; qty: number }
 
 function buildMessage(type: NotificationType, data: Record<string, string>): string {
   switch (type) {
-    case NotificationType.COUPON_ISSUED:
-      return `🎫 你收到一張新優惠券！\n折扣：${data.discount}\n類型：${data.typeName}\n立即開啟 App 查看`
-
     case NotificationType.ORDER_PAID:
       return `✅ 付款成功！\n${data.itemsBlock}\n金額：NT$${data.amount}\n正在為你準備 eSIM 啟動碼…`
 
@@ -232,17 +206,11 @@ function buildMessage(type: NotificationType, data: Record<string, string>): str
     case NotificationType.ORDER_ESIM_PENDING:
       return `⏳ eSIM 啟動碼準備中\n${data.productName}\n系統正在處理，完成後會再通知你。如超過 30 分鐘請聯繫客服。`
 
-    case NotificationType.COMMISSION_SETTLED:
-      return `💰 分潤已結算！\n期間：${data.period}\n金額：NT$${data.amount}\n請至社群主後台查看詳情。`
+    case NotificationType.MEMBER_APPROVED:
+      return `🎉 你加入企業「${data.companyName}」的申請已通過！\n現在起購買 eSIM 可享企業福利價。`
 
-    case NotificationType.GROUP_APPROVED:
-      return `🎉 恭喜！你的社群「${data.groupName}」已通過審核。\n現在可以開始邀請成員，享有分潤收益！`
-
-    case NotificationType.GROUP_REJECTED:
-      return `😔 你的社群申請「${data.groupName}」未通過審核。\n如有疑問請聯繫客服。`
-
-    case NotificationType.GIFT_CLAIMED:
-      return `🎁 ${data.recipientName} 已接受你轉贈的 eSIM\n商品：${data.productName}\n感謝你的分享！`
+    case NotificationType.MEMBER_REJECTED:
+      return `😔 你加入企業「${data.companyName}」的申請未通過。\n如有疑問請聯繫企業管理員。`
 
     default:
       return data.content ?? ''
@@ -256,7 +224,6 @@ export interface SendNotificationInput {
   type: NotificationType
   data: Record<string, string>
   title?: string
-  tenantAdminId?: string | null
   button?: { label: string; uri: string }   // LINE 訊息下方可選按鈕（如「前往我的 eSIM」）
   flex?: object                              // 提供時改送 Flex 卡片（altText 仍用 content 首行）
 }
@@ -283,7 +250,7 @@ export async function sendNotification(input: SendNotificationInput): Promise<vo
   })
 
   // 推送 LINE 訊息（非同步，失敗不影響主流程）
-  sendLineMessage(user.lineUid, content, input.tenantAdminId, {
+  sendLineMessage(user.lineUid, content, {
     button: input.button,
     flex: input.flex,
   }).catch(() => {})
@@ -295,9 +262,8 @@ export async function notifyOrderPaid(
   userId: string,
   items: { productName: string; qty: number }[],
   amount: number,
-  tenantAdminId?: string | null,
 ) {
-  const { primaryColor, liffId } = await getTenantBrand(tenantAdminId)
+  const { primaryColor, liffId } = getBrand()
   const buttonUri = liffId ? `https://liff.line.me/${liffId}/orders` : undefined
   const itemsBlock = formatPaidItemsBlock(items)
   const flex = buildOrderPaidFlex({ primaryColor, itemsBlock, amount: String(amount), buttonUri })
@@ -305,7 +271,6 @@ export async function notifyOrderPaid(
     userId,
     type: NotificationType.ORDER_PAID,
     data: { itemsBlock, amount: String(amount) },
-    tenantAdminId,
     flex,
   })
 }
@@ -314,12 +279,9 @@ export async function notifyOrderPaid(
 export async function notifyEsimReady(
   userId: string,
   productName: string,
-  tenantAdminId?: string | null,
   plan?: { country?: string | null; days?: number | null; capacity?: string | null },
 ) {
-  // 深連結到租戶 LIFF 的訂單列表：LIFF endpoint 為 /liff/<slug>，
-  // 故 https://liff.line.me/<liffId>/orders 會開到列表頁。
-  const { primaryColor, liffId } = await getTenantBrand(tenantAdminId)
+  const { primaryColor, liffId } = getBrand()
   const buttonUri = liffId ? `https://liff.line.me/${liffId}/orders` : undefined
   const country = plan?.country || productName
   const planLine =
@@ -329,62 +291,31 @@ export async function notifyEsimReady(
     userId,
     type: NotificationType.ORDER_ESIM_READY,
     data: { productName },
-    tenantAdminId,
     flex,
   })
 }
 
-export async function notifyEsimPending(userId: string, productName: string, tenantAdminId?: string | null) {
+export async function notifyEsimPending(userId: string, productName: string) {
   await sendNotification({
     userId,
     type: NotificationType.ORDER_ESIM_PENDING,
     data: { productName },
-    tenantAdminId,
   })
 }
 
-export async function notifyCouponIssued(userId: string, discount: number, typeName: string, tenantAdminId?: string | null) {
-  const pct = Math.round((1 - discount) * 100)
+// 企業加入審核結果通知（企業管理員審核成員後呼叫）
+export async function notifyMemberApproved(userId: string, companyName: string) {
   await sendNotification({
     userId,
-    type: NotificationType.COUPON_ISSUED,
-    data: { discount: `${pct}% OFF`, typeName },
-    tenantAdminId,
+    type: NotificationType.MEMBER_APPROVED,
+    data: { companyName },
   })
 }
 
-export async function notifyGroupApproved(userId: string, groupName: string, tenantAdminId?: string | null) {
+export async function notifyMemberRejected(userId: string, companyName: string) {
   await sendNotification({
     userId,
-    type: NotificationType.GROUP_APPROVED,
-    data: { groupName },
-    tenantAdminId,
-  })
-}
-
-export async function notifyGroupRejected(userId: string, groupName: string, tenantAdminId?: string | null) {
-  await sendNotification({
-    userId,
-    type: NotificationType.GROUP_REJECTED,
-    data: { groupName },
-    tenantAdminId,
-  })
-}
-
-export async function notifyGiftClaimed(senderUserId: string, recipientName: string, productName: string, tenantAdminId?: string | null) {
-  await sendNotification({
-    userId: senderUserId,
-    type: NotificationType.GIFT_CLAIMED,
-    data: { recipientName, productName },
-    tenantAdminId,
-  })
-}
-
-export async function notifyCommissionSettled(userId: string, period: string, amount: number, tenantAdminId?: string | null) {
-  await sendNotification({
-    userId,
-    type: NotificationType.COMMISSION_SETTLED,
-    data: { period, amount: String(amount) },
-    tenantAdminId,
+    type: NotificationType.MEMBER_REJECTED,
+    data: { companyName },
   })
 }
