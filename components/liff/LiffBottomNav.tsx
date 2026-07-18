@@ -53,7 +53,7 @@ function IconAdmin({ size = 20 }: { size?: number }) {
   )
 }
 
-const ADMIN_PATH = 'group-admin'
+const ADMIN_PATH = 'company-admin'
 
 // 這些頁面有自己的底部操作列（確認付款／送出等），底部分頁導覽會疊在按鈕上、
 // 把按鈕蓋住（看起來像破圖／按不到），所以在這些流程中隱藏分頁導覽。
@@ -68,7 +68,7 @@ const TABS: TabDef[] = [
   { path: 'profile',  label: '個人',  Icon: IconProfile },
 ]
 
-const ADMIN_TAB: TabDef = { path: ADMIN_PATH, label: '後台', Icon: IconAdmin, ownerOnly: true }
+const ADMIN_TAB: TabDef = { path: ADMIN_PATH, label: '管理', Icon: IconAdmin, ownerOnly: true }
 
 function useBasePath() {
   const pathname = usePathname()
@@ -81,13 +81,13 @@ export default function LiffBottomNav() {
   const pathname = usePathname()
   const base = useBasePath()
   const C = useTenantColors()
-  const [isGroupOwner, setIsGroupOwner] = useState(false)
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
   const navRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.ownedGroup?.status === 'APPROVED') setIsGroupOwner(true) })
+    // 企業管理員（被指派為某企業的 Group.adminUserId）才顯示「管理」分頁。
+    fetch('/api/company-admin')
+      .then(r => { if (r.ok) setIsCompanyAdmin(true) })
       .catch(() => {})
   }, [])
 
@@ -112,7 +112,7 @@ export default function LiffBottomNav() {
     }
   }, [])
 
-  const tabs = isGroupOwner ? [...TABS, ADMIN_TAB] : TABS
+  const tabs = isCompanyAdmin ? [...TABS, ADMIN_TAB] : TABS
 
   // 結帳／付款等流程隱藏底部分頁導覽，避免蓋住頁面自己的操作按鈕
   if (HIDE_ON.some(p => pathname.includes(p))) return null
