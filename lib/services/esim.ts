@@ -26,15 +26,11 @@ function wmFetchInit(apiUrl: string, init: RequestInit): RequestInit {
   return { ...init, dispatcher: wmInsecureAgent } as RequestInit
 }
 
-async function getWmConfig(tenantAdminId?: string | null) {
-  if (tenantAdminId) {
-    const cfg = await getEsimConfig(tenantAdminId)  // token 已解密
-    if (cfg && cfg.isActive) {
-      return { apiUrl: cfg.apiUrl, merchantId: cfg.merchantId, deptId: cfg.deptId, token: cfg.token }
-    }
-    // 指定了租戶卻查無啟用設定 → 明確報錯，不退回平台全域 env（避免漏設定的白牌
-    // 靜默用平台的世界移動帳號發卡）。env fallback 只給「無租戶」的單租戶/開發情境。
-    throw new Error('此商店尚未設定 eSIM 供應商（世界移動），請至後台「eSIM 設定」填寫')
+// 單一品牌：世界移動設定取自全域 EsimConfig（singleton），未設定則退回 env（開發用）。
+async function getWmConfig() {
+  const cfg = await getEsimConfig()  // token 已解密
+  if (cfg && cfg.isActive) {
+    return { apiUrl: cfg.apiUrl, merchantId: cfg.merchantId, deptId: cfg.deptId, token: cfg.token }
   }
 
   const apiUrl = process.env.NODE_ENV === 'production'
@@ -48,8 +44,8 @@ async function getWmConfig(tenantAdminId?: string | null) {
   return { apiUrl, merchantId, deptId, token }
 }
 
-async function wmPost(endpoint: string, payload: object, tenantAdminId?: string | null): Promise<unknown> {
-  const { apiUrl, merchantId, deptId, token } = await getWmConfig(tenantAdminId)
+async function wmPost(endpoint: string, payload: object): Promise<unknown> {
+  const { apiUrl, merchantId, deptId, token } = await getWmConfig()
   const body = JSON.stringify(payload)
   const sign = buildWmSignature(merchantId, deptId, token, body)
 
@@ -88,9 +84,9 @@ interface WmEsimResult {
   activationEnd?: Date
 }
 
-async function fetchEsimCodes(wmOrderId: string, tenantAdminId?: string | null): Promise<WmEsimResult | null> {
+async function fetchEsimCodes(wmOrderId: string): Promise<WmEsimResult | null> {
   try {
-    const data = await wmPost('/api/order/esim/query', { orderId: wmOrderId }, tenantAdminId) as Record<string, unknown>
+    const data = await wmPost('/api/order/esim/query', { orderId: wmOrderId }) as Record<string, unknown>
 
     if (!data || data.code !== '0000') return null
 
@@ -128,7 +124,7 @@ async function fetchEsimCodes(wmOrderId: string, tenantAdminId?: string | null):
 // 為什麼 systemMail=false：我們透過 LIFF 自己給用戶看 QR，不需要 WM 寄信。
 // 但 email 欄位仍是必填（WM 要求），用戶 email 解密後傳入；無 email 則用 lineUid 組 placeholder。
 
-async function placeWmOrder(orderId: string, tenantAdminId?: string | null): Promise<string | null> {
+async function placeWmOrder(orderId: string): Promise<string | null> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: {
@@ -137,7 +133,7 @@ async function placeWmOrder(orderId: string, tenantAdminId?: string | null): Pro
     },
   })
   if (!order || !order.orderItems[0]) {
-    await recordAlert('wm_order_no_item', { orderId, tenantAdminId })
+    await recordAlert('wm_order_no_item', { orderId })
     return null
   }
 
@@ -145,7 +141,7 @@ async function placeWmOrder(orderId: string, tenantAdminId?: string | null): Pro
   const wmproductId = item.product.supplierProduct?.wmProductId
   if (!wmproductId) {
     // 商品沒對到世界移動 wmProductId（如假 SKU / 未同步）→ 付款成功卻開不了卡，必須告警
-    await recordAlert('wm_order_no_wmproductid', { orderId, tenantAdminId, productId: item.productId })
+    await recordAlert('wm_order_no_wmproductid', { orderId, productId: item.productId })
     return null
   }
 
@@ -155,7 +151,7 @@ async function placeWmOrder(orderId: string, tenantAdminId?: string | null): Pro
     ? safeDecrypt(rawEmail)
     : `${order.user.lineUid}@noreply.local`
 
-  const { apiUrl, merchantId, deptId, token } = await getWmConfig(tenantAdminId)
+  const { apiUrl, merchantId, deptId, token } = await getWmConfig()
   const qty = item.qty
   const prodList = [{ wmproductId, qty }]
 
@@ -179,7 +175,7 @@ async function placeWmOrder(orderId: string, tenantAdminId?: string | null): Pro
     if (!res.ok || !data || data.code !== 0) {
       // 付款成功卻 WM 下單失敗（最該被看到的狀況）→ 告警，後台儀表板會跳紅
       await recordAlert('wm_order_failed', {
-        orderId, tenantAdminId, wmProductId: wmproductId,
+        orderId, wmProductId: wmproductId,
         httpStatus: res.status,
         wmCode: data?.code ?? null,
         wmMsg: (data?.msg ?? data?.message ?? null) as string | null,
@@ -189,7 +185,7 @@ async function placeWmOrder(orderId: string, tenantAdminId?: string | null): Pro
     return (data.orderId as string) ?? null
   } catch (err) {
     await recordAlert('wm_order_exception', {
-      orderId, tenantAdminId, wmProductId: wmproductId,
+      orderId, wmProductId: wmproductId,
       error: err instanceof Error ? err.message : String(err),
     })
     return null
@@ -205,13 +201,6 @@ export async function triggerEsimRedemption(orderId: string): Promise<{ ok: bool
       id: true, status: true,
       esimRcode: true, esimQrcode: true,
       redeemedAt: true, activatedAt: true,
-      user: {
-        select: {
-          tenantAdminId: true,
-          groupMembership: { select: { group: { select: { tenantAdminId: true } } } },
-          ownedGroup:      { select: { tenantAdminId: true } },
-        },
-      },
     },
   })
   if (!order)                  return { ok: false, reason: '訂單不存在' }
@@ -223,15 +212,7 @@ export async function triggerEsimRedemption(orderId: string): Promise<{ ok: bool
   // redeemedAt 已設但 QR 未到 → 視為已觸發過，等 callback；前端會 polling
   if (order.redeemedAt)        return { ok: true }
 
-  // 直接租戶用戶（user.tenantAdminId）優先；社群成員/社群主再 fallback。
-  // 過去只看 group → 非社群的一般租戶用戶 tenantAdminId 永遠 null、getWmConfig
-  // 找不到租戶 WM 設定 → placeWmOrder throw、eSIM 發不出。與 payment-config 一致。
-  const tenantAdminId = order.user.tenantAdminId
-    ?? order.user.groupMembership?.group.tenantAdminId
-    ?? order.user.ownedGroup?.tenantAdminId
-    ?? null
-
-  const { apiUrl, merchantId, token } = await getWmConfig(tenantAdminId)
+  const { apiUrl, merchantId, token } = await getWmConfig()
   const qrcodeType = 2   // 0=URL, 1=文字, 2=兩者
   const rcode = order.esimRcode
 
@@ -250,18 +231,10 @@ export async function triggerEsimRedemption(orderId: string): Promise<{ ok: bool
     const data = await res.json() as Record<string, unknown>
     if (data.code !== 0) return { ok: false, reason: (data.msg as string) ?? '兌換失敗' }
 
-    // 標記 redeemedAt（鎖死轉贈；3.2 callback 之後會補上 QR/LPA）
-    // 同時若有 pending 未領取的 gift 自動取消（避免領了卻領到已 redeem 的卡）
-    const now = new Date()
-    await prisma.$transaction(async tx => {
-      await tx.order.update({
-        where: { id: orderId },
-        data: { redeemedAt: now },
-      })
-      await tx.orderGift.updateMany({
-        where: { orderId, claimedAt: null, cancelledAt: null },
-        data: { cancelledAt: now, cancelReason: 'buyer_redeemed' },
-      })
+    // 標記 redeemedAt（3.2 callback 之後會補上 QR/LPA）
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { redeemedAt: new Date() },
     })
     return { ok: true }
   } catch (err) {
@@ -278,13 +251,6 @@ export async function triggerEsimActivation(orderId: string): Promise<void> {
       userId: true,
       wmOrderId: true,
       orderItems: { select: { productName: true } },
-      user: {
-        select: {
-          tenantAdminId: true,
-          groupMembership: { select: { group: { select: { tenantAdminId: true } } } },
-          ownedGroup: { select: { tenantAdminId: true } },
-        },
-      },
     },
   })
   // 冪等守門：已下過供應商單（wmOrderId 已存在）就直接略過，避免並發 webhook /
@@ -293,21 +259,16 @@ export async function triggerEsimActivation(orderId: string): Promise<void> {
   if (orderInfo?.wmOrderId) return
   const userId = orderInfo?.userId ?? ''
   const productName = orderInfo?.orderItems[0]?.productName ?? 'eSIM'
-  // 直接租戶用戶優先（見 triggerEsimRedemption 同款修正）
-  const tenantAdminId = orderInfo?.user?.tenantAdminId
-    ?? orderInfo?.user?.groupMembership?.group?.tenantAdminId
-    ?? orderInfo?.user?.ownedGroup?.tenantAdminId
-    ?? null
 
   // 只負責下單，等 WM 推 2.5 callback 完成餘下流程
-  const wmOrderId = await placeWmOrder(orderId, tenantAdminId)
+  const wmOrderId = await placeWmOrder(orderId)
   if (!wmOrderId) {
     // 下單失敗：訂單維持 PAID（付款成功但尚未發卡），不再轉成 ESIM_PENDING。
     // ⚠ 不要靜默：印出 log（Vercel 可見），訂單留在「PAID 且無 esimRcode」可被
     // retry cron / 後台補發撈到。這段過去靜默吞錯，是「付款成功卻沒收到 eSIM」
     // 最難 debug 的主因。
     console.error('[esim] placeWmOrder 失敗，訂單維持 PAID 待重試', { orderId })
-    notifyEsimPending(userId, productName, tenantAdminId).catch(() => {})
+    notifyEsimPending(userId, productName).catch(() => {})
     return
   }
 
@@ -329,9 +290,9 @@ export interface EsimUsage {
   unit: string         // 'MB' | 'GB'
 }
 
-export async function queryEsimUsage(iccid: string, tenantAdminId?: string | null): Promise<EsimUsage | null> {
+export async function queryEsimUsage(iccid: string): Promise<EsimUsage | null> {
   try {
-    const data = await wmPost('/api/esim/usage', { iccid }, tenantAdminId) as Record<string, unknown>
+    const data = await wmPost('/api/esim/usage', { iccid }) as Record<string, unknown>
     if (!data || data.code !== '0000') return null
 
     const d = data.data as Record<string, unknown>
@@ -374,8 +335,8 @@ export type SupplierProductMap = Map<string, SupplierProductInfo>
  * 向世界移動取得所有可購買方案清單，回傳以 wmproductId 為 key 的 Map。
  * 一次呼叫取回全部，供呼叫端批次比對，請勿逐筆觸發。
  */
-export async function fetchSupplierProductMap(tenantAdminId?: string | null): Promise<SupplierProductMap> {
-  const { apiUrl, merchantId, token } = await getWmConfig(tenantAdminId)
+export async function fetchSupplierProductMap(): Promise<SupplierProductMap> {
+  const { apiUrl, merchantId, token } = await getWmConfig()
   // 此端點簽章只用 merchantId + token，不帶 deptId 也不帶 body
   const encStr = crypto.createHash('sha1').update(merchantId + token).digest('hex')
 
@@ -425,25 +386,11 @@ export async function fetchSupplierProductMap(tenantAdminId?: string | null): Pr
 export async function retryEsimActivation(orderId: string): Promise<void> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: {
-      wmOrderId: true,
-      user: {
-        select: {
-          tenantAdminId: true,
-          groupMembership: { select: { group: { select: { tenantAdminId: true } } } },
-          ownedGroup: { select: { tenantAdminId: true } },
-        },
-      },
-    },
+    select: { wmOrderId: true },
   })
 
   if (order?.wmOrderId) {
-    // 直接租戶用戶優先（否則 fetchEsimCodes 走 env fallback、找不到租戶 WM 設定）
-    const tenantAdminId = order.user?.tenantAdminId
-      ?? order.user?.groupMembership?.group?.tenantAdminId
-      ?? order.user?.ownedGroup?.tenantAdminId
-      ?? null
-    const esimData = await fetchEsimCodes(order.wmOrderId, tenantAdminId)
+    const esimData = await fetchEsimCodes(order.wmOrderId)
     if (esimData) {
       await markOrderCompleted(orderId, esimData)
       return
@@ -484,7 +431,7 @@ export async function retryStuckEsimActivations(limit = 20): Promise<{
     },
     orderBy: { paidAt: 'asc' },
     take: limit,
-    select: { id: true, retryCount: true, user: { select: { tenantAdminId: true } } },
+    select: { id: true, retryCount: true },
   })
 
   let retried = 0, completed = 0, exhausted = 0
@@ -502,12 +449,11 @@ export async function retryStuckEsimActivations(limit = 20): Promise<{
     if (claim.count !== 1) continue   // 已被別的 runner 搶走或狀態已變 → 跳過
     retried++
 
-    const tenantAdminId = o.user?.tenantAdminId ?? null
     try {
       await retryEsimActivation(o.id)
     } catch (err) {
       await recordAlert('esim_retry_exception', {
-        orderId: o.id, tenantAdminId,
+        orderId: o.id,
         error: err instanceof Error ? err.message : String(err),
       })
     }
@@ -520,11 +466,10 @@ export async function retryStuckEsimActivations(limit = 20): Promise<{
       // 不再 < maxRetries 而被排除，不會重複告警。
       exhausted++
       await recordAlert('esim_activation_exhausted', {
-        orderId: o.id, tenantAdminId, retryCount: o.retryCount + 1, level: 'error',
+        orderId: o.id, retryCount: o.retryCount + 1, level: 'error',
       })
     }
   }
 
   return { scanned: candidates.length, retried, completed, exhausted }
 }
-
