@@ -7,7 +7,6 @@ import { useLiffBase } from '@/hooks/useLiffBase'
 import { redirectToPaymentUrl } from '@/lib/utils/payment-redirect'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { useLiff } from '@/components/liff/LiffProvider'
-import { findBestCouponCombo as _findBestCouponCombo } from '@/lib/utils/coupon-combo'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { useCart } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
@@ -64,8 +63,8 @@ const TYPE_LABEL: Record<string, string> = {
   GROUP_ACTIVITY:   '活動券',
 }
 
-// 使用共用版本
-const findBestCouponCombo = _findBestCouponCombo
+// 券系統已移除：無折扣 stub（券相關 UI 於 Phase 5 前端一併清除）。
+const findBestCouponCombo = (_coupons: unknown[], _price: number): string[] => []
 
 // 多張結帳：把總折扣按各筆原價比例攤回每一張（最大餘數法，與後端 allocateDiscountByWeight
 // 同邏輯），讓上方每張預覽也能顯示折後價；加總必等於總折扣。
