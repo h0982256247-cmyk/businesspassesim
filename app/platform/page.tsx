@@ -231,7 +231,6 @@ export default function PlatformDashboard() {
   const setupSteps = [
     { label: '匯入商品',   done: stats.totalProducts > 0,   href: '/platform/products', cta: '前往匯入' },
     { label: '建立企業',   done: stats.totalCompanies > 0,  href: '/platform/groups',   cta: '前往建立' },
-    { label: '設定金流',   done: stats.paymentConfigured,   href: '/platform/liff',     cta: '前往設定' },
   ]
   const setupDone = setupSteps.filter(s => s.done).length
   const showSetup = !isSuper && setupDone < setupSteps.length

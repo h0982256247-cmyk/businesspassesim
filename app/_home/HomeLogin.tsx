@@ -121,10 +121,10 @@ function HomeLoginInner() {
           </form>
         </div>
 
-        {/* 社群主登入導引 — 沒 email/password，要從 LINE 開 LIFF 進入 */}
+        {/* 企業管理員導引 — 走 LINE LIFF，非此後台（此後台為商務通平台管理者用） */}
         <div className="mt-4 bg-white/70 border border-slate-200 rounded-xl p-4 text-xs text-slate-500 leading-relaxed text-center">
-          <p className="font-semibold text-slate-700 mb-1">社群主後台？</p>
-          <p>請在 LINE 內開啟你的品牌 LIFF，登入後從底部「後台」進入。</p>
+          <p className="font-semibold text-slate-700 mb-1">企業管理員？</p>
+          <p>請在 LINE 內開啟商務通 LIFF，登入後從底部「管理」分頁審核成員。</p>
         </div>
       </div>
     </div>
