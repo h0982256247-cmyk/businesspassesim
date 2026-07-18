@@ -310,10 +310,19 @@ enum AdminRole {
 // 全域設定與整合（單一品牌，取代原白牌 per-tenant 設定）
 // ============================================================
 
-// 單列設定表；benefitMarkupRate = 福利價預設倍率（PRD 五：成本×1.5）
+// 單列全域設定：福利價倍率 + 品牌 + 網域（後台「系統設定」可改）。
 model PlatformSetting {
   id                String   @id @default("singleton")
   benefitMarkupRate Decimal  @default(1.50) @map("benefit_markup_rate") @db.Decimal(4, 2)
+  // 品牌
+  brandName         String?  @map("brand_name")
+  logoUrl           String?  @map("logo_url")
+  primaryColor      String?  @map("primary_color")
+  lineOaUrl         String?  @map("line_oa_url") // 客服/官方帳號連結
+  liffId            String?  @map("liff_id")
+  lineChannelToken  String?  @map("line_channel_token") // LINE Messaging push token（加密儲存）
+  // 網域
+  domain            String?  // 自訂網域（純 host，如 esim.example.com）
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")

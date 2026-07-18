@@ -136,6 +136,58 @@ export async function setPaymentConfigActive(gateway: string, isActive: boolean)
   })
 }
 
+// ─── 全域設定（品牌 / 網域 / 福利價倍率）────────────────────────────
+
+const SETTING_ID = 'singleton'
+
+/** 回傳全域設定（lineChannelToken 已解密，僅供 server 用）。未設定的品牌欄位為 null，
+ *  呼叫端（tenant.ts / notification.ts）再以 env 補 fallback。 */
+export async function getPlatformSettings() {
+  const s = await prisma.platformSetting.findUnique({ where: { id: SETTING_ID } })
+  return {
+    benefitMarkupRate: s ? Number(s.benefitMarkupRate) : 1.5,
+    brandName: s?.brandName ?? null,
+    logoUrl: s?.logoUrl ?? null,
+    primaryColor: s?.primaryColor ?? null,
+    lineOaUrl: s?.lineOaUrl ?? null,
+    liffId: s?.liffId ?? null,
+    lineChannelToken: s?.lineChannelToken ? safeDecrypt(s.lineChannelToken) : null,
+    domain: s?.domain ?? null,
+  }
+}
+
+export interface UpdatePlatformSettingsInput {
+  benefitMarkupRate?: number
+  brandName?: string | null
+  logoUrl?: string | null
+  primaryColor?: string | null
+  lineOaUrl?: string | null
+  liffId?: string | null
+  lineChannelToken?: string | null  // 明文；傳入遮罩值（****開頭）代表沿用、不覆寫
+  domain?: string | null
+}
+
+export async function updatePlatformSettings(input: UpdatePlatformSettingsInput) {
+  const data: Record<string, unknown> = {}
+  if (input.benefitMarkupRate !== undefined) data.benefitMarkupRate = input.benefitMarkupRate
+  if (input.brandName !== undefined) data.brandName = input.brandName
+  if (input.logoUrl !== undefined) data.logoUrl = input.logoUrl
+  if (input.primaryColor !== undefined) data.primaryColor = input.primaryColor
+  if (input.lineOaUrl !== undefined) data.lineOaUrl = input.lineOaUrl
+  if (input.liffId !== undefined) data.liffId = input.liffId
+  if (input.domain !== undefined) data.domain = input.domain?.toLowerCase().split(':')[0].trim() || null
+  if (input.lineChannelToken !== undefined) {
+    // 遮罩值沿用（不覆寫既有加密 token）；空字串清除；其餘加密後寫入
+    if (!(input.lineChannelToken && input.lineChannelToken.startsWith('****'))) {
+      data.lineChannelToken = input.lineChannelToken ? encrypt(input.lineChannelToken) : null
+    }
+  }
+
+  const existing = await prisma.platformSetting.findUnique({ where: { id: SETTING_ID } })
+  if (existing) return prisma.platformSetting.update({ where: { id: SETTING_ID }, data })
+  return prisma.platformSetting.create({ data: { id: SETTING_ID, ...data } })
+}
+
 // ─── 工具 ─────────────────────────────────────────────────────────
 
 export function maskSecret(s: string): string {

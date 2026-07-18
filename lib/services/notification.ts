@@ -1,11 +1,13 @@
 import { prisma } from '@/lib/db/prisma'
 import { NotificationType } from '@prisma/client'
+import { getPlatformSettings } from './tenant-config'
 
 // ─── LINE Messaging API Push Message ─────────────────────────────
-// 單一品牌：LINE OA access token 與品牌設定一律取自 env（原白標版是 per-tenant）。
+// 單一品牌：LINE OA token 與品牌設定取自後台「系統設定」（PlatformSetting），env 當 fallback。
 
-function getLineToken(): string {
-  return process.env.LINE_CHANNEL_ACCESS_TOKEN ?? ''
+async function getLineToken(): Promise<string> {
+  const s = await getPlatformSettings()
+  return s.lineChannelToken || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
 }
 
 async function sendLineMessage(
@@ -13,7 +15,7 @@ async function sendLineMessage(
   text: string,
   extra?: { button?: { label: string; uri: string }; flex?: object },
 ): Promise<void> {
-  const token = getLineToken()
+  const token = await getLineToken()
   if (!token) return // 金鑰未設定時靜默跳過
 
   const altText = (text.split('\n')[0] || 'eSIM 通知').slice(0, 400)
@@ -46,10 +48,11 @@ async function sendLineMessage(
 // 品牌主色：單一品牌，取 env（未設用預設）。
 const DEFAULT_PRIMARY = '#635BFF'
 
-function getBrand(): { primaryColor: string; liffId: string | null } {
+async function getBrand(): Promise<{ primaryColor: string; liffId: string | null }> {
+  const s = await getPlatformSettings()
   return {
-    primaryColor: process.env.NEXT_PUBLIC_BRAND_COLOR || DEFAULT_PRIMARY,
-    liffId: process.env.NEXT_PUBLIC_LIFF_ID || null,
+    primaryColor: s.primaryColor || process.env.NEXT_PUBLIC_BRAND_COLOR || DEFAULT_PRIMARY,
+    liffId: s.liffId || process.env.NEXT_PUBLIC_LIFF_ID || null,
   }
 }
 
@@ -263,7 +266,7 @@ export async function notifyOrderPaid(
   items: { productName: string; qty: number }[],
   amount: number,
 ) {
-  const { primaryColor, liffId } = getBrand()
+  const { primaryColor, liffId } = await getBrand()
   const buttonUri = liffId ? `https://liff.line.me/${liffId}/orders` : undefined
   const itemsBlock = formatPaidItemsBlock(items)
   const flex = buildOrderPaidFlex({ primaryColor, itemsBlock, amount: String(amount), buttonUri })
@@ -281,7 +284,7 @@ export async function notifyEsimReady(
   productName: string,
   plan?: { country?: string | null; days?: number | null; capacity?: string | null },
 ) {
-  const { primaryColor, liffId } = getBrand()
+  const { primaryColor, liffId } = await getBrand()
   const buttonUri = liffId ? `https://liff.line.me/${liffId}/orders` : undefined
   const country = plan?.country || productName
   const planLine =
