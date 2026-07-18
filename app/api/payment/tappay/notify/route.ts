@@ -10,8 +10,6 @@ import {
   isOrderExpired,
 } from '@/lib/services/order'
 import { triggerEsimActivation } from '@/lib/services/esim'
-import { calculateAndSaveCommission } from '@/lib/services/commission'
-import { issueRepurchaseCouponForOrder } from '@/lib/services/coupon'
 import { notifyOrderPaid } from '@/lib/services/notification'
 import { recordAlert } from '@/lib/services/alert'
 import { fireAndLog } from '@/lib/utils/fire-and-log'
@@ -43,7 +41,6 @@ export async function POST(req: NextRequest) {
   const order = await prisma.order.findFirst({
     where: { tapPayOrderId },
     include: {
-      user: true,
       orderItems: { take: 1 },
     },
   })
@@ -56,7 +53,6 @@ export async function POST(req: NextRequest) {
   // 真偽驗證不再靠 x-api-key header（實測 TapPay 的 backend_notify 不帶該 header，
   // 舊版用它比對 partner_key → 每筆合法通知都被 401 擋掉、訂單永遠卡 PROCESSING）。
   // 改在「確定要標記 PAID」前，用 rec_trade_id 向 TapPay Record API 回查驗真（見下）。
-  const tenantAdminId = order.user.tenantAdminId
 
   // Idempotent: skip already-completed orders
   if (order.status === OrderStatus.PAID || order.status === OrderStatus.COMPLETED) {
@@ -80,7 +76,7 @@ export async function POST(req: NextRequest) {
             _sum: { totalPaid: true },
           }))._sum.totalPaid ?? order.totalPaid
         : order.totalPaid
-      const refund = await tapPayRefund(recTradeId, refundAmount, order.user.tenantAdminId)
+      const refund = await tapPayRefund(recTradeId, refundAmount)
       if (refund.ok) {
         if (bundleId) {
           await prisma.order.updateMany({ where: { bundleId }, data: { status: OrderStatus.REFUNDED } })
@@ -113,13 +109,13 @@ export async function POST(req: NextRequest) {
   const expectedAmount = bundleId
     ? ((await prisma.order.aggregate({ where: { bundleId }, _sum: { totalPaid: true } }))._sum.totalPaid ?? order.totalPaid)
     : order.totalPaid
-  const verify = await tapPayQueryTrade(recTradeId, tenantAdminId, gateway)
+  const verify = await tapPayQueryTrade(recTradeId, gateway)
   // record_status 0 = 已授權（即使尚未請款 is_captured=false 也算付款成立，TapPay
   // 會在 cap_millis 自動請款）。金額需與訂單相符。
   if (!verify.ok || verify.amount !== expectedAmount || verify.recordStatus !== 0) {
     console.warn('[tappay-notify] Record API 驗真失敗，不標記 PAID', { order_number: tapPayOrderId, expectedAmount, verify })
     await recordAlert('payment_verify_failed', {
-      orderId: order.id, tenantAdminId,
+      orderId: order.id,
       orderNumber: tapPayOrderId, expectedAmount,
       gotAmount: verify.ok ? verify.amount : null,
       recordStatus: verify.ok ? verify.recordStatus : null,
@@ -145,20 +141,13 @@ export async function POST(req: NextRequest) {
   for (const oid of paidOrderIds) {
     // 開卡必須在 webhook 回 200「之前」await 完成：Vercel serverless 在回應後會凍結/
     // 終止函式，未 await 的背景工作（fire-and-forget）可能根本沒跑完。X6S4GW 即如此
-    // ——付款成功卻完全沒有 placeWmOrder 紀錄。commission/coupon 非時間敏感、維持背景。
+    // ——付款成功卻完全沒有 placeWmOrder 紀錄。
     try {
       await triggerEsimActivation(oid)
     } catch (e) {
       console.error('[pay-notify] triggerEsimActivation failed', oid, e)
-      await recordAlert('esim_activation_failed', { orderId: oid, tenantAdminId, error: e instanceof Error ? e.message : String(e) })
+      await recordAlert('esim_activation_failed', { orderId: oid, error: e instanceof Error ? e.message : String(e) })
     }
-    // 分潤/回購券改為 await：原本 fire-and-forget 在 Vercel 回 200 後函式被凍結/終止，
-    // 背景 promise 常沒跑完 → 偶發「付款成功卻沒發回購券/沒記分潤」（社群主韓國單即如此）。
-    // 兩者皆為快速且具冪等的 DB 操作，await 成本極低、失敗會記 alert 而非靜默。
-    try { await calculateAndSaveCommission(oid) }
-    catch (e) { console.error('[pay-notify] commission failed', oid, e); await recordAlert('commission_failed', { orderId: oid, tenantAdminId, error: e instanceof Error ? e.message : String(e) }) }
-    try { await issueRepurchaseCouponForOrder(oid) }
-    catch (e) { console.error('[pay-notify] repurchase coupon failed', oid, e); await recordAlert('repurchase_coupon_failed', { orderId: oid, tenantAdminId, error: e instanceof Error ? e.message : String(e) }) }
   }
 
   if (bundleId && paidOrderIds.length > 1) {
@@ -171,11 +160,10 @@ export async function POST(req: NextRequest) {
       order.userId,
       bundleItems,
       totalAggregate._sum.totalPaid ?? order.totalPaid,
-      tenantAdminId,
     ))
   } else {
     const items = order.orderItems.map(it => ({ productName: it.productName, qty: it.qty }))
-    fireAndLog('notify_order_paid_failed', order.id, notifyOrderPaid(order.userId, items, order.totalPaid, tenantAdminId))
+    fireAndLog('notify_order_paid_failed', order.id, notifyOrderPaid(order.userId, items, order.totalPaid))
   }
 
   return NextResponse.json({ message: 'ok' })

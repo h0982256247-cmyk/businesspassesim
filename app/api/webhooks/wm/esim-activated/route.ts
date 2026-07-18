@@ -31,10 +31,7 @@ export async function POST(req: NextRequest) {
   // 用 wmOrderId + esimRcode 雙比對找出我們的訂單
   const order = await prisma.order.findFirst({
     where: { wmOrderId: body.orderId, esimRcode: body.rcode },
-    select: {
-      id: true, userId: true, currentOwnerId: true, activatedAt: true, status: true,
-      gift: { select: { id: true, claimedAt: true, cancelledAt: true } },
-    },
+    select: { id: true, userId: true, activatedAt: true, status: true },
   })
 
   if (!order) {
@@ -57,23 +54,13 @@ export async function POST(req: NextRequest) {
   const useS = body.useSDate ? new Date(Number(body.useSDate)) : null
   const useE = body.useEDate ? new Date(Number(body.useEDate)) : null
 
-  await prisma.$transaction(async tx => {
-    await tx.order.update({
-      where: { id: order.id },
-      data: {
-        activatedAt: new Date(),
-        ...(useS && !isNaN(useS.getTime()) ? { activationStart: useS } : {}),
-        ...(useE && !isNaN(useE.getTime()) ? { activationEnd:   useE } : {}),
-      },
-    })
-
-    // 若有 pending 未領取的 gift → 自動 cancel（買家已自用，不能再轉贈）
-    if (order.gift?.id && !order.gift.claimedAt && !order.gift.cancelledAt) {
-      await tx.orderGift.update({
-        where: { id: order.gift.id },
-        data: { cancelledAt: new Date(), cancelReason: 'esim_activated_by_buyer' },
-      })
-    }
+  await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      activatedAt: new Date(),
+      ...(useS && !isNaN(useS.getTime()) ? { activationStart: useS } : {}),
+      ...(useE && !isNaN(useE.getTime()) ? { activationEnd:   useE } : {}),
+    },
   })
 
   return new NextResponse('1', { status: 200 })

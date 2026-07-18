@@ -84,21 +84,17 @@ export function tapPayErrorMessage(status: number, msg?: string): string {
   return `信用卡交易失敗，請確認卡片資訊或改用其他卡片後再試一次${tail}`
 }
 
-async function getConfig(tenantAdminId?: string | null, gateway: string = 'tappay_credit') {
-  if (tenantAdminId) {
-    const cfg = await getPaymentConfig(tenantAdminId, gateway)  // partnerKey 已解密
-    if (cfg && cfg.isActive) {
-      return {
-        partnerKey: cfg.partnerKey,
-        merchantId: cfg.merchantId,
-        baseUrl: cfg.env === 'production'
-          ? 'https://prod.tappaysdk.com/tpc'
-          : 'https://sandbox.tappaysdk.com/tpc',
-      }
+async function getConfig(gateway: string = 'tappay_credit') {
+  // 單一品牌：金流設定取自全域 PaymentConfig（by gateway），未設定退回 env（開發用）。
+  const cfg = await getPaymentConfig(gateway)  // partnerKey 已解密
+  if (cfg && cfg.isActive) {
+    return {
+      partnerKey: cfg.partnerKey,
+      merchantId: cfg.merchantId,
+      baseUrl: cfg.env === 'production'
+        ? 'https://prod.tappaysdk.com/tpc'
+        : 'https://sandbox.tappaysdk.com/tpc',
     }
-    // 指定了租戶卻查無啟用設定 → 明確報錯，不退回平台全域 env（避免漏設定的白牌
-    // 靜默用平台帳號收款）。env fallback 只給「無租戶」的單租戶/開發情境。
-    throw new Error(`此商店尚未設定${gateway === 'tappay_linepay' ? 'LINE Pay' : '信用卡'}金流，請至後台「金流設定」填寫後再付款`)
   }
 
   const partnerKey = process.env.TAPPAY_PARTNER_KEY
@@ -135,8 +131,8 @@ export function build3dsBlock(resultUrl: TapPayChargeInput['resultUrl']) {
   }
 }
 
-export async function tapPayCharge(input: TapPayChargeInput, tenantAdminId?: string | null): Promise<TapPayChargeResult> {
-  const { partnerKey, merchantId, baseUrl } = await getConfig(tenantAdminId, 'tappay_credit')
+export async function tapPayCharge(input: TapPayChargeInput): Promise<TapPayChargeResult> {
+  const { partnerKey, merchantId, baseUrl } = await getConfig('tappay_credit')
 
   const body = {
     prime: input.prime,
@@ -180,8 +176,8 @@ export async function tapPayCharge(input: TapPayChargeInput, tenantAdminId?: str
   }
 }
 
-export async function tapPayChargeByToken(input: TapPayTokenChargeInput, tenantAdminId?: string | null): Promise<TapPayChargeResult> {
-  const { partnerKey, merchantId, baseUrl } = await getConfig(tenantAdminId, 'tappay_credit')
+export async function tapPayChargeByToken(input: TapPayTokenChargeInput): Promise<TapPayChargeResult> {
+  const { partnerKey, merchantId, baseUrl } = await getConfig('tappay_credit')
 
   const body = {
     card_key: input.cardKey,
@@ -232,14 +228,13 @@ export async function tapPayChargeByToken(input: TapPayTokenChargeInput, tenantA
 // 文件：https://docs.tappaysdk.com/tutorial/zh/back.html#record-api
 export async function tapPayQueryTrade(
   recTradeId: string,
-  tenantAdminId?: string | null,
   gateway: string = 'tappay_credit',
 ): Promise<
   | { ok: true; amount: number; orderNumber: string; recordStatus: number; raw: unknown }
   | { ok: false; message: string; raw?: unknown }
 > {
   if (!recTradeId) return { ok: false, message: 'no rec_trade_id' }
-  const { partnerKey, baseUrl } = await getConfig(tenantAdminId, gateway)
+  const { partnerKey, baseUrl } = await getConfig(gateway)
 
   const res = await fetch(`${baseUrl}/transaction/query`, {
     method: 'POST',
@@ -274,16 +269,12 @@ export async function tapPayQueryTrade(
 //   保留相容，勿用於新流程。
 // TapPay 未提供 HMAC signature；防偽靠 partner_key header 比對
 
-export async function verifyTapPayWebhook(req: Request, tenantAdminId?: string | null): Promise<boolean> {
+export async function verifyTapPayWebhook(req: Request): Promise<boolean> {
   const key = req.headers.get('x-api-key')
-
-  if (tenantAdminId) {
-    const cfg = await getPaymentConfig(tenantAdminId, 'tappay_credit')  // partnerKey 已解密
-    if (cfg && cfg.isActive) {
-      return key === cfg.partnerKey
-    }
+  const cfg = await getPaymentConfig('tappay_credit')  // partnerKey 已解密
+  if (cfg && cfg.isActive) {
+    return key === cfg.partnerKey
   }
-
   return key === process.env.TAPPAY_PARTNER_KEY
 }
 
@@ -292,9 +283,8 @@ export async function verifyTapPayWebhook(req: Request, tenantAdminId?: string |
 export async function tapPayRefund(
   recTradeId: string,
   amount: number,
-  tenantAdminId?: string | null,
 ): Promise<{ ok: boolean; message?: string }> {
-  const { partnerKey, baseUrl } = await getConfig(tenantAdminId, 'tappay_credit')
+  const { partnerKey, baseUrl } = await getConfig('tappay_credit')
 
   const res = await fetch(`${baseUrl}/transaction/refund`, {
     method: 'POST',
@@ -340,9 +330,8 @@ export interface TapPayLinePayChargeInput {
 
 export async function tapPayChargeLinePay(
   input: TapPayLinePayChargeInput,
-  tenantAdminId?: string | null,
 ): Promise<TapPayChargeResult> {
-  const { partnerKey, merchantId, baseUrl } = await getConfig(tenantAdminId, 'tappay_linepay')
+  const { partnerKey, merchantId, baseUrl } = await getConfig('tappay_linepay')
 
   const body = {
     prime: input.prime,
