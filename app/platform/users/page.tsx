@@ -2,15 +2,12 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import TenantScopeBar from '@/components/platform/TenantScopeBar'
 
 type User = {
   id: string; lineUid: string; displayName: string; avatarUrl: string | null
   phone: string | null; email: string | null; createdAt: string
-  tenantAdmin: { id: string; name: string; brandName: string | null } | null
-  groupMembership: { group: { name: string } } | null
-  ownedGroup: { name: string; status: string } | null
-  _count: { orders: number; coupons: number }
+  groupMembership: { status: string; group: { name: string } } | null
+  _count: { orders: number }
 }
 
 const COLORS = ['bg-blue-500','bg-violet-500','bg-emerald-500','bg-amber-500','bg-rose-500']
@@ -31,30 +28,14 @@ function UsersContent() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(q)
-  const [currentRole, setCurrentRole] = useState<string | null>(null)
-  const [platformAdmins, setPlatformAdmins] = useState<{ id: string; name: string; brandName: string | null }[]>([])
-  const [filterTenantId, setFilterTenantId] = useState<string>('')
-
-  useEffect(() => {
-    fetch('/api/platform/auth/me').then(r => r.json()).then(d => {
-      if (d.admin) {
-        setCurrentRole(d.admin.role)
-        if (d.admin.role === 'SUPER_ADMIN') {
-          fetch('/api/platform/admins').then(r => r.json()).then(a => {
-            setPlatformAdmins((a.admins ?? []).filter((x: { role: string }) => x.role === 'PLATFORM_ADMIN'))
-          })
-        }
-      }
-    })
-  }, [])
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/platform/users?page=${page}&q=${encodeURIComponent(q)}${filterTenantId ? `&tenantAdminId=${filterTenantId}` : ''}`)
+    fetch(`/api/platform/users?page=${page}&q=${encodeURIComponent(q)}`)
       .then(r => r.status === 401 ? (router.replace('/platform/login'), null) : r.json())
       .then(d => { if (d) { setUsers(d.users); setTotal(d.total) } })
       .finally(() => setLoading(false))
-  }, [page, q, filterTenantId, router])
+  }, [page, q, router])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,11 +52,6 @@ function UsersContent() {
           <p className="text-sm text-gray-400 mt-0.5">共 {total} 位會員</p>
         </div>
       </div>
-
-      {currentRole === 'SUPER_ADMIN' && platformAdmins.length > 0 && (
-        <TenantScopeBar admins={platformAdmins} value={filterTenantId}
-          onChange={v => { setFilterTenantId(v); router.push(`/platform/users?page=1&q=${encodeURIComponent(q)}`) }} />
-      )}
 
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="relative flex-1">
@@ -95,7 +71,7 @@ function UsersContent() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['會員', '所屬平台', '社群身份', '訂單 / 有效券', '加入時間', ''].map(h => (
+                {['會員', '企業歸屬', '訂單', '加入時間', ''].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -116,36 +92,20 @@ function UsersContent() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5">
-                    {u.tenantAdmin
-                      ? <span className="text-xs font-medium text-gray-700">{u.tenantAdmin.brandName || u.tenantAdmin.name}</span>
-                      : <span className="text-xs text-gray-300">未分配</span>
-                    }
-                  </td>
-                  <td className="px-5 py-3.5">
-                    {u.ownedGroup
+                    {u.groupMembership
                       ? (
                         <div className="space-y-0.5">
-                          <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
-                            <span className="w-1.5 h-1.5 rounded-full bg-current" />社群主
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${u.groupMembership.status === 'APPROVED' ? 'bg-green-50 text-green-600' : u.groupMembership.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-500'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{u.groupMembership.status === 'APPROVED' ? '企業會員' : u.groupMembership.status === 'PENDING' ? '審核中' : '未通過'}
                           </span>
-                          <p className="text-xs text-gray-400 pl-1">{u.ownedGroup.name}</p>
+                          <p className="text-xs text-gray-400 pl-1">{u.groupMembership.group.name}</p>
                         </div>
                       )
-                      : u.groupMembership
-                        ? (
-                          <div className="space-y-0.5">
-                            <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">
-                              <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />社群會員
-                            </span>
-                            <p className="text-xs text-gray-400 pl-1">{u.groupMembership.group.name}</p>
-                          </div>
-                        )
-                        : <span className="text-gray-300 text-xs">未加入</span>
+                      : <span className="text-gray-300 text-xs">未加入</span>
                     }
                   </td>
                   <td className="px-5 py-3.5 text-sm">
-                    <span className="font-medium text-gray-700">{u._count.orders}</span><span className="text-gray-400 text-xs"> 筆 / </span>
-                    <span className="font-medium text-gray-700">{u._count.coupons}</span><span className="text-gray-400 text-xs"> 張</span>
+                    <span className="font-medium text-gray-700">{u._count.orders}</span><span className="text-gray-400 text-xs"> 筆</span>
                   </td>
                   <td className="px-5 py-3.5 text-xs text-gray-400">{new Date(u.createdAt).toLocaleDateString('zh-TW')}</td>
                   <td className="px-3 py-3.5 text-gray-300">

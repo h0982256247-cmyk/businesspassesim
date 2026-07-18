@@ -3,25 +3,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
-import { useLiff } from '@/components/liff/LiffProvider'
-import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
+import { useTenantColors } from '@/components/liff/TenantContext'
 import { deriveEsimStatus, daysLeftOf, TONE_STYLE } from '@/lib/esimStatus'
-import { IconSim, IconInstall, IconShare, IconCheck, IconClock, IconAlert } from '@/components/liff/EsimIcons'
+import { IconSim, IconInstall, IconCheck, IconClock, IconAlert } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
-import { GiftIcon } from '@/components/liff/GiftIcon'
 import type { ReactNode } from 'react'
-
-type GiftInfo = {
-  token: string
-  sharedAt: string
-  expiresAt: string
-  claimedAt: string | null
-  cancelledAt: string | null
-  recipientName: string | null
-  toUser: { displayName: string } | null
-  fromUser: { displayName: string } | null
-}
 
 type OrderDetail = {
   id: string
@@ -29,12 +16,10 @@ type OrderDetail = {
   status: string
   totalPaid: number
   subtotal: number
-  discountAmount: number
   paymentMethod: string
   paidAt: string | null
   createdAt: string
   userId: string
-  currentOwnerId: string
   bundleId: string | null
   failureReason: string | null
   cancelReason: string | null
@@ -47,7 +32,6 @@ type OrderDetail = {
   redeemedAt: string | null
   activatedAt: string | null
   orderItems: { productName: string; qty: number; unitPrice: number; product?: { dataCapacity: string | null } | null }[]
-  gift: GiftInfo | null
 }
 
 type EsimUsage = {
@@ -96,32 +80,22 @@ function buildAppleOneClickUrl(lpa: string): string {
   return `https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=${encodeURIComponent(lpa)}`
 }
 
-// 折扣（0.85）→ 折數標籤（9 折 / 85 折 / 92 折）
-function zheLabel(d: number): string {
-  const n = Math.round(d * 100)
-  return n % 10 === 0 ? `${n / 10} 折` : `${n} 折`
-}
-
 export default function OrderDetailPage() {
   const router = useRouter()
   const base = useLiffBase()
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const C = useTenantColors()
-  const tenant = useTenant()
-  const { liff } = useLiff()
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [usage, setUsage] = useState<EsimUsage | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
   const [usageError, setUsageError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
-  const [sharing, setSharing] = useState(false)
   const [redeeming, setRedeeming] = useState(false)
   const [redeemError, setRedeemError] = useState<string | null>(null)
   const [redeemTimeout, setRedeemTimeout] = useState(false)
   const [canOneClick, setCanOneClick] = useState(false)
-  const [repurchaseCoupon, setRepurchaseCoupon] = useState<{ discount: number } | null>(null)
   // 自訂確認彈窗（取代 window.confirm，避免 LINE 內建瀏覽器露出網址）
   const [dialog, setDialog] = useState<null | {
     title: string; lines: string[]; confirmLabel: string;
@@ -164,7 +138,6 @@ export default function OrderDetailPage() {
         .then(r => { if (r.status === 404) setNotFound(true); return r.json() })
         .then(d => {
           if (d.order) setOrder(d.order)
-          setRepurchaseCoupon(d.repurchaseCoupon ?? null)
           const o = d.order
           // 需要 polling 的情境：
           //   A. 訂單處理中（PAID/ESIM_PENDING 還沒收 2.2 callback）
@@ -209,7 +182,7 @@ export default function OrderDetailPage() {
     if (!order) return
     setDialog({
       title: '確定要安裝這張 eSIM 嗎？',
-      lines: ['安裝後會立即產生 QR 碼並綁定這支手機，', '綁定後就無法再轉贈給別人。'],
+      lines: ['安裝後會立即產生 QR 碼並綁定這支手機，', '請在要長期使用這張 eSIM 的手機上安裝。'],
       confirmLabel: '確定安裝',
       tone: 'primary',
       icon: <IconInstall size={24} />,
@@ -229,159 +202,6 @@ export default function OrderDetailPage() {
       return
     }
     // 重新 fetch 一次拿到 redeemedAt（觸發 polling 等 QR）
-    const fresh = await fetch(`/api/orders/${order.id}`).then(x => x.json())
-    if (fresh.order) setOrder(fresh.order)
-  }
-
-  // 建立分享連結並開啟 LINE 的 shareTargetPicker
-  const handleShare = () => {
-    if (!order) return
-    if (!liff || !liff.isLoggedIn()) {
-      setToast({ message: '請先登入 LINE', tone: 'error' })
-      return
-    }
-    if (!liff.isApiAvailable('shareTargetPicker')) {
-      setToast({ message: '您的 LINE 版本不支援分享功能，請更新 LINE App', tone: 'error' })
-      return
-    }
-    setDialog({
-      title: '確定要轉贈這張 eSIM 嗎？',
-      lines: ['轉贈後這張 eSIM 將由對方使用，', '你就無法自己安裝了。'],
-      confirmLabel: '確定轉贈',
-      tone: 'primary',
-      icon: <IconShare size={22} />,
-      onConfirm: () => { setDialog(null); doShare() },
-    })
-  }
-
-  const doShare = async () => {
-    if (!order || !liff) return
-    setSharing(true)
-    try {
-      // 1. 建立 gift token
-      const r = await fetch(`/api/orders/${order.id}/gift`, { method: 'POST' }).then(x => x.json())
-      if (!r.ok) {
-        setToast({ message: `分享失敗：${r.error}`, tone: 'error' })
-        return
-      }
-
-      // 2. 把 /gift/<token> 轉成 LIFF 永久連結
-      const giftPath = `${base}/gift/${r.token}`
-      const fullUrl = `${window.location.origin}${giftPath}`
-      let giftLink: string = fullUrl
-      try {
-        giftLink = await liff.permanentLink.createUrlBy(fullUrl)
-      } catch {
-        // 若無權限，fallback 直接用一般 URL
-      }
-
-      // 3. 開啟分享面板，秀 Flex Message
-      const item = order.orderItems[0]
-      const productName = item?.productName ?? 'eSIM'
-      // 完整方案：國家 N天 + 流量（新訂單快照已含流量，舊訂單靠 join 補、避免重複）
-      const cap = item?.product?.dataCapacity
-      const planLabel = cap && !productName.includes(cap) ? `${productName} · ${cap}` : productName
-      const brandName = tenant?.brandName ?? 'eSIM'
-      const flexMessage = {
-        type: 'flex' as const,
-        altText: `你收到一張來自「${brandName}」的 eSIM：${planLabel}`,
-        contents: {
-          type: 'bubble' as const,
-          body: {
-            type: 'box' as const,
-            layout: 'vertical' as const,
-            spacing: 'md',
-            contents: [
-              {
-                type: 'text' as const,
-                text: `你收到一張來自「${brandName}」的 eSIM`,
-                weight: 'bold' as const,
-                size: 'lg' as const,
-                color: '#1a1a1a',
-                wrap: true,
-              },
-              {
-                type: 'text' as const,
-                text: planLabel,
-                size: 'md' as const,
-                weight: 'bold' as const,
-                wrap: true,
-                color: C.primaryText,
-              },
-              {
-                type: 'text' as const,
-                text: '點下方按鈕完成領取，即可開始使用',
-                size: 'sm' as const,
-                color: '#475569',
-                wrap: true,
-              },
-              {
-                type: 'separator' as const,
-                margin: 'md' as const,
-              },
-              {
-                type: 'text' as const,
-                text: '⚠ 連結 7 天內有效，請盡快領取',
-                size: 'xs' as const,
-                color: '#94a3b8',
-                wrap: true,
-              },
-            ],
-          },
-          footer: {
-            type: 'box' as const,
-            layout: 'vertical' as const,
-            spacing: 'sm',
-            contents: [
-              {
-                type: 'button' as const,
-                style: 'primary' as const,
-                color: C.primaryText,
-                action: {
-                  type: 'uri' as const,
-                  label: '查看並接受 eSIM',
-                  uri: giftLink,
-                },
-              },
-            ],
-          },
-        },
-      }
-
-      const result = await liff.shareTargetPicker([flexMessage])
-      if (result?.status === 'success') {
-        // 4. 重新載入訂單以顯示 gift 狀態
-        const fresh = await fetch(`/api/orders/${order.id}`).then(x => x.json())
-        if (fresh.order) setOrder(fresh.order)
-      }
-      // status 'cancel' → 用戶取消，gift 已建立但沒人收到。下次點分享會 reuse 同一個 token。
-    } catch (err) {
-      setToast({ message: err instanceof Error ? err.message : '分享失敗', tone: 'error' })
-    } finally {
-      setSharing(false)
-    }
-  }
-
-  const handleCancelShare = () => {
-    if (!order) return
-    setDialog({
-      title: '確定要取消分享嗎？',
-      lines: ['取消後分享連結會失效，', '對方將無法再領取這張 eSIM。'],
-      confirmLabel: '取消分享',
-      tone: 'danger',
-      onConfirm: () => { setDialog(null); doCancelShare() },
-    })
-  }
-
-  const doCancelShare = async () => {
-    if (!order) return
-    setSharing(true)
-    const r = await fetch(`/api/orders/${order.id}/gift`, { method: 'DELETE' }).then(x => x.json())
-    setSharing(false)
-    if (r.error) {
-      setToast({ message: `取消失敗：${r.error}`, tone: 'error' })
-      return
-    }
     const fresh = await fetch(`/api/orders/${order.id}`).then(x => x.json())
     if (fresh.order) setOrder(fresh.order)
   }
@@ -455,121 +275,40 @@ export default function OrderDetailPage() {
         <p style={{ fontSize: 12, color: S.faint, marginTop: 4 }}>{order.orderNumber ?? `#${order.id.slice(-8).toUpperCase()}`}</p>
       </div>
 
-      {/* 結帳完成回饋：本筆已發出回購券（趁剛買完最有感）*/}
-      {repurchaseCoupon && (order.status === 'PAID' || order.status === 'COMPLETED') && (
-        <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <span style={{ flexShrink: 0 }}><GiftIcon size={28} color={C.primaryText} /></span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 14, fontWeight: 800, color: C.primaryText, margin: 0 }}>本筆已回饋 {zheLabel(repurchaseCoupon.discount)} 回購券</p>
-            <p style={{ fontSize: 12, color: S.muted, margin: '2px 0 0' }}>下次購買即可使用，於「優惠券」查看</p>
+      {/* === eSIM 階段一：未使用（已收到 rcode、未按我要安裝） === */}
+      {order.status === 'COMPLETED' && order.esimRcode && !order.redeemedAt && !order.activatedAt && (
+        <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px', marginBottom: 12 }}>
+          <div style={{ textAlign: 'center', marginBottom: 16 }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fff', border: `1px solid ${C.border}`, color: C.primaryText, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+              <IconSim size={24} />
+            </div>
+            <h2 style={{ fontSize: 16, fontWeight: 800, color: S.ink, margin: '0 0 4px' }}>eSIM 已準備好</h2>
+            <p style={{ fontSize: 13, color: S.muted, margin: 0, lineHeight: 1.6 }}>
+              點下方按鈕安裝，安裝後綁定此手機即可開始使用
+            </p>
           </div>
-          <button onClick={() => router.push(`${base}/coupons`)} style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: C.primaryText, background: '#fff', border: `1px solid ${C.border}`, borderRadius: 100, padding: '6px 12px', cursor: 'pointer', whiteSpace: 'nowrap' }}>查看</button>
+
+          <button
+            onClick={handleRedeem}
+            disabled={redeeming}
+            style={{
+              width: '100%', background: C.primary, color: C.onPrimary,
+              border: 'none', borderRadius: 100, padding: '15px',
+              fontSize: 15, fontWeight: 800, cursor: redeeming ? 'wait' : 'pointer',
+              opacity: redeeming ? 0.7 : 1, letterSpacing: '0.02em', marginBottom: 4,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {redeeming ? '處理中…' : <><IconInstall size={17} /> 我要安裝</>}
+          </button>
+          <p style={{ fontSize: 11, color: S.faint, textAlign: 'center', margin: '0 0 4px', lineHeight: 1.5 }}>
+            安裝後會綁定此手機
+          </p>
+          {redeemError && (
+            <p style={{ fontSize: 12, color: '#dc2626', marginTop: 4, marginBottom: 4, textAlign: 'center' }}>{redeemError}</p>
+          )}
         </div>
       )}
-
-      {/* === eSIM 階段一：未使用（已收到 rcode、未按我要安裝） === */}
-      {order.status === 'COMPLETED' && order.esimRcode && !order.redeemedAt && !order.activatedAt && (() => {
-        const gift = order.gift
-        const isPendingGift = gift && !gift.claimedAt && !gift.cancelledAt && new Date(gift.expiresAt) > new Date()
-        const isReceived = !!gift?.claimedAt   // 轉贈進來的卡（已領取）→ 不可再轉贈
-        return (
-          <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px', marginBottom: 12 }}>
-            {isReceived && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, background: '#ede9fe', color: '#6d28d9', padding: '5px 12px', borderRadius: 100 }}>
-                  <IconShare size={12} /> 由 {gift?.fromUser?.displayName ?? '朋友'} 轉贈給你
-                </span>
-              </div>
-            )}
-            <div style={{ textAlign: 'center', marginBottom: 16 }}>
-              <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fff', border: `1px solid ${C.border}`, color: C.primaryText, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
-                <IconSim size={24} />
-              </div>
-              <h2 style={{ fontSize: 16, fontWeight: 800, color: S.ink, margin: '0 0 4px' }}>eSIM 已準備好</h2>
-              <p style={{ fontSize: 13, color: S.muted, margin: 0, lineHeight: 1.6 }}>
-                {isPendingGift
-                  ? '已分享給朋友，等待對方領取。如要自己使用，請先取消分享。'
-                  : isReceived
-                    ? '這張是朋友轉贈給你的，安裝後即可使用、無法再轉贈'
-                    : '可以選擇自己安裝，或分享給朋友使用'}
-              </p>
-            </div>
-
-            {/* 分享中狀態 */}
-            {isPendingGift && (
-              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: '#c2410c', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 5 }}><IconClock size={13} /> 已分享，等待領取</p>
-                <p style={{ fontSize: 11, color: '#9a3412', margin: '0 0 10px', lineHeight: 1.5 }}>
-                  連結將於 {new Date(gift!.expiresAt).toLocaleDateString('zh-TW')} 過期
-                </p>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    onClick={handleShare}
-                    disabled={sharing}
-                    style={{ flex: 1, background: '#fff', border: '1px solid #fdba74', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#c2410c', cursor: 'pointer' }}
-                  >
-                    再次分享
-                  </button>
-                  <button
-                    onClick={handleCancelShare}
-                    disabled={sharing}
-                    style={{ flex: 1, background: '#fff', border: '1px solid #fca5a5', borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 600, color: '#b91c1c', cursor: 'pointer' }}
-                  >
-                    取消分享
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* 我要安裝按鈕（pending gift 時隱藏，避免衝突） */}
-            {!isPendingGift && (
-              <>
-                <button
-                  onClick={handleRedeem}
-                  disabled={redeeming}
-                  style={{
-                    width: '100%', background: C.primary, color: C.onPrimary,
-                    border: 'none', borderRadius: 100, padding: '15px',
-                    fontSize: 15, fontWeight: 800, cursor: redeeming ? 'wait' : 'pointer',
-                    opacity: redeeming ? 0.7 : 1, letterSpacing: '0.02em', marginBottom: 4,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}
-                >
-                  {redeeming ? '處理中…' : <><IconInstall size={17} /> 我要安裝</>}
-                </button>
-                <p style={{ fontSize: 11, color: S.faint, textAlign: 'center', margin: '0 0 12px', lineHeight: 1.5 }}>
-                  安裝後綁定此手機，將無法再轉贈
-                </p>
-              </>
-            )}
-            {redeemError && (
-              <p style={{ fontSize: 12, color: '#dc2626', marginTop: 4, marginBottom: 10, textAlign: 'center' }}>{redeemError}</p>
-            )}
-
-            {/* 轉贈按鈕（沒 gift 時顯示） */}
-            {!isPendingGift && !gift?.claimedAt && (
-              <>
-                <button
-                  onClick={handleShare}
-                  disabled={sharing}
-                  style={{
-                    width: '100%', background: S.white,
-                    border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px',
-                    fontSize: 14, fontWeight: 700, color: C.primaryText,
-                    cursor: sharing ? 'wait' : 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}
-                >
-                  <IconShare size={16} /> 轉贈給朋友
-                </button>
-                <p style={{ fontSize: 11, color: S.faint, textAlign: 'center', margin: '8px 0 0', lineHeight: 1.5 }}>
-                  透過 LINE 傳給朋友，對方領取後由對方使用
-                </p>
-              </>
-            )}
-          </div>
-        )
-      })()}
 
       {/* === eSIM 階段二：兌換中（已按我要安裝、QR 還沒到） === */}
       {order.redeemedAt && !order.esimQrcode && !order.activatedAt && (
@@ -840,13 +579,8 @@ export default function OrderDetailPage() {
         </div>
         <div style={{ borderTop: `1px solid ${S.line}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: S.muted }}>
-            <span>商品原價</span><span>NT${order.subtotal.toLocaleString()}</span>
+            <span>商品金額</span><span>NT${order.subtotal.toLocaleString()}</span>
           </div>
-          {order.discountAmount > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#16a34a' }}>
-              <span>優惠折扣{order.bundleId ? '（多張總額折扣分攤至本張）' : ''}</span><span>-NT${order.discountAmount.toLocaleString()}</span>
-            </div>
-          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, borderTop: `1px solid ${S.line}`, paddingTop: 12, marginTop: 2 }}>
             <span style={{ color: S.ink }}>實付金額</span>
             <span style={{ color: C.primaryText, letterSpacing: '-0.02em' }}>NT${order.totalPaid.toLocaleString()}</span>

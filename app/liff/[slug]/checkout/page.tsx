@@ -41,53 +41,11 @@ type Product = {
   isNativeSim: boolean
 }
 
-type Coupon = {
-  id: string
-  type: string
-  level: string
-  discount: number
-  expiresAt: string | null
-}
-
 type SavedCard = {
   lastFour: string
   cardType: number
   cardTypeLabel: string
   expiresAt: string | null
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  OFFICIAL_WELCOME: '歡迎券',
-  GROUP_JOIN:       '入群券',
-  GROUP_REPURCHASE: '回購券',
-  GROUP_OWNER:      '社群主專屬',
-  GROUP_ACTIVITY:   '活動券',
-}
-
-// 券系統已移除：無折扣 stub（券相關 UI 於 Phase 5 前端一併清除）。
-const findBestCouponCombo = (_coupons: unknown[], _price: number): string[] => []
-
-// 多張結帳：把總折扣按各筆原價比例攤回每一張（最大餘數法，與後端 allocateDiscountByWeight
-// 同邏輯），讓上方每張預覽也能顯示折後價；加總必等於總折扣。
-function allocateLineDiscounts(weights: number[], total: number): number[] {
-  const sum = weights.reduce((a, b) => a + b, 0)
-  if (sum <= 0 || total <= 0) return weights.map(() => 0)
-  const raw = weights.map(w => (total * w) / sum)
-  const floored = raw.map(Math.floor)
-  const remainder = total - floored.reduce((a, b) => a + b, 0)
-  const byFrac = raw.map((r, i) => ({ i, frac: r - Math.floor(r) })).sort((a, b) => b.frac - a.frac)
-  const result = [...floored]
-  for (let k = 0; k < remainder && k < byFrac.length; k++) result[byFrac[k].i]++
-  return result
-}
-
-function TicketIcon({ color }: { color: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-      <line x1="7" y1="7" x2="7.01" y2="7" />
-    </svg>
-  )
 }
 
 function CreditCardIcon() {
@@ -155,14 +113,9 @@ function CheckoutContent() {
   const { liff } = useLiff()
 
   const [product, setProduct] = useState<Product | null>(null)
-  const [coupons, setCoupons] = useState<Coupon[]>([])
-  const [selectedCouponIds, setSelectedCouponIds] = useState<string[]>([])
-  const [autoSelectedIds, setAutoSelectedIds] = useState<string[]>([])  // 記錄自動帶入的組合
   const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'LINE_PAY'>('CREDIT_CARD')
   // 平台商可在後台關閉某支付；關閉者前台不顯示。預設兩者皆開（env fallback / 尚未載入時）。
   const [methods, setMethods] = useState<{ creditCard: boolean; linePay: boolean }>({ creditCard: true, linePay: true })
-  const [finalPrice, setFinalPrice] = useState<number | null>(null)
-  const [comboError, setComboError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -184,48 +137,15 @@ function CheckoutContent() {
   const [tapPayConfig, setTapPayConfig] = useState<{ appId: number; appKey: string; env: string } | null>(null)
   const setupDoneRef = useRef(false)
 
-  // 單張：商品 + 優惠券一起載入，並用商品原價自動帶入最優惠組合
+  // 單張：載入商品（價格依身分回傳福利價 / 一般價）
   useEffect(() => {
     if (bundleMode) { setLoading(false); return }
     if (!productId) return
-    Promise.all([
-      fetch(`/api/products/${productId}`).then(r => r.json()),
-      fetch('/api/coupons').then(r => r.json()),
-    ]).then(([pd, cd]) => {
-      const prod: Product | null = pd.product ?? null
-      setProduct(prod)
-      const now = new Date()
-      const validCoupons: Coupon[] = (cd.coupons ?? []).filter((c: Coupon) =>
-        !('usedAt' in c && (c as { usedAt: string | null }).usedAt) &&
-        (!c.expiresAt || new Date(c.expiresAt) > now)
-      )
-      setCoupons(validCoupons)
-      if (prod && validCoupons.length > 0) {
-        const best = findBestCouponCombo(validCoupons, prod.sellPrice)
-        setSelectedCouponIds(best)
-        setAutoSelectedIds(best)
-      }
-    }).finally(() => setLoading(false))
+    fetch(`/api/products/${productId}`)
+      .then(r => r.json())
+      .then(pd => setProduct(pd.product ?? null))
+      .finally(() => setLoading(false))
   }, [productId, bundleMode])
-
-  // 購物車（多張）：載入優惠券，並用「整筆總額」自動帶入最優惠組合（折總額）
-  useEffect(() => {
-    if (!bundleMode || !cart.hydrated) return
-    const base = cart.subtotal
-    fetch('/api/coupons').then(r => r.json()).then(cd => {
-      const now = new Date()
-      const validCoupons: Coupon[] = (cd.coupons ?? []).filter((c: Coupon) =>
-        !('usedAt' in c && (c as { usedAt: string | null }).usedAt) &&
-        (!c.expiresAt || new Date(c.expiresAt) > now)
-      )
-      setCoupons(validCoupons)
-      if (validCoupons.length > 0 && base > 0) {
-        const best = findBestCouponCombo(validCoupons, base)
-        setSelectedCouponIds(best)
-        setAutoSelectedIds(best)
-      }
-    }).catch(() => {})
-  }, [bundleMode, cart.hydrated, cart.subtotal])
 
   // 載入已儲存卡片
   useEffect(() => {
@@ -356,36 +276,6 @@ function CheckoutContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sdkLoaded, paymentMethod, tapPayConfig])
 
-  // 優惠券試算（單張用商品原價、購物車用總額）
-  useEffect(() => {
-    const base = bundleMode ? cart.subtotal : (product ? cartItemPrice(product) : undefined)
-    if (base == null) return
-    if (selectedCouponIds.length === 0) {
-      setFinalPrice(base)
-      setComboError(null)
-      return
-    }
-    fetch('/api/coupons/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ couponIds: selectedCouponIds, productPrice: base }),
-    }).then(r => r.json()).then(d => {
-      if (d.valid) {
-        setFinalPrice(d.finalPrice)
-        setComboError(null)
-      } else {
-        setFinalPrice(base)
-        setComboError(d.reason)
-      }
-    })
-  }, [selectedCouponIds, product, bundleMode, cart.subtotal])
-
-  const toggleCoupon = (id: string) => {
-    setSelectedCouponIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    )
-  }
-
   // 付款結果處理（3DS 導轉 / 成功 / 失敗共用）
   // 只有在扣款被受理（導轉 3DS）或同步成功時才清空購物車；
   // 第一階段失敗時保留購物車，讓使用者可直接重試。
@@ -472,7 +362,6 @@ function CheckoutContent() {
           body: JSON.stringify({
             paymentMethod,
             lines: cart.items.map(i => ({ productId: i.productId, qty: i.qty })),
-            couponIds: selectedCouponIds,
           }),
         })
         dbg('bundle order HTTP', r.status)
@@ -494,14 +383,14 @@ function CheckoutContent() {
       chargeBody = { bundleId: res.bundleId, returnUrl: await buildReturnUrl(successHref) }
     } else {
       // ── 單張：建立單筆訂單 ──
-      if (!product || !productId || comboError) { stopWatchdog(); setSubmitting(false); return }
+      if (!product || !productId) { stopWatchdog(); setSubmitting(false); return }
       let orderRes: { ok?: boolean; orderId?: string; error?: string }
       try {
         dbg('POST /api/orders ...', { productId })
         const r = await fetch('/api/orders', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId, couponIds: selectedCouponIds, paymentMethod }),
+          body: JSON.stringify({ productId, paymentMethod }),
         })
         dbg('order HTTP', r.status)
         orderRes = await r.json()
@@ -673,11 +562,8 @@ function CheckoutContent() {
   const bundleItems = cart.items
   const bundleQty = cart.totalQty
   const bundleSubtotal = cart.subtotal
-  const basePrice = bundleMode ? bundleSubtotal : cartItemPrice(product!)
-  const displayPrice = finalPrice ?? basePrice
-  const discount = basePrice - displayPrice
-  // 多張：把總折扣攤回每一張，讓上方每張卡也顯示折後價（順序對齊 bundleItems）
-  const lineDiscounts = allocateLineDiscounts(bundleItems.map(i => i.sellPrice * i.qty), discount)
+  // 實付金額（已含身分定價：企業會員福利價 / 一般價，由 cartItemPrice 決定）
+  const payable = bundleMode ? bundleSubtotal : cartItemPrice(product!)
 
   const cc = paymentMethod === 'CREDIT_CARD'
   const lp = paymentMethod === 'LINE_PAY'
@@ -687,7 +573,7 @@ function CheckoutContent() {
   const methodReady = cc
     ? ((!useNewCard && savedCard) ? true : (canPay && sdkReady))
     : (lp ? sdkLoaded : false)
-  const canSubmit = !submitting && !comboError && methodReady
+  const canSubmit = !submitting && methodReady
 
   return (
     <div style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 120 }}>
@@ -726,7 +612,7 @@ function CheckoutContent() {
               </span>
             </div>
 
-            {bundleItems.map((item, idx) => (
+            {bundleItems.map(item => (
               <div key={item.productId} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 paddingTop: 12, borderTop: '1px solid rgba(0,0,0,0.06)',
@@ -748,13 +634,13 @@ function CheckoutContent() {
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  {lineDiscounts[idx] > 0 ? (
+                  {cartItemPrice(item) < item.sellPrice ? (
                     <>
                       <p style={{ fontSize: 10.5, color: '#94a3b8', margin: 0, textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>
-                        NT${(cartItemPrice(item) * item.qty).toLocaleString()}
+                        NT${(item.sellPrice * item.qty).toLocaleString()}
                       </p>
                       <p style={{ fontSize: 14, fontWeight: 800, color: C.primaryText, margin: '1px 0 0', fontVariantNumeric: 'tabular-nums' }}>
-                        NT${(item.sellPrice * item.qty - lineDiscounts[idx]).toLocaleString()}
+                        NT${(cartItemPrice(item) * item.qty).toLocaleString()}
                       </p>
                     </>
                   ) : (
@@ -772,7 +658,7 @@ function CheckoutContent() {
             ))}
 
             <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>
-              一次刷卡完成 · 每張 eSIM 會獨立發送 · 優惠券折抵整筆總額
+              一次刷卡完成 · 每張 eSIM 會獨立發送
             </p>
           </div>
         ) : (
@@ -813,10 +699,10 @@ function CheckoutContent() {
                 <NetworkBadge networkType={product!.networkType} />
                 <NativeSimBadge isNative={product!.isNativeSim} />
               </div>
-              {discount > 0 ? (
+              {cartItemPrice(product!) < product!.sellPrice ? (
                 <p style={{ fontSize: 20, fontWeight: 800, color: C.primaryText, margin: 0, letterSpacing: '-0.02em', display: 'flex', alignItems: 'baseline', gap: 8 }}>
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#94a3b8', textDecoration: 'line-through' }}>NT${product!.sellPrice.toLocaleString()}</span>
-                  <span>NT${displayPrice.toLocaleString()}</span>
+                  <span>NT${cartItemPrice(product!).toLocaleString()}</span>
                 </p>
               ) : (
                 <p style={{ fontSize: 20, fontWeight: 800, color: C.primaryText, margin: 0, letterSpacing: '-0.02em' }}>
@@ -824,88 +710,6 @@ function CheckoutContent() {
                 </p>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Coupon section（單張與購物車皆適用；購物車折整筆總額） */}
-        {(
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 8px 4px' }}>
-              <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>使用優惠券</p>
-              {autoSelectedIds.length > 0 && (
-                <span style={{
-                  fontSize: 11, fontWeight: 600,
-                  background: '#d1fae5', color: '#065f46',
-                  padding: '2px 8px', borderRadius: 100,
-                  display: 'flex', alignItems: 'center', gap: 3,
-                }}>
-                  ✦ 已自動帶入最優惠組合
-                </span>
-              )}
-            </div>
-            {coupons.length === 0 ? (
-              <div style={{
-                background: '#fff', borderRadius: 12,
-                border: '1px solid rgba(0,0,0,0.07)',
-                padding: '14px 16px',
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-                <TicketIcon color="#94a3b8" />
-                <span style={{ flex: 1, fontSize: 14, color: '#94a3b8' }}>選取或輸入優惠碼</span>
-                <span style={{ fontSize: 13, color: '#c4c9d4' }}>尚無可用 ›</span>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {coupons.map(c => {
-                  const selected = selectedCouponIds.includes(c.id)
-                  return (
-                    <label
-                      key={c.id}
-                      style={{
-                        display: 'flex', alignItems: 'center',
-                        background: selected ? C.light : '#fff',
-                        borderRadius: 12,
-                        border: `1.5px solid ${selected ? C.primary : 'rgba(0,0,0,0.07)'}`,
-                        padding: '13px 16px', cursor: 'pointer',
-                        transition: 'border-color 0.15s, background 0.15s',
-                      }}
-                    >
-                      <div style={{ marginRight: 12, flexShrink: 0 }}>
-                        <TicketIcon color={selected ? C.primary : '#94a3b8'} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', margin: 0 }}>{TYPE_LABEL[c.type] ?? c.type}</p>
-                        <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>{c.level} 級券</p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 15, fontWeight: 800, color: C.primaryText }}>
-                          {Math.round((1 - c.discount) * 100)}% OFF
-                        </span>
-                        <div
-                          style={{
-                            width: 20, height: 20, borderRadius: 6, flexShrink: 0,
-                            border: `2px solid ${selected ? C.primary : '#d1d5db'}`,
-                            background: selected ? C.primary : '#fff',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            transition: 'all 0.15s',
-                          }}
-                          onClick={() => toggleCoupon(c.id)}
-                        >
-                          {selected && (
-                            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke={C.onPrimary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="2 6 5 9 10 3" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                    </label>
-                  )
-                })}
-                {comboError && (
-                  <p style={{ fontSize: 12, color: '#ef4444', margin: '0 0 0 4px' }}>{comboError}</p>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -1120,21 +924,15 @@ function CheckoutContent() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b' }}>
             <span>{bundleMode ? `商品小計（${bundleQty} 張）` : '商品金額'}</span>
-            <span>NT${(bundleMode ? bundleSubtotal : cartItemPrice(product!)).toLocaleString()}</span>
+            <span>NT${payable.toLocaleString()}</span>
           </div>
-          {discount > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#16a34a' }}>
-              <span>優惠折扣</span>
-              <span>-NT${discount.toLocaleString()}</span>
-            </div>
-          )}
           <div style={{
             display: 'flex', justifyContent: 'space-between',
             fontSize: 15, fontWeight: 700,
             borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 10, marginTop: 2,
           }}>
             <span style={{ color: '#1a1a1a' }}>實付金額</span>
-            <span style={{ color: C.primaryText, fontSize: 18, letterSpacing: '-0.02em' }}>NT${displayPrice.toLocaleString()}</span>
+            <span style={{ color: C.primaryText, fontSize: 18, letterSpacing: '-0.02em' }}>NT${payable.toLocaleString()}</span>
           </div>
         </div>
 
@@ -1210,15 +1008,9 @@ function CheckoutContent() {
         )}
         <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
           <div>
-            {discount > 0 && (
-              <p style={{ fontSize: 12, color: '#94a3b8', margin: 0, textDecoration: 'line-through' }}>NT${basePrice.toLocaleString()}</p>
-            )}
             <p style={{ fontSize: 24, fontWeight: 800, color: C.primaryText, margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>
-              NT${displayPrice.toLocaleString()}
+              NT${payable.toLocaleString()}
             </p>
-            {discount > 0 && (
-              <p style={{ fontSize: 11, color: '#16a34a', margin: '2px 0 0', fontWeight: 600 }}>省 NT${discount.toLocaleString()}</p>
-            )}
           </div>
           {profileComplete === false ? (
             <button

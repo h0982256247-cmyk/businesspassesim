@@ -4,8 +4,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import RefundConfirmDialog, { type RefundTarget } from '@/components/platform/RefundConfirmDialog'
 
-type CouponLine = { coupon: { type: string; discount: number } }
-type Commission = { commissionAmount: number; ownerRate: number; status: string } | null
 type OrderItem = { productName: string; qty: number }
 type Esim = {
   id: string
@@ -13,11 +11,8 @@ type Esim = {
   status: string
   bundleSeq: number | null
   subtotal: number
-  discountAmount: number
   totalPaid: number
   orderItems: OrderItem[]
-  orderCoupons: CouponLine[]
-  commission: Commission
   esimRcode: string | null
   esimQrcode: string | null
   esimIccid: string | null
@@ -49,12 +44,6 @@ const STATUS: Record<string, { text: string; cls: string }> = {
   CANCELLED:    { text: '已取消',   cls: 'bg-gray-100 text-gray-400' },
   REFUNDED:     { text: '已退款',   cls: 'bg-red-50 text-red-500' },
 }
-const COUPON_LABEL: Record<string, string> = {
-  OFFICIAL_WELCOME: '官方歡迎券', GROUP_JOIN: '入群券', GROUP_REPURCHASE: '回購券',
-  GROUP_OWNER: '社群主券', GROUP_ACTIVITY: '活動券',
-}
-const COMMISSION_STATUS: Record<string, string> = { SETTLED: '已結算', CANCELLED: '已取消', PENDING: '待結算' }
-function fold(d: number) { const n = Math.round(d * 100); return n % 10 === 0 ? `${n / 10} 折` : `${n} 折` }
 function dt(s: string | null) { return s ? new Date(s).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' }
 
 function Pill({ status }: { status: string }) {
@@ -144,12 +133,10 @@ export default function PlatformOrderDetail() {
     setActingId(e.id)
     const j = await fetch(`/api/platform/orders/${e.id}`).then(x => x.json()).catch(() => null)
     setActingId(null)
-    const all = d?.esims ?? [e]
-    const othersActive = all.some(x => x.id !== e.id && ACTIVE(x.status))
     setRefundTarget({
       id: e.id, orderNumber: e.orderNumber, status: e.status, scope: 'single',
       amount: e.totalPaid, count: 1,
-      restoresCoupons: !othersActive,
+      restoresCoupons: false,
       preview: j?.refundPreview ?? null,
     })
   }
@@ -166,7 +153,7 @@ export default function PlatformOrderDetail() {
       id: d.focusedId, orderNumber: d.orderNumber, status: refundable[0].status, scope: 'bundle',
       amount: refundable.reduce((s, e) => s + e.totalPaid, 0),
       count: refundable.length,
-      restoresCoupons: true,
+      restoresCoupons: false,
       preview: j?.refundPreview ?? null,
     })
   }
@@ -178,8 +165,6 @@ export default function PlatformOrderDetail() {
     }).then(x => x.json()).catch(() => ({ error: '連線失敗' }))
     if (r.error) return { ok: false, message: r.error }
     const parts = [`已退還 NT$${(r.refundedAmount ?? 0).toLocaleString()}${r.refundedCount > 1 ? `（${r.refundedCount} 張 eSIM）` : ''}`]
-    if (r.restoredCoupons > 0) parts.push(`歸還優惠券 ${r.restoredCoupons} 張`)
-    if (r.voidedCoupons > 0) parts.push(`作廢回購券 ${r.voidedCoupons} 張`)
     load()
     return { ok: true, message: parts.join('\n') }
   }
@@ -192,10 +177,6 @@ export default function PlatformOrderDetail() {
   const isBundle = esims.length > 1
   const single = esims[0]
   const totalPaid = esims.reduce((s, e) => s + e.totalPaid, 0)
-  const totalSubtotal = esims.reduce((s, e) => s + e.subtotal, 0)
-  const totalDiscount = esims.reduce((s, e) => s + e.discountAmount, 0)
-  const totalCommission = esims.reduce((s, e) => s + (e.commission?.commissionAmount ?? 0), 0)
-  const hasCommission = esims.some(e => e.commission)
   const refundableCount = esims.filter(e => REFUNDABLE(e.status)).length
 
   const btn = {
@@ -338,9 +319,6 @@ export default function PlatformOrderDetail() {
                   {isBundle && (
                     <div className="flex flex-wrap items-center gap-x-5 gap-y-1 pt-3 border-t border-gray-50 text-xs text-gray-500">
                       <span>實付 <b className="text-sm text-gray-900">NT${e.totalPaid.toLocaleString()}</b></span>
-                      {e.discountAmount > 0 && <span>原價 NT${e.subtotal.toLocaleString()}・折 NT${e.discountAmount.toLocaleString()}</span>}
-                      {e.orderCoupons.length > 0 && <span>{e.orderCoupons.map(c => `${COUPON_LABEL[c.coupon.type] ?? c.coupon.type}（${fold(c.coupon.discount)}）`).join('、')}</span>}
-                      {e.commission && <span>分潤 NT${e.commission.commissionAmount}</span>}
                     </div>
                   )}
                 </div>
@@ -391,21 +369,10 @@ export default function PlatformOrderDetail() {
             <div className="p-5">
               <SecLabel>金額明細</SecLabel>
               <div className="space-y-2">
-                <KV label="原價">NT${totalSubtotal.toLocaleString()}</KV>
-                <KV label="折扣">- NT${totalDiscount.toLocaleString()}</KV>
-                <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-gray-100">
+                <div className="flex justify-between items-baseline">
                   <span className="text-sm font-semibold text-gray-700">{isBundle ? `合計實付（${esims.length} 張）` : '實付'}</span>
                   <span className="text-lg font-extrabold text-gray-900">NT${totalPaid.toLocaleString()}</span>
                 </div>
-                {!isBundle && single.orderCoupons.length > 0 && (
-                  <KV label="使用優惠券">{single.orderCoupons.map(c => `${COUPON_LABEL[c.coupon.type] ?? c.coupon.type}（${fold(c.coupon.discount)}）`).join('、')}</KV>
-                )}
-                {hasCommission && (
-                  <KV label="社群分潤">
-                    NT${totalCommission.toLocaleString()}
-                    {!isBundle && single.commission && <span className="text-gray-400">（{Math.round(Number(single.commission.ownerRate) * 100)}%・{COMMISSION_STATUS[single.commission.status] ?? single.commission.status}）</span>}
-                  </KV>
-                )}
               </div>
             </div>
           </div>
