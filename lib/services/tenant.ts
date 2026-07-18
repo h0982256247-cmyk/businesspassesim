@@ -1,99 +1,34 @@
-import { prisma } from '@/lib/db/prisma'
 import type { TenantConfig } from '@/components/liff/TenantContext'
 
 export type { TenantConfig }
 
-export async function getTenantBySlug(slug: string): Promise<TenantConfig | null> {
-  const admin = await prisma.platformAdmin.findUnique({
-    where: { tenantSlug: slug, isActive: true },
-    select: { id: true, tenantSlug: true, brandName: true, liffId: true, logoUrl: true, primaryColor: true, homeTemplate: true, productsTemplate: true, lineOaUrl: true },
-  })
-
-  if (!admin || !admin.tenantSlug || !admin.brandName || !admin.liffId) return null
-
-  return {
-    id: admin.id,
-    slug: admin.tenantSlug,
-    brandName: admin.brandName,
-    liffId: admin.liffId,
-    logoUrl: admin.logoUrl,
-    primaryColor: admin.primaryColor,
-    homeTemplate: (admin.homeTemplate as TenantConfig['homeTemplate']) ?? null,
-    productsTemplate: (admin.productsTemplate as TenantConfig['productsTemplate']) ?? null,
-    lineOaUrl: admin.lineOaUrl,
-  }
+// 單一品牌：原白牌版由 PlatformAdmin 解析 per-tenant 設定（slug/liffId/domain）。
+// 改造後只有「商務通」一個品牌，一律回傳同一組 env 設定；保留這些函式簽名讓
+// 既有 /liff/[slug] 路由與 TenantContext 不用大改（slug 變常數）。
+const BRAND: TenantConfig = {
+  id: 'default',
+  slug: process.env.NEXT_PUBLIC_BRAND_SLUG || 'app',
+  brandName: process.env.NEXT_PUBLIC_BRAND_NAME || '商務通',
+  liffId: process.env.NEXT_PUBLIC_LIFF_ID || '',
+  logoUrl: process.env.NEXT_PUBLIC_BRAND_LOGO || null,
+  primaryColor: process.env.NEXT_PUBLIC_BRAND_COLOR || null,
+  homeTemplate: null,
+  productsTemplate: null,
+  lineOaUrl: process.env.NEXT_PUBLIC_LINE_OA_URL || null,
 }
 
-// 非 slug 的單租戶部署（用環境變數 NEXT_PUBLIC_LIFF_ID 綁定）靠 liffId 反查後台
-// 品牌設定，用來設定頁面標題等。liffId 理論上對應單一後台，取第一筆即可。
-export async function getTenantByLiffId(liffId: string): Promise<TenantConfig | null> {
-  if (!liffId) return null
-  const admin = await prisma.platformAdmin.findFirst({
-    where: { liffId, isActive: true },
-    select: { id: true, tenantSlug: true, brandName: true, liffId: true, logoUrl: true, primaryColor: true, homeTemplate: true, productsTemplate: true, lineOaUrl: true },
-  })
-
-  if (!admin || !admin.tenantSlug || !admin.brandName || !admin.liffId) return null
-
-  return {
-    id: admin.id,
-    slug: admin.tenantSlug,
-    brandName: admin.brandName,
-    liffId: admin.liffId,
-    logoUrl: admin.logoUrl,
-    primaryColor: admin.primaryColor,
-    homeTemplate: (admin.homeTemplate as TenantConfig['homeTemplate']) ?? null,
-    productsTemplate: (admin.productsTemplate as TenantConfig['productsTemplate']) ?? null,
-    lineOaUrl: admin.lineOaUrl,
-  }
+export async function getTenantBySlug(_slug: string): Promise<TenantConfig | null> {
+  return BRAND
 }
 
-// 以 hostname 解析租戶（自訂網域入口）。傳入 Host header（可能含 port），
-// 正規化為小寫純 host 後查 TenantDomain。命中才回傳，否則 null（交由 slug 入口處理）。
-export async function getTenantByDomain(host: string): Promise<TenantConfig | null> {
-  const domain = host.toLowerCase().split(':')[0].trim()
-  if (!domain) return null
-  const row = await prisma.tenantDomain.findUnique({
-    where: { domain },
-    select: {
-      admin: {
-        select: { id: true, isActive: true, tenantSlug: true, brandName: true, liffId: true, logoUrl: true, primaryColor: true, homeTemplate: true, productsTemplate: true, lineOaUrl: true },
-      },
-    },
-  })
-  const admin = row?.admin
-  if (!admin || !admin.isActive || !admin.tenantSlug || !admin.brandName || !admin.liffId) return null
-
-  return {
-    id: admin.id,
-    slug: admin.tenantSlug,
-    brandName: admin.brandName,
-    liffId: admin.liffId,
-    logoUrl: admin.logoUrl,
-    primaryColor: admin.primaryColor,
-    homeTemplate: (admin.homeTemplate as TenantConfig['homeTemplate']) ?? null,
-    productsTemplate: (admin.productsTemplate as TenantConfig['productsTemplate']) ?? null,
-    lineOaUrl: admin.lineOaUrl,
-  }
+export async function getTenantByLiffId(_liffId: string): Promise<TenantConfig | null> {
+  return BRAND
 }
 
-export async function getTenantById(tenantAdminId: string): Promise<TenantConfig | null> {
-  const admin = await prisma.platformAdmin.findUnique({
-    where: { id: tenantAdminId, isActive: true },
-    select: { id: true, tenantSlug: true, brandName: true, liffId: true, logoUrl: true, primaryColor: true, homeTemplate: true, productsTemplate: true, lineOaUrl: true },
-  })
+export async function getTenantByDomain(_host: string): Promise<TenantConfig | null> {
+  return BRAND
+}
 
-  if (!admin || !admin.tenantSlug || !admin.brandName || !admin.liffId) return null
-
-  return {
-    id: admin.id,
-    slug: admin.tenantSlug,
-    brandName: admin.brandName,
-    liffId: admin.liffId,
-    logoUrl: admin.logoUrl,
-    primaryColor: admin.primaryColor,
-    homeTemplate: (admin.homeTemplate as TenantConfig['homeTemplate']) ?? null,
-    productsTemplate: (admin.productsTemplate as TenantConfig['productsTemplate']) ?? null,
-    lineOaUrl: admin.lineOaUrl,
-  }
+export async function getTenantById(_id: string): Promise<TenantConfig | null> {
+  return BRAND
 }

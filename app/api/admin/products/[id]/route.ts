@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
 import { upsertProduct, setProductStatus } from '@/lib/services/product'
 import { ProductStatus } from '@prisma/client'
-import { prisma } from '@/lib/db/prisma'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -13,15 +12,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const { id } = await params
   const body = await req.json()
-
-  // Verify ownership for non-SUPER_ADMIN
-  if (auth.role !== 'SUPER_ADMIN') {
-    const existing = await prisma.product.findUnique({ where: { id }, select: { tenantAdminId: true } })
-    if (!existing) return NextResponse.json({ error: '商品不存在' }, { status: 404 })
-    if (existing.tenantAdminId !== auth.tenantAdminId) {
-      return NextResponse.json({ error: '無權操作此商品' }, { status: 403 })
-    }
-  }
 
   // Status-only update
   if (body.status && Object.keys(body).length === 1) {

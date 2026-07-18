@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
 
   try {
-    const r = await recomputeMetaFromSupplier(auth.tenantAdminId)
+    const r = await recomputeMetaFromSupplier()
     return NextResponse.json({
       message: `重算完成：共 ${r.total} 筆，國家更新 ${r.countryUpdated} 筆，流量更新 ${r.capacityUpdated} 筆`,
       ...r,

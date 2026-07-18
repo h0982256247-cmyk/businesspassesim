@@ -1,6 +1,5 @@
 /**
  * 執行方式：
- *   cd app-src
  *   npx tsx scripts/seed-super-admin.ts
  *
  * 只需執行一次。若 Super Admin 已存在則跳過。
@@ -26,7 +25,7 @@ const SUPER_ADMIN_NAME = 'Super Admin'
 // ──────────────────────────────────────────────────────────────────
 
 async function main() {
-  const existing = await prisma.platformAdmin.findUnique({
+  const existing = await prisma.adminUser.findUnique({
     where: { email: SUPER_ADMIN_EMAIL },
   })
 
@@ -37,13 +36,12 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 12)
 
-  await prisma.platformAdmin.create({
+  await prisma.adminUser.create({
     data: {
       email: SUPER_ADMIN_EMAIL,
       passwordHash,
       name: SUPER_ADMIN_NAME,
       role: 'SUPER_ADMIN',
-      modules: [],
     },
   })
 

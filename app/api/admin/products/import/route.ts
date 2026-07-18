@@ -316,7 +316,7 @@ export async function POST(req: NextRequest) {
   // /api/admin/products/validate 比對、POST .../apply 套用），讓匯入快速單純、
   // 不受 WM API 連線狀況影響。
   try {
-    const result = await batchCreateProducts(rows, auth.tenantAdminId)
+    const result = await batchCreateProducts(rows)
 
     const warns: string[] = []
     if (skippedSheets.length > 0) warns.push(`略過非商品分頁：${skippedSheets.join('、')}`)

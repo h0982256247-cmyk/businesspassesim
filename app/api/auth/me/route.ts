@@ -28,7 +28,9 @@ export async function GET(req: NextRequest) {
       avatarUrl: user.avatarUrl,
       profileComplete: isProfileComplete(user),
     },
-    group: user.groupMembership?.group ?? null,
-    ownedGroup: user.ownedGroup ?? null,
+    // 企業歸屬 + 審核狀態（前端據此顯示福利價資格）
+    membership: user.groupMembership
+      ? { status: user.groupMembership.status, group: user.groupMembership.group }
+      : null,
   })
 }
