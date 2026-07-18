@@ -400,3 +400,22 @@ enum NotificationType {
 
   @@map("notification_type")
 }
+
+// ============================================================
+// 系統告警（可觀測性守門，見 CLAUDE.md F）
+// ============================================================
+
+// 業務關鍵 async 失敗（開卡/金流驗真/WM 下單等）寫入，供後台儀表板紅色警示區呈現。
+// 取代 .catch(()=>{}) 靜默吞錯。recordAlert 自身失敗只退 console，絕不影響主流程。
+model SystemAlert {
+  id         String    @id @default(cuid())
+  level      String    @default("error") // error | warn
+  label      String
+  orderId    String?   @map("order_id")
+  context    Json?
+  resolvedAt DateTime? @map("resolved_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([resolvedAt, createdAt])
+  @@map("system_alerts")
+}
