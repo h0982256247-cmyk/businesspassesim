@@ -21,6 +21,7 @@ type Product = {
   isNativeSim: boolean
   description: string | null
   sellPrice: number
+  benefitPrice?: number   // 企業會員福利價（API 依身分回傳）
 }
 
 const S = {
@@ -177,9 +178,9 @@ export default function ProductDetailPage() {
         <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ minWidth: 0 }}>
             {(() => {
-              const bestPrice = product.sellPrice
-              const savedAmount = 0
-              const hasDiscount = false
+              const hasDiscount = product.benefitPrice != null && product.benefitPrice < product.sellPrice
+              const bestPrice = hasDiscount ? product.benefitPrice! : product.sellPrice
+              const savedAmount = hasDiscount ? product.sellPrice - product.benefitPrice! : 0
               return hasDiscount ? (
                 <>
                   <p style={{ fontSize: 11, color: S.faint, margin: 0, textDecoration: 'line-through' }}>

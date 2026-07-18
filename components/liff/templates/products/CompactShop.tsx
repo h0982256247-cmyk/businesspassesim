@@ -279,9 +279,9 @@ export default function CompactShop({
 
         {visible.map((d, i) => {
           const p = d.plan
-          const bestPrice = p.sellPrice
-          const savedAmount = 0
-          const hasDiscount = false
+          const hasDiscount = p.benefitPrice != null && p.benefitPrice < p.sellPrice
+          const bestPrice = hasDiscount ? p.benefitPrice! : p.sellPrice
+          const savedAmount = hasDiscount ? p.sellPrice - p.benefitPrice! : 0
           const inCart = cart.has(p.id)
           const tier = TIER_COLOR[d.tier]
           return (

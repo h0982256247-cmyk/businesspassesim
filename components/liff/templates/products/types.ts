@@ -19,6 +19,8 @@ export interface Product {
   isNativeSim: boolean
   description: string | null
   sellPrice: number
+  /** 企業福利價：僅已核准企業會員的 API 回應會帶；有值且 < sellPrice 時顯示「原價槓掉 + 福利價」。 */
+  benefitPrice?: number
 }
 
 export interface DayFilterControls {

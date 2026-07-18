@@ -27,6 +27,7 @@ export async function getActiveProducts(countryCode?: string) {
       isNativeSim: true,
       description: true,
       sellPrice: true,
+      benefitPrice: true, // 企業福利價；route 依身分決定是否回傳
       sortOrder: true,
     },
   })

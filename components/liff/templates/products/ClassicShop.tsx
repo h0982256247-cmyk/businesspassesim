@@ -386,8 +386,8 @@ export default function ClassicShop({
 
         {displays.map(d => {
           const p = d.plan
-          const bestPrice = p.sellPrice
-          const hasDiscount = false
+          const hasDiscount = p.benefitPrice != null && p.benefitPrice < p.sellPrice
+          const bestPrice = hasDiscount ? p.benefitPrice! : p.sellPrice
           const inCart = cart.has(p.id)
           const tier = TIER_COLOR[d.tier]
           return (
