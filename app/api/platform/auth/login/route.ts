@@ -20,18 +20,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '帳號或密碼錯誤' }, { status: 401 })
   }
 
-  let tenantAdminId: string | null = null
-  if (admin.role === 'PLATFORM_ADMIN') tenantAdminId = admin.id
-  else if (admin.role === 'SUB_ADMIN') tenantAdminId = admin.parentId ?? null
-
   const token = await createPlatformSession({
     adminId: admin.id,
     role: admin.role,
-    tenantAdminId,
+    groupId: admin.groupId,   // COMPANY_ADMIN 綁定的企業；SUPER_ADMIN 為 null
   })
 
   const res = NextResponse.json({
-    admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, tenantAdminId },
+    admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role, groupId: admin.groupId },
   })
 
   res.cookies.set(PLATFORM_COOKIE, token, {

@@ -7,19 +7,15 @@ export async function GET(req: NextRequest) {
   const auth = await requirePlatformAuth(req)
   if (auth instanceof NextResponse) return auth
 
-  const admin = await prisma.platformAdmin.findUnique({
+  const admin = await prisma.adminUser.findUnique({
     where: { id: auth.adminId },
-    select: { id: true, name: true, email: true, role: true, maxRebateRate: true },
+    select: {
+      id: true, name: true, email: true, role: true, groupId: true,
+      group: { select: { id: true, name: true } },
+    },
   })
 
   if (!admin) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  return NextResponse.json({
-    admin: {
-      ...admin,
-      tenantAdminId:    auth.tenantAdminId,
-      impersonatorId:   auth.impersonatorId   ?? null,
-      impersonatorName: auth.impersonatorName ?? null,
-    },
-  })
+  return NextResponse.json({ admin })
 }

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
 import { prisma } from '@/lib/db/prisma'
 import { Prisma, OrderStatus } from '@prisma/client'
-import { orderTenantWhere } from '@/lib/services/order'
 
 // GET /api/platform/orders?page=1&status=PENDING（待付款涵蓋 PENDING+PROCESSING）
 export async function GET(req: NextRequest) {
@@ -13,13 +12,7 @@ export async function GET(req: NextRequest) {
   const statusParam = req.nextUrl.searchParams.get('status')
   const pageSize = 20
 
-  const tenantAdminId = auth.role === 'SUPER_ADMIN'
-    ? (req.nextUrl.searchParams.get('tenantAdminId') || null)
-    : auth.tenantAdminId
-  const tenantWhere = orderTenantWhere(tenantAdminId)
-
-  // 待付款 filter（status=PENDING）需同時涵蓋 PENDING（建立中）與 PROCESSING
-  // （金流進行中／已送出尚未收到 backend notify）——兩者前台皆顯示「待付款」。
+  // 待付款 filter（status=PENDING）需同時涵蓋 PENDING（建立中）與 PROCESSING（金流進行中）。
   const statusWhere: Prisma.OrderWhereInput =
     statusParam === OrderStatus.PENDING
       ? { status: { in: [OrderStatus.PENDING, OrderStatus.PROCESSING] } }
@@ -36,14 +29,10 @@ export async function GET(req: NextRequest) {
     ],
   } : {}
 
-  const where: Prisma.OrderWhereInput = {
-    ...statusWhere,
-    ...tenantWhere,
-    ...searchWhere,
-  }
+  const where: Prisma.OrderWhereInput = { ...statusWhere, ...searchWhere }
 
   // 同捆（多張 eSIM 一次結帳 = 共用 bundleId）在列表只佔一列：
-  // 代表列 = 無 bundle 的單筆訂單，或 bundle 的第一張（bundleSeq=1，1-indexed）。
+  // 代表列 = 無 bundle 的單筆訂單，或 bundle 的第一張（bundleSeq=1）。
   const repWhere: Prisma.OrderWhereInput = {
     AND: [where, { OR: [{ bundleId: null }, { bundleSeq: 1 }] }],
   }
@@ -60,7 +49,7 @@ export async function GET(req: NextRequest) {
         status: true,
         totalPaid: true,
         subtotal: true,
-        discountAmount: true,
+        priceTier: true,
         paymentMethod: true,
         tapPayOrderId: true,
         paidAt: true,
@@ -68,13 +57,14 @@ export async function GET(req: NextRequest) {
         retryCount: true,
         bundleId: true,
         user: { select: { displayName: true, lineUid: true } },
+        company: { select: { name: true } },
         orderItems: { select: { productName: true } },
       },
     }),
     prisma.order.count({ where: repWhere }),
   ])
 
-  // 同捆合計：張數與金額合計（不受 status filter 影響，呈現整捆全貌）
+  // 同捆合計：張數與金額（不受 status filter 影響，呈現整捆全貌）
   const bundleIds = reps.map(r => r.bundleId).filter((b): b is string => !!b)
   const aggMap = new Map<string, { count: number; total: number }>()
   if (bundleIds.length > 0) {
