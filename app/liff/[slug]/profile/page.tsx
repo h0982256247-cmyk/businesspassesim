@@ -11,8 +11,7 @@ type UserInfo = {
   displayName: string
   avatarUrl: string | null
   profileComplete: boolean
-  ownedGroup?: { status: string; name: string } | null
-  membership?: { group: { name: string } } | null
+  membership?: { status: string; group: { name: string } } | null
 }
 
 const S = {
@@ -64,26 +63,26 @@ export default function ProfilePage() {
   const { data, loading } = useCachedData('profile', async () => {
     const d = await fetch('/api/auth/me').then(r => r.ok ? r.json() : null)
     if (!d?.user) return { user: null as UserInfo | null }
-    // /api/auth/me 回傳的會員社群欄位叫 `group`（非 membership）；包成 { group } 對應 UI。
-    return { user: { ...d.user, ownedGroup: d.ownedGroup ?? null, membership: d.group ? { group: d.group } : null } as UserInfo }
+    return { user: { ...d.user, membership: d.membership ?? null } as UserInfo }
   })
   const user = data?.user ?? null
 
   if (loading) return <PageSkeleton rows={4} />
   if (!user) return null
 
-  const isGroupOwner = user.ownedGroup?.status === 'APPROVED'
-  const isMember = !!user.membership && !isGroupOwner
-
-  const groupLabel = isGroupOwner
-    ? `社群主 · ${user.ownedGroup!.name}`
-    : isMember
-    ? `會員 · ${user.membership!.group.name}`
-    : '尚未加入社群'
+  const m = user.membership
+  const isApproved = m?.status === 'APPROVED'
+  const groupLabel = !m
+    ? '尚未加入企業'
+    : m.status === 'PENDING'
+    ? `審核中 · ${m.group.name}`
+    : m.status === 'REJECTED'
+    ? '加入申請未通過'
+    : `企業會員 · ${m.group.name}`
 
   const menuItems = [
     { label: '個人資料', sub: '姓名、電話、電郵', icon: <IconEdit />, href: `${base}/profile/setup` },
-    { label: '我的社群', sub: groupLabel,           icon: <IconGroup />, href: `${base}/group` },
+    { label: '我的企業', sub: groupLabel,           icon: <IconGroup />, href: `${base}/company` },
     { label: '客服中心', sub: '問題回報與聯絡',    icon: <IconSupport />, href: `${base}/support` },
   ]
 
@@ -106,9 +105,9 @@ export default function ProfilePage() {
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <p style={{ fontSize: 18, fontWeight: 700, color: S.ink, margin: 0 }}>{user.displayName}</p>
-            {isGroupOwner && (
-              <span style={{ fontSize: 11, fontWeight: 700, background: '#fef3c7', color: '#92400e', padding: '2px 8px', borderRadius: 100 }}>
-                社群主
+            {isApproved && (
+              <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 100 }}>
+                企業會員
               </span>
             )}
           </div>
