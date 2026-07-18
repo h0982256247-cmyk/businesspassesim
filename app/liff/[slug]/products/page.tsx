@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { useLiff } from '@/components/liff/LiffProvider'
 import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
-import { type CouponItem } from '@/lib/utils/coupon-combo'
 import { pickInitialDay, PRODUCTS_DEFAULT_DAYS } from '@/lib/utils/products-day-default'
 import { peekCache, setCache, productsCacheKey } from '@/hooks/useCachedData'
 
@@ -65,7 +64,6 @@ function ProductsContent() {
   const [countries, setCountries] = useState<Country[]>([])
   // allProducts = 後端抓回的「所有方案」；selectedCountry/dayFilter 在前端篩選，避免切國家時重打 API
   const [allProducts, setAllProducts] = useState<Product[]>([])
-  const [coupons, setCoupons] = useState<CouponItem[]>([])
   const [loading, setLoading] = useState(true)
 
   // Day filter state — 有從搜尋帶 ?days 就用它，否則預設 5（避免「340 → 17」閃爍）
@@ -106,23 +104,12 @@ function ProductsContent() {
     }
 
     async function load() {
-      const [prodData, couponData] = await Promise.all([
-        fetch('/api/products').then(r => r.json()),
-        fetch('/api/coupons').then(r => r.json()).catch(() => ({ coupons: [] })),
-      ])
+      const prodData = await fetch('/api/products').then(r => r.json())
       if (cancelled) return
       // 拿到最新 → 同時更新狀態與快取（用 setCache 強制覆蓋，prefetchCache 會跳過已存在的 key）
       setCache(productsCacheKey(), prodData)
       setCountries(prodData.countries ?? [])
       setAllProducts(prodData.products ?? [])
-      const now = new Date()
-      setCoupons(
-        (couponData.coupons ?? [])
-          .filter((c: CouponItem & { usedAt?: string | null; expiresAt?: string | null }) =>
-            !c.usedAt && (!c.expiresAt || new Date(c.expiresAt) > now)
-          )
-          .map((c: CouponItem) => ({ id: c.id, discount: c.discount }))
-      )
       setLoading(false)
     }
     load()
@@ -228,7 +215,6 @@ function ProductsContent() {
         countries={countries}
         products={filteredProducts}
         coverageCountries={coverageCountries}
-        coupons={coupons}
         selectedCountry={selectedCountry}
         showSetup={showSetup}
         colors={C}

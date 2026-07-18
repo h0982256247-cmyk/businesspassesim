@@ -5,7 +5,6 @@ import { useRouter, useParams } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { SignalIllustration } from '@/components/liff/LiffIllustrations'
 import { useTenantColors } from '@/components/liff/TenantContext'
-import { calcBestPrice, type CouponItem } from '@/lib/utils/coupon-combo'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { useCart } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge, parseNetworkType } from '@/components/liff/ProductBadges'
@@ -56,28 +55,16 @@ export default function ProductDetailPage() {
   const C = useTenantColors()
   const cart = useCart()
   const [product, setProduct] = useState<Product | null>(null)
-  const [coupons, setCoupons] = useState<CouponItem[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/products/${id}`).then(r => {
-        if (r.status === 404) { setNotFound(true); return null }
-        return r.json()
-      }),
-      fetch('/api/coupons').then(r => r.json()).catch(() => ({ coupons: [] })),
-    ]).then(([prodData, couponData]) => {
+    fetch(`/api/products/${id}`).then(r => {
+      if (r.status === 404) { setNotFound(true); return null }
+      return r.json()
+    }).then(prodData => {
       if (prodData) setProduct(prodData.product)
-      const now = new Date()
-      setCoupons(
-        (couponData.coupons ?? [])
-          .filter((c: CouponItem & { usedAt?: string | null; expiresAt?: string | null }) =>
-            !c.usedAt && (!c.expiresAt || new Date(c.expiresAt) > now)
-          )
-          .map((c: CouponItem) => ({ id: c.id, discount: c.discount }))
-      )
     }).finally(() => setLoading(false))
   }, [id])
 
@@ -190,7 +177,9 @@ export default function ProductDetailPage() {
         <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ minWidth: 0 }}>
             {(() => {
-              const { bestPrice, savedAmount, hasDiscount } = calcBestPrice(coupons, product.sellPrice)
+              const bestPrice = product.sellPrice
+              const savedAmount = 0
+              const hasDiscount = false
               return hasDiscount ? (
                 <>
                   <p style={{ fontSize: 11, color: S.faint, margin: 0, textDecoration: 'line-through' }}>

@@ -6,7 +6,6 @@ import { useCart } from '@/components/liff/CartProvider'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
-import { calcBestPrice, type CouponItem } from '@/lib/utils/coupon-combo'
 
 // Pages where the floating cart should NOT appear
 const HIDE_ON = ['/checkout', '/profile/setup', '/login', '/gift/']
@@ -67,8 +66,6 @@ export default function FloatingCart() {
   const { items, count, totalQty, subtotal, remove, setQty, hydrated } = useCart()
   const [open, setOpen] = useState(false)
   const [bumped, setBumped] = useState(false)
-  // 優惠券：載入使用者可用券，在購物車預覽「折總額後」價格（與結帳頁、商品卡一致）。
-  const [coupons, setCoupons] = useState<CouponItem[]>([])
 
   // Bump animation when qty count increases
   const [prevTotalQty, setPrevTotalQty] = useState(totalQty)
@@ -88,20 +85,6 @@ export default function FloatingCart() {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = prev }
   }, [open])
-
-  // 載入可用優惠券（折總額預覽用）。每次「打開抽屜」就重抓一次 —— 取消訂單把券
-  // 退回後、或在別頁領到新券，打開購物車就會即時反映，不會停在舊的快取狀態。
-  useEffect(() => {
-    if (!open || !hydrated) return
-    fetch('/api/coupons').then(r => r.json()).then(cd => {
-      const now = new Date()
-      setCoupons(
-        (cd.coupons ?? [])
-          .filter((c: { usedAt?: string | null; expiresAt?: string | null }) => !c.usedAt && (!c.expiresAt || new Date(c.expiresAt) > now))
-          .map((c: { id: string; discount: number }) => ({ id: c.id, discount: c.discount }))
-      )
-    }).catch(() => {})
-  }, [open, hydrated])
 
   if (!hydrated) return null
   if (HIDE_ON.some(p => pathname.includes(p))) return null
@@ -130,9 +113,10 @@ export default function FloatingCart() {
 
   const badgeNumber = totalQty > 0 ? totalQty : count
 
-  // 折總額預覽：把可用券的最優組合套在「整筆小計」上（與結帳頁折總額一致）。
-  // 結帳頁會自動帶入同一組合，使用者可在那裡再調整。
-  const { bestPrice, savedAmount, hasDiscount } = calcBestPrice(coupons, subtotal)
+  // 無優惠券系統：購物車金額 = 小計（依身分顯示福利價為 Phase 5 前端再加）
+  const bestPrice = subtotal
+  const savedAmount = 0
+  const hasDiscount = false
 
   return (
     <>

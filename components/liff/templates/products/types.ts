@@ -1,5 +1,4 @@
 import type { TenantColors } from '@/components/liff/TenantContext'
-import type { CouponItem } from '@/lib/utils/coupon-combo'
 
 export interface Country {
   countryCode: string
@@ -61,7 +60,6 @@ export interface ProductsTemplateProps {
   products: Product[]
   /** 該目的地「適用國家」原字串（取自未經天數篩選的整組方案，避免被日篩濾掉）。 */
   coverageCountries: string | null
-  coupons: CouponItem[]
   selectedCountry: string | null
   showSetup: boolean
   colors: TenantColors

@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { calcBestPrice } from '@/lib/utils/coupon-combo'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import DayPicker from '@/components/liff/DayPicker'
 import { annotatePlans, sortByValue, TIER_LABEL, TIER_COLOR, type DataTier } from '@/lib/utils/product-display'
@@ -49,7 +48,7 @@ function StarIcon({ size = 11 }: { size?: number }) {
 const TIER_ORDER: DataTier[] = ['light', 'standard', 'medium', 'heavy', 'unlimited', 'titanium', 'highspeed', 'unknown']
 
 export default function CompactShop({
-  countries, products, coupons, selectedCountry,
+  countries, products, selectedCountry,
   colors: C, onSelectCountry, onSelectProduct, onBack,
   filter, cart,
 }: ProductsTemplateProps) {
@@ -280,7 +279,9 @@ export default function CompactShop({
 
         {visible.map((d, i) => {
           const p = d.plan
-          const { bestPrice, savedAmount, hasDiscount } = calcBestPrice(coupons, p.sellPrice)
+          const bestPrice = p.sellPrice
+          const savedAmount = 0
+          const hasDiscount = false
           const inCart = cart.has(p.id)
           const tier = TIER_COLOR[d.tier]
           return (

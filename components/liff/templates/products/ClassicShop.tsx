@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { calcBestPrice } from '@/lib/utils/coupon-combo'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getCoverageList, CoveragePopup } from '@/components/liff/CoverageCountries'
 import DayPicker from '@/components/liff/DayPicker'
@@ -67,7 +66,7 @@ function CrownIcon({ size = 12 }: { size?: number }) {
 }
 
 export default function ClassicShop({
-  countries, products, coverageCountries, coupons, selectedCountry,
+  countries, products, coverageCountries, selectedCountry,
   colors: C, onSelectCountry, onSelectProduct, onBack,
   filter, cart,
 }: ProductsTemplateProps) {
@@ -387,7 +386,8 @@ export default function ClassicShop({
 
         {displays.map(d => {
           const p = d.plan
-          const { bestPrice, hasDiscount } = calcBestPrice(coupons, p.sellPrice)
+          const bestPrice = p.sellPrice
+          const hasDiscount = false
           const inCart = cart.has(p.id)
           const tier = TIER_COLOR[d.tier]
           return (

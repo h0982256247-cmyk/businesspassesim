@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { calcBestPrice } from '@/lib/utils/coupon-combo'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getCoverageList, CoveragePopup } from '@/components/liff/CoverageCountries'
 import DayPicker from '@/components/liff/DayPicker'
@@ -69,7 +68,7 @@ function CrownIcon({ size = 14 }: { size?: number }) {
 }
 
 export default function MagazineShop({
-  countries, products, coverageCountries, coupons, selectedCountry,
+  countries, products, coverageCountries, selectedCountry,
   colors: C, onSelectCountry, onSelectProduct, onBack,
   filter, cart,
 }: ProductsTemplateProps) {
@@ -317,7 +316,6 @@ export default function MagazineShop({
           </p>
           <FeaturedCard
             display={featured}
-            coupons={coupons}
             colors={C}
             inCart={cart.has(featured.plan.id)}
             onToggleCart={() => cart.toggle(featured.plan)}
@@ -360,7 +358,9 @@ export default function MagazineShop({
 
         {rest.map(d => {
           const p = d.plan
-          const { bestPrice, savedAmount, hasDiscount } = calcBestPrice(coupons, p.sellPrice)
+          const bestPrice = p.sellPrice
+          const savedAmount = 0
+          const hasDiscount = false
           const inCart = cart.has(p.id)
           const tier = TIER_COLOR[d.tier]
           return (
@@ -493,16 +493,17 @@ export default function MagazineShop({
 
 interface FeaturedCardProps {
   display: ReturnType<typeof annotatePlans>[number]
-  coupons: Parameters<typeof calcBestPrice>[0]
   colors: ProductsTemplateProps['colors']
   inCart: boolean
   onToggleCart: () => void
   onSelectProduct: () => void
 }
 
-function FeaturedCard({ display: d, coupons, colors: C, inCart, onToggleCart, onSelectProduct }: FeaturedCardProps) {
+function FeaturedCard({ display: d, colors: C, inCart, onToggleCart, onSelectProduct }: FeaturedCardProps) {
   const p = d.plan
-  const { bestPrice, savedAmount, hasDiscount } = calcBestPrice(coupons, p.sellPrice)
+  const bestPrice = p.sellPrice
+  const savedAmount = 0
+  const hasDiscount = false
   const tier = TIER_COLOR[d.tier]
 
   return (
