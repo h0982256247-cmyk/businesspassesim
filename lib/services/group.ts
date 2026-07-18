@@ -35,6 +35,7 @@ export async function getAllCompanies() {
   return prisma.group.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
+      adminUser: { select: { id: true, displayName: true } },
       _count: { select: { members: { where: { status: MemberStatus.APPROVED, leftAt: null } } } },
     },
   })

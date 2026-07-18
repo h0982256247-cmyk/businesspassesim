@@ -23,17 +23,15 @@ type Stats = {
   totalUsers: number
   totalOrders: number
   totalRevenue: number
-  pendingGroups: number
-  totalGroupOwners: number
+  pendingMembers: number
+  totalCompanies: number
   totalProducts: number
   paymentConfigured: boolean
-  pendingCommissions: number
   esimPendingOrders: number
   monthlyRevenue: MonthlyRevenue[]
   recentOrders: RecentOrder[]
   eligibleRevenue: number
   totalCost: number
-  commissionPaid: number
   grossProfit: number
   marginRate: number
   ordersIncluded: number
@@ -231,9 +229,9 @@ export default function PlatformDashboard() {
   const today = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
 
   const setupSteps = [
-    { label: '匯入商品',       done: stats.totalProducts > 0,    href: '/platform/products', cta: '前往匯入' },
-    { label: '升級社群主',     done: stats.totalGroupOwners > 0, href: '/platform/users',    cta: '前往設定' },
-    { label: '設定金流 / 外觀', done: stats.paymentConfigured,    href: '/platform/liff',     cta: '前往設定' },
+    { label: '匯入商品',   done: stats.totalProducts > 0,   href: '/platform/products', cta: '前往匯入' },
+    { label: '建立企業',   done: stats.totalCompanies > 0,  href: '/platform/groups',   cta: '前往建立' },
+    { label: '設定金流',   done: stats.paymentConfigured,   href: '/platform/liff',     cta: '前往設定' },
   ]
   const setupDone = setupSteps.filter(s => s.done).length
   const showSetup = !isSuper && setupDone < setupSteps.length
@@ -302,7 +300,7 @@ export default function PlatformDashboard() {
           value={stats.totalOrders.toLocaleString()} foot={stats.esimPendingOrders > 0 ? `待發卡 ${stats.esimPendingOrders} 張` : '全部已處理'} />
         <MetricCard tint="bg-amber-50 text-amber-600" label="總會員數"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2h5" /><circle cx="12" cy="8" r="4" /></svg>}
-          value={stats.totalUsers.toLocaleString()} foot={`社群主 ${stats.totalGroupOwners} 人`} />
+          value={stats.totalUsers.toLocaleString()} foot={`企業 ${stats.totalCompanies} 家`} />
         <MetricCard tint="bg-sky-50 text-sky-600" label="毛利率"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19l6-12M7.5 9a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm9 9a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" /></svg>}
           value={stats.ordersIncluded > 0 ? `${(stats.marginRate * 100).toFixed(1)}%` : '—'} foot={`納入 ${stats.ordersIncluded} 筆`} />
@@ -328,10 +326,9 @@ export default function PlatformDashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm flex flex-col">
           <h2 className="text-sm font-semibold text-gray-800 mb-3">營運快覽</h2>
           <div className="space-y-2.5">
-            <QuickStat href="/platform/commissions" label="待結算分潤" value={`NT$${stats.pendingCommissions.toLocaleString()}`} tone="text-amber-600" />
             <QuickStat href="/platform/orders?status=PAID" label="付款成功・待發卡" value={`${stats.esimPendingOrders} 張`} tone={stats.esimPendingOrders > 0 ? 'text-red-500' : 'text-gray-700'} />
-            <QuickStat href="/platform/groups?status=PENDING" label="待審社群申請" value={`${stats.pendingGroups} 件`} tone={stats.pendingGroups > 0 ? 'text-amber-600' : 'text-gray-700'} />
-            <QuickStat href="/platform/groups" label="社群主人數" value={`${stats.totalGroupOwners} 人`} tone="text-gray-700" />
+            <QuickStat href="/platform/groups" label="待審核成員" value={`${stats.pendingMembers} 人`} tone={stats.pendingMembers > 0 ? 'text-amber-600' : 'text-gray-700'} />
+            <QuickStat href="/platform/groups" label="企業數" value={`${stats.totalCompanies} 家`} tone="text-gray-700" />
             <QuickStat label="累計成本" value={`NT$${stats.totalCost.toLocaleString()}`} tone="text-gray-700" />
           </div>
         </div>

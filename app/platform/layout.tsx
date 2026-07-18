@@ -41,7 +41,7 @@ const NAV_ALL = [
   },
   {
     href: '/platform/groups',
-    label: '社群管理',
+    label: '企業管理',
     group: '營運',
     roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUB_ADMIN'],
     icon: (
@@ -54,7 +54,7 @@ const NAV_ALL = [
     href: '/platform/products',
     label: '商品管理',
     group: '商品與前台',
-    roles: ['PLATFORM_ADMIN', 'SUB_ADMIN'],
+    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUB_ADMIN'],
     icon: (
       <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0v10l-8 4m-8-4V7m16 0l-8 4m-8-4l8 4" />
@@ -63,9 +63,9 @@ const NAV_ALL = [
   },
   {
     href: '/platform/liff',
-    label: 'LIFF 前台',
+    label: '前台設定',
     group: '商品與前台',
-    roles: ['PLATFORM_ADMIN', 'SUB_ADMIN'],
+    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUB_ADMIN'],
     icon: (
       <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -80,39 +80,6 @@ const NAV_ALL = [
     icon: (
       <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/platform/commissions',
-    label: '分潤管理',
-    group: '財務',
-    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUB_ADMIN'],
-    icon: (
-      <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-      </svg>
-    ),
-  },
-  {
-    href: '/platform/withdrawals',
-    label: '提領審核',
-    group: '財務',
-    roles: ['SUPER_ADMIN', 'PLATFORM_ADMIN', 'SUB_ADMIN'],
-    icon: (
-      <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-      </svg>
-    ),
-  },
-  {
-    href: '/platform/finance',
-    label: '財務總覽',
-    group: '財務',
-    roles: ['SUPER_ADMIN'],
-    icon: (
-      <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
       </svg>
     ),
   },
