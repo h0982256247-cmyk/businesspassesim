@@ -12,8 +12,6 @@ vi.mock('@/lib/services/order', () => ({
   isOrderExpired: vi.fn(() => false),
 }))
 vi.mock('@/lib/services/esim', () => ({ triggerEsimActivation: vi.fn() }))
-vi.mock('@/lib/services/commission', () => ({ calculateAndSaveCommission: vi.fn() }))
-vi.mock('@/lib/services/coupon', () => ({ issueRepurchaseCouponForOrder: vi.fn() }))
 vi.mock('@/lib/services/notification', () => ({ notifyOrderPaid: vi.fn() }))
 vi.mock('@/lib/services/alert', () => ({ recordAlert: vi.fn() }))
 vi.mock('@/lib/utils/fire-and-log', () => ({ fireAndLog: vi.fn() }))
@@ -23,8 +21,6 @@ vi.mock('@/lib/services/tappay-failure-reason', () => ({ mapTapPayFailureReason:
 import { POST } from '@/app/api/payment/tappay/notify/route'
 import { prisma } from '@/lib/db/prisma'
 import { triggerEsimActivation } from '@/lib/services/esim'
-import { calculateAndSaveCommission } from '@/lib/services/commission'
-import { issueRepurchaseCouponForOrder } from '@/lib/services/coupon'
 import { markOrderPaid, markOrderRefunded } from '@/lib/services/order'
 import { tapPayQueryTrade, tapPayRefund } from '@/lib/services/tappay'
 
@@ -32,8 +28,7 @@ const makeReq = (body: unknown) => ({ json: async () => body }) as Parameters<ty
 
 const orderRow = (status: string) => ({
   id: 'o1', status, bundleId: null, totalPaid: 100,
-  createdAt: new Date(), userId: 'u1',
-  user: { tenantAdminId: 't1' }, orderItems: [],
+  createdAt: new Date(), userId: 'u1', orderItems: [],
 })
 
 describe('TapPay notify — 重送冪等（不重複發卡）', () => {
@@ -47,8 +42,6 @@ describe('TapPay notify — 重送冪等（不重複發卡）', () => {
 
     // 核心不變量：早退路徑完全不碰交付 side effect、也不重打 Record API
     expect(triggerEsimActivation).not.toHaveBeenCalled()
-    expect(calculateAndSaveCommission).not.toHaveBeenCalled()
-    expect(issueRepurchaseCouponForOrder).not.toHaveBeenCalled()
     expect(markOrderPaid).not.toHaveBeenCalled()
     expect(tapPayQueryTrade).not.toHaveBeenCalled()
   })

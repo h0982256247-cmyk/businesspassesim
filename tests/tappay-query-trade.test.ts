@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// tappay service import 時不會 throw（getConfig 只在執行期呼叫），但仍 mock prisma
-// 讓 tenantAdminId=null 時走 env config、不碰 DB。
-vi.mock('@/lib/db/prisma', () => ({ prisma: {} }))
+// getConfig 先讀全域 PaymentConfig（singleton）再退回 env：mock 回 null 讓它走 env config。
+vi.mock('@/lib/db/prisma', () => ({ prisma: { paymentConfig: { findUnique: async () => null } } }))
 
 import { tapPayQueryTrade } from '@/lib/services/tappay'
 
@@ -32,7 +31,7 @@ describe('tapPayQueryTrade — Record API 驗真', () => {
       }),
     }))
 
-    const r = await tapPayQueryTrade(REC, null)
+    const r = await tapPayQueryTrade(REC)
     expect(r.ok).toBe(true)
     if (r.ok) {
       expect(r.amount).toBe(103)
@@ -45,14 +44,14 @@ describe('tapPayQueryTrade — Record API 驗真', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       json: async () => ({ status: 2, msg: 'End of list', trade_records: [] }),
     }))
-    const r = await tapPayQueryTrade(REC, null)
+    const r = await tapPayQueryTrade(REC)
     expect(r.ok).toBe(false)
   })
 
   it('沒帶 rec_trade_id → ok:false，且不打 API', async () => {
     const f = vi.fn()
     vi.stubGlobal('fetch', f)
-    const r = await tapPayQueryTrade('', null)
+    const r = await tapPayQueryTrade('')
     expect(r.ok).toBe(false)
     expect(f).not.toHaveBeenCalled()
   })
