@@ -13,11 +13,18 @@ export type CartItem = {
   networkType?: string | null
   isNativeSim?: boolean
   sellPrice: number
+  /** 加入當下若為已核准企業會員則帶福利價；成交價以此為準（無則用 sellPrice）。 */
+  benefitPrice?: number
   qty: number
   addedAt: number
 }
 
 export type CartItemInput = Omit<CartItem, 'addedAt' | 'qty'> & { qty?: number }
+
+/** 購物車成交單價：有福利價用福利價，否則一般售價。 */
+export function cartItemPrice(i: { sellPrice: number; benefitPrice?: number }): number {
+  return i.benefitPrice != null && i.benefitPrice < i.sellPrice ? i.benefitPrice : i.sellPrice
+}
 
 type CartContextValue = {
   items: CartItem[]
@@ -163,7 +170,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     items,
     count: items.length,
     totalQty: items.reduce((s, i) => s + i.qty, 0),
-    subtotal: items.reduce((s, i) => s + i.sellPrice * i.qty, 0),
+    subtotal: items.reduce((s, i) => s + cartItemPrice(i) * i.qty, 0),
     has,
     add,
     setQty,

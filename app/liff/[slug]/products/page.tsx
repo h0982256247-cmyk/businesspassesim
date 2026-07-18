@@ -198,6 +198,7 @@ function ProductsContent() {
         networkType: product.networkType,
         isNativeSim: product.isNativeSim,
         sellPrice: product.sellPrice,
+        benefitPrice: product.benefitPrice,
       })
     },
   }), [cart, countries])

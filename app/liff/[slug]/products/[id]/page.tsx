@@ -223,6 +223,7 @@ export default function ProductDetailPage() {
                       networkType: product.networkType,
                       isNativeSim: product.isNativeSim,
                       sellPrice: product.sellPrice,
+                      benefitPrice: product.benefitPrice,
                     })
                     setJustAdded(true)
                     setTimeout(() => setJustAdded(false), 1200)

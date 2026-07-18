@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   ])
 
   // 非會員不回傳福利價（避免外洩企業價）
-  const shaped = isMember ? products : products.map(({ benefitPrice, ...rest }) => rest)
+  const shaped = isMember ? products : products.map(({ benefitPrice: _b, ...rest }) => rest)
 
   return NextResponse.json({ products: shaped, countries, isMember })
 }

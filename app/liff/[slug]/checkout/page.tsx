@@ -8,7 +8,7 @@ import { redirectToPaymentUrl } from '@/lib/utils/payment-redirect'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { useLiff } from '@/components/liff/LiffProvider'
 import { CountryFlag } from '@/components/common/CountryFlag'
-import { useCart } from '@/components/liff/CartProvider'
+import { useCart, cartItemPrice } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
 
 declare global {
@@ -35,6 +35,7 @@ type Product = {
   countryFlag: string | null
   displayDays: number
   sellPrice: number
+  benefitPrice?: number   // 企業會員福利價（API 依身分回傳）
   dataCapacity: string | null
   networkType: string | null
   isNativeSim: boolean
@@ -357,7 +358,7 @@ function CheckoutContent() {
 
   // 優惠券試算（單張用商品原價、購物車用總額）
   useEffect(() => {
-    const base = bundleMode ? cart.subtotal : product?.sellPrice
+    const base = bundleMode ? cart.subtotal : (product ? cartItemPrice(product) : undefined)
     if (base == null) return
     if (selectedCouponIds.length === 0) {
       setFinalPrice(base)
@@ -672,7 +673,7 @@ function CheckoutContent() {
   const bundleItems = cart.items
   const bundleQty = cart.totalQty
   const bundleSubtotal = cart.subtotal
-  const basePrice = bundleMode ? bundleSubtotal : product!.sellPrice
+  const basePrice = bundleMode ? bundleSubtotal : cartItemPrice(product!)
   const displayPrice = finalPrice ?? basePrice
   const discount = basePrice - displayPrice
   // 多張：把總折扣攤回每一張，讓上方每張卡也顯示折後價（順序對齊 bundleItems）
@@ -750,7 +751,7 @@ function CheckoutContent() {
                   {lineDiscounts[idx] > 0 ? (
                     <>
                       <p style={{ fontSize: 10.5, color: '#94a3b8', margin: 0, textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>
-                        NT${(item.sellPrice * item.qty).toLocaleString()}
+                        NT${(cartItemPrice(item) * item.qty).toLocaleString()}
                       </p>
                       <p style={{ fontSize: 14, fontWeight: 800, color: C.primaryText, margin: '1px 0 0', fontVariantNumeric: 'tabular-nums' }}>
                         NT${(item.sellPrice * item.qty - lineDiscounts[idx]).toLocaleString()}
@@ -763,7 +764,7 @@ function CheckoutContent() {
                   )}
                   {item.qty > 1 && (
                     <p style={{ fontSize: 10.5, color: '#94a3b8', margin: '1px 0 0', fontVariantNumeric: 'tabular-nums' }}>
-                      NT${item.sellPrice.toLocaleString()} × {item.qty}
+                      NT${cartItemPrice(item).toLocaleString()} × {item.qty}
                     </p>
                   )}
                 </div>
@@ -819,7 +820,7 @@ function CheckoutContent() {
                 </p>
               ) : (
                 <p style={{ fontSize: 20, fontWeight: 800, color: C.primaryText, margin: 0, letterSpacing: '-0.02em' }}>
-                  NT${product!.sellPrice.toLocaleString()}
+                  NT${cartItemPrice(product!).toLocaleString()}
                 </p>
               )}
             </div>
@@ -1118,8 +1119,8 @@ function CheckoutContent() {
           display: 'flex', flexDirection: 'column', gap: 8,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b' }}>
-            <span>{bundleMode ? `商品小計（${bundleQty} 張）` : '商品原價'}</span>
-            <span>NT${(bundleMode ? bundleSubtotal : product!.sellPrice).toLocaleString()}</span>
+            <span>{bundleMode ? `商品小計（${bundleQty} 張）` : '商品金額'}</span>
+            <span>NT${(bundleMode ? bundleSubtotal : cartItemPrice(product!)).toLocaleString()}</span>
           </div>
           {discount > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#16a34a' }}>

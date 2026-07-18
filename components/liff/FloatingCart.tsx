@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter, useParams } from 'next/navigation'
-import { useCart } from '@/components/liff/CartProvider'
+import { useCart, cartItemPrice } from '@/components/liff/CartProvider'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
@@ -231,7 +231,7 @@ export default function FloatingCart() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {items.slice().sort((a, b) => b.addedAt - a.addedAt).map(item => {
-                    const lineTotal = item.sellPrice * item.qty
+                    const lineTotal = cartItemPrice(item) * item.qty
                     return (
                       <div
                         key={item.productId}
@@ -317,7 +317,7 @@ export default function FloatingCart() {
                               </p>
                               {item.qty > 1 && (
                                 <p style={{ fontSize: 10, color: '#94a3b8', margin: '1px 0 0', fontVariantNumeric: 'tabular-nums' }}>
-                                  NT${item.sellPrice.toLocaleString()} × {item.qty}
+                                  NT${cartItemPrice(item).toLocaleString()} × {item.qty}
                                 </p>
                               )}
                             </div>
