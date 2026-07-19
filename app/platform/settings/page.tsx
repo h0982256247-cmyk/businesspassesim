@@ -1,12 +1,37 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
 const TABS = ['品牌與網域', '金流 (TapPay)', 'eSIM (世界移動)', '福利價'] as const
 type Tab = typeof TABS[number]
 
 const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400'
+
+// 前端把上傳圖片縮到最長邊 max 並輸出 PNG data URI（保留透明；直接存進 logoUrl，沿用既有儲存）
+function resizeImage(file: File, max: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('讀取失敗'))
+    reader.onload = () => {
+      const img = document.createElement('img')
+      img.onerror = () => reject(new Error('圖片解析失敗'))
+      img.onload = () => {
+        const scale = Math.min(1, max / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return reject(new Error('無法建立畫布'))
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/png'))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
@@ -39,6 +64,7 @@ export default function SettingsPage() {
   const [s, setS] = useState<Record<string, string>>({})
   const [sSaving, setSSaving] = useState(false)
   const [sMsg, setSMsg] = useState<string | null>(null)
+  const [logoBusy, setLogoBusy] = useState(false)
   // 金流（TapPay：Partner Key / App ID / App Key / 環境 兩種支付共用；Merchant ID 與前台啟用各自）
   const [pay, setPay] = useState<{
     partnerKey: string; appId: string; appKey: string; env: string
@@ -53,6 +79,20 @@ export default function SettingsPage() {
   const [esimMsg, setEsimMsg] = useState<string | null>(null)
 
   const authed = (r: Response) => { if (r.status === 401) { router.replace('/platform/login'); return false }; return true }
+
+  const onLogoFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''   // 允許重選同一張
+    if (!file) return
+    if (!file.type.startsWith('image/')) { alert('請選擇圖片檔'); return }
+    if (file.size > 5 * 1024 * 1024) { alert('圖片請小於 5MB'); return }
+    setLogoBusy(true)
+    try {
+      const dataUrl = await resizeImage(file, 256)
+      setS(p => ({ ...p, logoUrl: dataUrl }))
+    } catch { alert('圖片處理失敗，請換一張試試') }
+    setLogoBusy(false)
+  }
 
   useEffect(() => {
     fetch('/api/platform/settings').then(r => authed(r) ? r.json() : null).then(d => { if (d) setS({
@@ -117,7 +157,23 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-3">
             <Field label="品牌名稱"><input className={inputCls} value={s.brandName ?? ''} onChange={e => setS(p => ({ ...p, brandName: e.target.value }))} placeholder="商務通" /></Field>
             <Field label="LIFF ID"><input className={inputCls} value={s.liffId ?? ''} onChange={e => setS(p => ({ ...p, liffId: e.target.value }))} placeholder="1234567890-abcdefgh" /></Field>
-            <Field label="Logo 網址"><input className={inputCls} value={s.logoUrl ?? ''} onChange={e => setS(p => ({ ...p, logoUrl: e.target.value }))} placeholder="https://…" /></Field>
+            <Field label="Logo 圖片" hint="建議正方形；上傳後自動縮圖儲存">
+              <div className="flex items-center gap-3">
+                <div className="w-14 h-14 rounded-xl border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {s.logoUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={s.logoUrl} alt="logo" className="w-full h-full object-contain" />
+                    : <span className="text-gray-300 text-xs">無</span>}
+                </div>
+                <div className="flex flex-col gap-1.5 items-start">
+                  <label className={`cursor-pointer inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition ${logoBusy ? 'bg-gray-100 text-gray-400' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}>
+                    {logoBusy ? '處理中…' : (s.logoUrl ? '更換圖片' : '選擇圖片')}
+                    <input type="file" accept="image/*" className="hidden" onChange={onLogoFile} disabled={logoBusy} />
+                  </label>
+                  {s.logoUrl && <button type="button" onClick={() => setS(p => ({ ...p, logoUrl: '' }))} className="text-xs text-gray-400 hover:text-red-500">移除</button>}
+                </div>
+              </div>
+            </Field>
             <Field label="主題色"><div className="flex items-center gap-2"><input type="color" value={s.primaryColor || '#635BFF'} onChange={e => setS(p => ({ ...p, primaryColor: e.target.value }))} className="w-10 h-9 border border-gray-200 rounded-xl cursor-pointer p-1" /><input className={`${inputCls} font-mono`} value={s.primaryColor ?? ''} onChange={e => setS(p => ({ ...p, primaryColor: e.target.value }))} /></div></Field>
             <Field label="客服 / LINE OA 連結"><input className={inputCls} value={s.lineOaUrl ?? ''} onChange={e => setS(p => ({ ...p, lineOaUrl: e.target.value }))} placeholder="https://lin.ee/…" /></Field>
             <Field label="自訂網域" hint="純 host，如 esim.example.com（DNS 需另於 Vercel 設定）"><input className={inputCls} value={s.domain ?? ''} onChange={e => setS(p => ({ ...p, domain: e.target.value }))} placeholder="esim.example.com" /></Field>
