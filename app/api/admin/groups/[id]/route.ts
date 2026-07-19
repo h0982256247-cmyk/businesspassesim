@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
-import { getCompanyById, getCompanyMembers, setCompanyAdmin, setCompanyActive } from '@/lib/services/group'
+import { getCompanyById, getCompanyMembers, setCompanyAdmin, setCompanyActive, deleteCompany } from '@/lib/services/group'
 import { AdminRole } from '@prisma/client'
 
 type Params = { params: Promise<{ id: string }> }
@@ -43,4 +43,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   return NextResponse.json({ error: '無效請求' }, { status: 400 })
+}
+
+// DELETE /api/admin/groups/:id — 刪除企業（有訂單則擋，回 409）
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const auth = await requirePlatformAuth(req)
+  if (auth instanceof NextResponse) return auth
+  if (auth.role !== AdminRole.SUPER_ADMIN) {
+    return NextResponse.json({ error: '權限不足' }, { status: 403 })
+  }
+
+  const { id } = await params
+  const result = await deleteCompany(id)
+  if (!result.ok) {
+    return NextResponse.json({ error: result.reason }, { status: result.reason === '企業不存在' ? 404 : 409 })
+  }
+  return NextResponse.json({ ok: true })
 }

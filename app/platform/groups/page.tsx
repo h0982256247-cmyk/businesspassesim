@@ -32,6 +32,9 @@ export default function CompaniesPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [membersLoading, setMembersLoading] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [del, setDel] = useState<Company | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [delError, setDelError] = useState<string | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -76,6 +79,15 @@ export default function CompaniesPage() {
       body: JSON.stringify({ isActive: !c.isActive }),
     }).catch(() => {})
     load()
+  }
+
+  const doDelete = async () => {
+    if (!del) return
+    setDeleting(true); setDelError(null)
+    const r = await fetch(`/api/admin/groups/${del.id}`, { method: 'DELETE' }).catch(() => null)
+    setDeleting(false)
+    if (r && r.ok) { setDel(null); load() }
+    else { const d = r ? await r.json().catch(() => ({})) : {}; setDelError(d.error ?? '刪除失敗，請稍後再試') }
   }
 
   return (
@@ -138,6 +150,7 @@ export default function CompaniesPage() {
                       <button onClick={() => toggleActive(c)} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${c.isActive ? 'bg-orange-50 hover:bg-orange-100 text-orange-700' : 'bg-green-50 hover:bg-green-100 text-green-700'}`}>
                         {c.isActive ? '停權' : '啟用'}
                       </button>
+                      <button onClick={() => { setDelError(null); setDel(c) }} className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg font-medium transition">刪除</button>
                     </div>
                   </td>
                 </tr>
@@ -176,6 +189,30 @@ export default function CompaniesPage() {
                 ? <button onClick={() => doAssign(null)} disabled={busy} className="text-xs text-red-500 hover:text-red-600">取消指派</button>
                 : <span />}
               <button onClick={() => setAssign(null)} className="text-sm text-gray-500 hover:text-gray-700">關閉</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 刪除企業 防呆確認 */}
+      {del && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => { if (!deleting) setDel(null) }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="font-bold text-gray-800">刪除企業「{del.name}」？</h2>
+            </div>
+            <div className="px-5 py-4 space-y-2">
+              <p className="text-sm text-gray-600 leading-relaxed">
+                此動作無法復原，將一併移除該企業的 <span className="font-semibold text-gray-800">{del._count.members}</span> 位成員（成員的 LINE 帳號本身不受影響）。
+              </p>
+              <p className="text-xs text-gray-400">若企業已有訂單則無法刪除，請改用「停權」。</p>
+              {delError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{delError}</p>}
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => setDel(null)} disabled={deleting} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-50">取消</button>
+              <button onClick={doDelete} disabled={deleting} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">
+                {deleting ? '刪除中…' : '確定刪除'}
+              </button>
             </div>
           </div>
         </div>

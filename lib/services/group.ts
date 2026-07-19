@@ -54,6 +54,24 @@ export async function setCompanyActive(groupId: string, isActive: boolean) {
   return prisma.group.update({ where: { id: groupId }, data: { isActive } })
 }
 
+// Super Admin 後台：刪除企業。已有訂單則擋（保護財務紀錄，請改用「停權」）；
+// 否則連帶刪除所有成員（GroupMember.group 為必填 FK，需先清才能刪企業）後刪企業。
+export async function deleteCompany(groupId: string): Promise<{ ok: boolean; reason?: string }> {
+  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { id: true } })
+  if (!group) return { ok: false, reason: '企業不存在' }
+
+  const orderCount = await prisma.order.count({ where: { companyId: groupId } })
+  if (orderCount > 0) {
+    return { ok: false, reason: `此企業已有 ${orderCount} 筆訂單，不可刪除。如需停止使用請改用「停權」。` }
+  }
+
+  await prisma.$transaction([
+    prisma.groupMember.deleteMany({ where: { groupId } }),
+    prisma.group.delete({ where: { id: groupId } }),
+  ])
+  return { ok: true }
+}
+
 // 重新產生邀請碼（舊碼外流時用）
 export async function regenerateInviteCode(groupId: string) {
   for (let i = 0; i < 5; i++) {
