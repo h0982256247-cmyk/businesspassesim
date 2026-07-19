@@ -39,7 +39,7 @@ type ValidateResult = {
   }
 }
 
-type ApplyResult = { disabled: number; repriced: number; priceRaised: number; syncedAt: string }
+type ApplyResult = { disabled: number; repriced: number; priceRaised: number; benefitRecomputed: number; syncedAt: string }
 type GuardSample = { country: string; days: number; cap: string | null; sell: number; cost: number; newSell: number }
 type GuardState = { enabled: boolean; rate: number; belowCount: number; samples: GuardSample[] }
 
@@ -248,7 +248,7 @@ export default function PlatformProductsPage() {
     if (!validateResult) return
     const disable = validateResult.issues.notFound.length
     const reprice = validateResult.issues.priceMismatch.length
-    const confirmMsg = `將執行：\n• 自動下架 ${disable} 筆查無方案\n• 更新 ${reprice} 筆成本價\n• 成本上升的方案，售價維持原利潤跟漲（毛利不足 40% 補到 40%）；成本下降不動售價\n\n確定要套用嗎？`
+    const confirmMsg = `將執行：\n• 自動下架 ${disable} 筆查無方案\n• 更新 ${reprice} 筆成本價\n• 成本上升的方案，售價維持原利潤跟漲（毛利不足 40% 補到 40%）；成本下降不動售價\n• 依目前福利價倍率重算福利價（成本未變、但倍率有調整過的商品也一起更新）\n\n確定要套用嗎？`
     if (!window.confirm(confirmMsg)) return
 
     setApplying(true)
@@ -772,7 +772,7 @@ export default function PlatformProductsPage() {
           <div className="flex-1">
             <p className="font-medium text-sm">已套用變更</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              自動下架 {applyResult.disabled} 筆 · 成本價更新 {applyResult.repriced} 筆 · 售價跟漲 {applyResult.priceRaised} 筆
+              自動下架 {applyResult.disabled} 筆 · 成本價更新 {applyResult.repriced} 筆 · 售價跟漲 {applyResult.priceRaised} 筆 · 福利價重算 {applyResult.benefitRecomputed} 筆
             </p>
           </div>
           <button onClick={() => setApplyResult(null)} className="text-gray-400 hover:text-gray-600 text-lg shrink-0">✕</button>

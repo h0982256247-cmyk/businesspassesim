@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       id: true,
       costPrice: true,
       sellPrice: true,
+      benefitPrice: true,
       supplierSkuId: true,
       supplierProduct: { select: { id: true, wmProductId: true } },
     },
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
 
   const toDisable: { productId: string; supplierProductId: string }[] = []
   const toReprice: { productId: string; supplierProductId: string; newCost: number; newSell: number; newBenefit: number }[] = []
+  const toRebenefit: { productId: string; newBenefit: number }[] = []   // 成本沒變、但福利價需依目前倍率補算
   let priceRaised = 0   // 售價有跟漲的筆數（回報用）
 
   for (const p of products) {
@@ -53,7 +55,12 @@ export async function POST(req: NextRequest) {
       toDisable.push({ productId: p.id, supplierProductId: sp.id })
       continue
     }
-    if (info.productPrice === p.costPrice) continue
+    if (info.productPrice === p.costPrice) {
+      // 成本沒變，但後台倍率可能改過 → 福利價與「成本 × 目前倍率」不符就補算（不動成本/售價）
+      const expected = benefitPriceFromCost(p.costPrice, markup)
+      if (expected !== p.benefitPrice) toRebenefit.push({ productId: p.id, newBenefit: expected })
+      continue
+    }
 
     const newCost = info.productPrice
     const newSell = sellPriceForCostChange({
@@ -108,6 +115,17 @@ export async function POST(req: NextRequest) {
     `
   }
 
+  // 2b. 成本沒變、但倍率改過 → 只補算福利價（不動成本/售價），批次 bulk SQL
+  for (let i = 0; i < toRebenefit.length; i += CHUNK) {
+    const chunk = toRebenefit.slice(i, i + CHUNK)
+    const bv = chunk.map(x => Prisma.sql`(${x.productId}::text, ${x.newBenefit}::int)`)
+    await prisma.$executeRaw`
+      UPDATE products AS p SET benefit_price = v.benefit, updated_at = NOW()
+      FROM (VALUES ${Prisma.join(bv)}) AS v(id, benefit)
+      WHERE p.id = v.id
+    `
+  }
+
   // 3. 其餘已比對通過的方案也戳上 lastSyncAt，避免重複查詢
   const untouchedSupplierIds = products
     .map(p => p.supplierProduct?.id)
@@ -124,6 +142,7 @@ export async function POST(req: NextRequest) {
     disabled: toDisable.length,
     repriced: toReprice.length,
     priceRaised,
+    benefitRecomputed: toRebenefit.length,   // 依目前倍率補算福利價的筆數（含成本未變者）
     syncedAt: now.toISOString(),
   })
 }
