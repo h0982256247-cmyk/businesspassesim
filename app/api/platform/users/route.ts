@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
         phone: true,
         email: true,
         createdAt: true,
-        groupMembership: { select: { status: true, group: { select: { name: true } } } },
+        groupMembership: { select: { status: true, group: { select: { name: true, adminUserId: true } } } },
         _count: { select: { orders: true } },
       },
     }),

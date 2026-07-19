@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 type User = {
   id: string; lineUid: string; displayName: string; avatarUrl: string | null
   phone: string | null; email: string | null; createdAt: string
-  groupMembership: { status: string; group: { name: string } } | null
+  groupMembership: { status: string; group: { name: string; adminUserId: string | null } } | null
   _count: { orders: number }
 }
 
@@ -93,14 +93,26 @@ function UsersContent() {
                   </td>
                   <td className="px-5 py-3.5">
                     {u.groupMembership
-                      ? (
-                        <div className="space-y-0.5">
-                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${u.groupMembership.status === 'APPROVED' ? 'bg-green-50 text-green-600' : u.groupMembership.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' : 'bg-red-50 text-red-500'}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{u.groupMembership.status === 'APPROVED' ? '企業會員' : u.groupMembership.status === 'PENDING' ? '審核中' : '未通過'}
-                          </span>
-                          <p className="text-xs text-gray-400 pl-1">{u.groupMembership.group.name}</p>
-                        </div>
-                      )
+                      ? (() => {
+                          const isAdmin = u.groupMembership.group.adminUserId === u.id
+                          const st = u.groupMembership.status
+                          const cls = isAdmin ? 'bg-indigo-50 text-indigo-600'
+                            : st === 'APPROVED' ? 'bg-green-50 text-green-600'
+                            : st === 'PENDING' ? 'bg-yellow-50 text-yellow-700'
+                            : 'bg-red-50 text-red-500'
+                          const label = isAdmin ? '企業管理員'
+                            : st === 'APPROVED' ? '企業會員'
+                            : st === 'PENDING' ? '審核中'
+                            : '未通過'
+                          return (
+                            <div className="space-y-0.5">
+                              <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${cls}`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{label}
+                              </span>
+                              <p className="text-xs text-gray-400 pl-1">{u.groupMembership.group.name}</p>
+                            </div>
+                          )
+                        })()
                       : <span className="text-gray-300 text-xs">未加入</span>
                     }
                   </td>

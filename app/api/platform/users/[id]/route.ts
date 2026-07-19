@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         birthday: true,
         createdAt: true,
         groupMembership: {
-          select: { status: true, joinedAt: true, group: { select: { id: true, name: true } } },
+          select: { status: true, joinedAt: true, group: { select: { id: true, name: true, adminUserId: true } } },
         },
         orders: {
           select: {
