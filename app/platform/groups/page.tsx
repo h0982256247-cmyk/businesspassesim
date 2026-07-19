@@ -167,7 +167,7 @@ export default function CompaniesPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-100">
               <h2 className="font-bold text-gray-800">指派「{assign.name}」的管理員</h2>
-              <p className="text-xs text-gray-400 mt-0.5">從已加入的成員中選一位，管理員可在 LINE LIFF 審核/移除成員</p>
+              <p className="text-xs text-gray-400 mt-0.5">從已用邀請碼加入的成員中選一位；指派後會自動核准為企業會員，該員即可在 LINE LIFF 的「管理」分頁審核／移除其他成員。</p>
             </div>
             <div className="overflow-y-auto p-3 space-y-1">
               {membersLoading ? spinner : members.length === 0 ? (

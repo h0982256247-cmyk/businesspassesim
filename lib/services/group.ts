@@ -218,9 +218,21 @@ export async function getManagedCompany(actingUserId: string) {
   return { company, members }
 }
 
-// Super Admin 後台：指派 / 變更企業管理員（傳 LINE User id；null 為取消指派）
+// Super Admin 後台：指派 / 變更企業管理員（傳 LINE User id；null 為取消指派）。
+// 指派時該員即為企業受信任者 → 自動核准其成員資格（免自我審核），與寫入 adminUserId
+// 包成同一 transaction，避免只成一半。取消指派（null）不動任何成員狀態。
 export async function setCompanyAdmin(groupId: string, adminUserId: string | null) {
-  return prisma.group.update({ where: { id: groupId }, data: { adminUserId } })
+  if (!adminUserId) {
+    return prisma.group.update({ where: { id: groupId }, data: { adminUserId: null } })
+  }
+  const now = new Date()
+  return prisma.$transaction(async tx => {
+    await tx.groupMember.updateMany({
+      where: { userId: adminUserId, groupId },
+      data: { status: MemberStatus.APPROVED, reviewedAt: now, leftAt: null },
+    })
+    return tx.group.update({ where: { id: groupId }, data: { adminUserId } })
+  })
 }
 
 // ─── 查詢 ────────────────────────────────────────────────────────
