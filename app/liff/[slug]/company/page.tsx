@@ -34,6 +34,13 @@ export default function CompanyPage() {
 
   useEffect(() => { load() }, [load])
 
+  // 由分享連結帶入邀請碼（?code=）→ 自動填入輸入框，員工點連結即可直接送出
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const c = new URLSearchParams(window.location.search).get('code')
+    if (c) setCode(c.trim().toUpperCase())
+  }, [])
+
   const join = async () => {
     if (!code.trim()) return
     setBusy(true); setMsg(null)
