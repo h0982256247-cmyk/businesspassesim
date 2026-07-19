@@ -24,7 +24,7 @@ type UserDetail = {
   email: string | null
   birthday: string | null
   createdAt: string
-  groupMembership: { status: string; joinedAt: string; group: { id: string; name: string; adminUserId: string | null } } | null
+  groupMembership: { status: string; role: string; joinedAt: string; group: { id: string; name: string } } | null
   orders: Order[]
 }
 
@@ -90,7 +90,7 @@ export default function UserDetailPage() {
         </button>
         <span className="text-gray-300">/</span>
         <h1 className="text-2xl font-bold text-gray-800">{user.displayName}</h1>
-        {m && (m.group.adminUserId === user.id
+        {m && (m.role === 'ADMIN'
           ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-indigo-50 text-indigo-600">企業管理員</span>
           : <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${MEMBER_STATUS[m.status]?.cls ?? 'bg-gray-100 text-gray-500'}`}>
               {MEMBER_STATUS[m.status]?.text ?? m.status}
@@ -167,7 +167,7 @@ export default function UserDetailPage() {
                     加入於 {new Date(m.joinedAt).toLocaleDateString('zh-TW')}
                   </p>
                 </div>
-                {m.group.adminUserId === user.id
+                {m.role === 'ADMIN'
                   ? <span className="text-xs px-2 py-1 rounded-full font-medium bg-indigo-50 text-indigo-600">企業管理員</span>
                   : <span className={`text-xs px-2 py-1 rounded-full font-medium ${MEMBER_STATUS[m.status]?.cls ?? 'bg-gray-100 text-gray-500'}`}>
                       {MEMBER_STATUS[m.status]?.text ?? m.status}

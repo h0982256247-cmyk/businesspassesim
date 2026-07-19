@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
-import { MemberStatus } from '@prisma/client'
+import { MemberStatus, GroupMemberRole } from '@prisma/client'
 import { notifyMemberApproved, notifyMemberRejected } from './notification'
 import { randomBytes } from 'crypto'
 
@@ -35,7 +35,12 @@ export async function getAllCompanies() {
   return prisma.group.findMany({
     orderBy: { createdAt: 'desc' },
     include: {
-      adminUser: { select: { id: true, displayName: true } },
+      // 企業管理員（可多位）：以 GroupMember.role=ADMIN 為準，依加入時間排序（第一位＝最早指派）
+      members: {
+        where: { role: GroupMemberRole.ADMIN, leftAt: null },
+        select: { user: { select: { id: true, displayName: true } } },
+        orderBy: { joinedAt: 'asc' },
+      },
       _count: { select: { members: { where: { status: MemberStatus.APPROVED, leftAt: null } } } },
     },
   })
@@ -163,10 +168,15 @@ export async function getCompanyMembers(groupId: string, status?: MemberStatus) 
 async function assertCompanyAdmin(actingUserId: string, targetUserId: string) {
   const membership = await prisma.groupMember.findUnique({
     where: { userId: targetUserId },
-    select: { groupId: true, leftAt: true, group: { select: { name: true, adminUserId: true } } },
+    select: { groupId: true, leftAt: true, group: { select: { name: true } } },
   })
   if (!membership || membership.leftAt) throw new Error('找不到此成員')
-  if (membership.group.adminUserId !== actingUserId) throw new Error('無權操作此成員')
+  // acting user 必須是「同企業的 ADMIN 成員」（一企業可多位管理員）
+  const actingAdmin = await prisma.groupMember.findFirst({
+    where: { userId: actingUserId, groupId: membership.groupId, role: GroupMemberRole.ADMIN, leftAt: null },
+    select: { id: true },
+  })
+  if (!actingAdmin) throw new Error('無權操作此成員')
   return membership
 }
 
@@ -205,11 +215,13 @@ export async function removeMember(actingUserId: string, targetUserId: string) {
 
 // LIFF company-admin 頁：取某 LINE User 管理的企業 + 成員清單（PENDING 在前）
 export async function getManagedCompany(actingUserId: string) {
-  const company = await prisma.group.findUnique({
-    where: { adminUserId: actingUserId },
-    select: { id: true, name: true, description: true, inviteCode: true, isActive: true },
+  // 找「actingUserId 是 ADMIN 成員」的企業（可多位管理員）
+  const adminOf = await prisma.groupMember.findFirst({
+    where: { userId: actingUserId, role: GroupMemberRole.ADMIN, leftAt: null },
+    select: { group: { select: { id: true, name: true, description: true, inviteCode: true, isActive: true } } },
   })
-  if (!company) return null
+  if (!adminOf) return null
+  const company = adminOf.group
   const members = await prisma.groupMember.findMany({
     where: { groupId: company.id, leftAt: null },
     include: { user: { select: { id: true, displayName: true, avatarUrl: true, createdAt: true } } },
@@ -218,21 +230,26 @@ export async function getManagedCompany(actingUserId: string) {
   return { company, members }
 }
 
-// Super Admin 後台：指派 / 變更企業管理員（傳 LINE User id；null 為取消指派）。
-// 指派時該員即為企業受信任者 → 自動核准其成員資格（免自我審核），與寫入 adminUserId
-// 包成同一 transaction，避免只成一半。取消指派（null）不動任何成員狀態。
-export async function setCompanyAdmin(groupId: string, adminUserId: string | null) {
-  if (!adminUserId) {
-    return prisma.group.update({ where: { id: groupId }, data: { adminUserId: null } })
-  }
-  const now = new Date()
-  return prisma.$transaction(async tx => {
-    await tx.groupMember.updateMany({
-      where: { userId: adminUserId, groupId },
-      data: { status: MemberStatus.APPROVED, reviewedAt: now, leftAt: null },
+// Super Admin 後台：設定 / 移除某成員的企業管理員身分（一企業可多位管理員）。
+// 設為管理員時同時自動核准其成員資格（免自我審核）；移除時不可移除最後一位管理員。
+export async function setMemberAdmin(
+  groupId: string, userId: string, makeAdmin: boolean,
+): Promise<{ ok: boolean; reason?: string }> {
+  if (makeAdmin) {
+    const now = new Date()
+    await prisma.groupMember.updateMany({
+      where: { userId, groupId },
+      data: { role: GroupMemberRole.ADMIN, status: MemberStatus.APPROVED, reviewedAt: now, leftAt: null },
     })
-    return tx.group.update({ where: { id: groupId }, data: { adminUserId } })
+    return { ok: true }
+  }
+  // 移除管理員：至少保留一位（否則沒人能在 LIFF 審核成員）
+  const adminCount = await prisma.groupMember.count({
+    where: { groupId, role: GroupMemberRole.ADMIN, leftAt: null },
   })
+  if (adminCount <= 1) return { ok: false, reason: '至少需保留一位管理員' }
+  await prisma.groupMember.updateMany({ where: { userId, groupId }, data: { role: GroupMemberRole.MEMBER } })
+  return { ok: true }
 }
 
 // ─── 查詢 ────────────────────────────────────────────────────────

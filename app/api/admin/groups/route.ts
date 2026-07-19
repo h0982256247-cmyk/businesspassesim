@@ -7,7 +7,11 @@ export async function GET(req: NextRequest) {
   const auth = await requirePlatformAuth(req)
   if (auth instanceof NextResponse) return auth
 
-  const companies = await getAllCompanies()
+  // members（僅 ADMIN 角色）攤平成 admins 陣列；管理員可多位，前台顯示第一位
+  const companies = (await getAllCompanies()).map(({ members, ...c }) => ({
+    ...c,
+    admins: members.map(m => m.user),
+  }))
   return NextResponse.json({ companies })
 }
 

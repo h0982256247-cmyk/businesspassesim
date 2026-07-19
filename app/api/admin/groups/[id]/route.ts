@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
-import { getCompanyById, getCompanyMembers, setCompanyAdmin, setCompanyActive, deleteCompany } from '@/lib/services/group'
+import { getCompanyById, getCompanyMembers, setMemberAdmin, setCompanyActive, deleteCompany } from '@/lib/services/group'
 import { AdminRole } from '@prisma/client'
 
 type Params = { params: Promise<{ id: string }> }
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   return NextResponse.json({ company, members })
 }
 
-// PATCH /api/admin/groups/:id — 指派/變更管理員（adminUserId）或啟用/停權（isActive）
+// PATCH /api/admin/groups/:id — 設定/移除某成員管理員（userId + makeAdmin，可多位）或啟用/停權（isActive）
 export async function PATCH(req: NextRequest, { params }: Params) {
   const auth = await requirePlatformAuth(req)
   if (auth instanceof NextResponse) return auth
@@ -31,9 +31,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params
   const body = await req.json()
 
-  // 指派管理員：傳入 LINE User id；空字串/null 為取消指派
-  if (body.adminUserId !== undefined) {
-    await setCompanyAdmin(id, body.adminUserId || null)
+  // 設定/移除某成員的企業管理員身分（一企業可多位管理員）
+  if (typeof body.makeAdmin === 'boolean' && body.userId) {
+    const r = await setMemberAdmin(id, body.userId, body.makeAdmin)
+    if (!r.ok) return NextResponse.json({ error: r.reason }, { status: 409 })
     return NextResponse.json({ ok: true })
   }
 

@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 type User = {
   id: string; lineUid: string; displayName: string; avatarUrl: string | null
   phone: string | null; email: string | null; createdAt: string
-  groupMembership: { status: string; group: { name: string; adminUserId: string | null } } | null
+  groupMembership: { status: string; role: string; group: { name: string } } | null
   _count: { orders: number }
 }
 
@@ -94,7 +94,7 @@ function UsersContent() {
                   <td className="px-5 py-3.5">
                     {u.groupMembership
                       ? (() => {
-                          const isAdmin = u.groupMembership.group.adminUserId === u.id
+                          const isAdmin = u.groupMembership.role === 'ADMIN'
                           const st = u.groupMembership.status
                           const cls = isAdmin ? 'bg-indigo-50 text-indigo-600'
                             : st === 'APPROVED' ? 'bg-green-50 text-green-600'

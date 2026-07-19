@@ -48,7 +48,7 @@ model Group {
   inviteCode  String   @unique @map("invite_code") // 企業邀請碼
   inviteLink  String?  @map("invite_link")
   isActive    Boolean  @default(true) @map("is_active") // 企業本身啟用/停權（由 Super Admin 控制）
-  adminUserId String?  @unique @map("admin_user_id") // 企業管理員（LINE User，在 LIFF 審核成員；由 Super Admin 指派）
+  adminUserId String?  @unique @map("admin_user_id") // 已棄用：管理員改記於 GroupMember.role=ADMIN（可多位）。此欄保留避免部署空窗，待後續清理
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -64,6 +64,7 @@ model GroupMember {
   groupId      String       @map("group_id")
   userId       String       @unique @map("user_id") // 一人只能屬於一個企業
   status       MemberStatus @default(PENDING) // 加入需企業管理員審核
+  role         GroupMemberRole @default(MEMBER) // 一般成員 / 企業管理員（一企業可多位管理員）
   joinedAt     DateTime     @default(now()) @map("joined_at")
   reviewedAt   DateTime?    @map("reviewed_at")
   reviewedById String?      @map("reviewed_by_id") // 審核的企業管理員（User）
@@ -83,6 +84,13 @@ enum MemberStatus {
   REJECTED // 已拒絕
 
   @@map("member_status")
+}
+
+enum GroupMemberRole {
+  MEMBER // 一般成員
+  ADMIN // 企業管理員（可在 LIFF 審核/移除成員；一企業可多位）
+
+  @@map("group_member_role")
 }
 
 // ============================================================

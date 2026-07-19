@@ -9,12 +9,13 @@ type Company = {
   description: string | null
   inviteCode: string
   isActive: boolean
-  adminUser: { id: string; displayName: string } | null
+  admins: { id: string; displayName: string }[]   // 企業管理員（可多位；列表顯示第一位）
   _count: { members: number }
 }
 type Member = {
   id: string
   status: string
+  role: string   // 'MEMBER' | 'ADMIN'
   user: { id: string; displayName: string; avatarUrl: string | null }
 }
 
@@ -63,14 +64,19 @@ export default function CompaniesPage() {
     setMembers(d?.members ?? []); setMembersLoading(false)
   }
 
-  const doAssign = async (userId: string | null) => {
+  const toggleAdmin = async (userId: string, makeAdmin: boolean) => {
     if (!assign) return
     setBusy(true)
-    await fetch(`/api/admin/groups/${assign.id}`, {
+    const r = await fetch(`/api/admin/groups/${assign.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adminUserId: userId }),
-    }).catch(() => {})
-    setBusy(false); setAssign(null); load()
+      body: JSON.stringify({ userId, makeAdmin }),
+    }).catch(() => null)
+    setBusy(false)
+    if (!r || !r.ok) { const d = r ? await r.json().catch(() => ({})) : {}; window.alert(d.error ?? '操作失敗'); return }
+    // 重新載入該企業成員（反映角色）＋ 企業列表（更新管理員欄）
+    const d = await fetch(`/api/admin/groups/${assign.id}`).then(x => x.json()).catch(() => null)
+    setMembers(d?.members ?? [])
+    load()
   }
 
   const toggleActive = async (c: Company) => {
@@ -138,7 +144,11 @@ export default function CompaniesPage() {
                     <span className="text-xs font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">{c.inviteCode}</span>
                   </td>
                   <td className="px-5 py-3.5"><span className="font-semibold text-gray-800">{c._count.members}</span><span className="text-xs text-gray-400"> 人</span></td>
-                  <td className="px-5 py-3.5 text-sm text-gray-600">{c.adminUser?.displayName ?? <span className="text-gray-300">未指派</span>}</td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600">
+                    {c.admins.length > 0
+                      ? <span>{c.admins[0].displayName}{c.admins.length > 1 && <span className="text-xs text-gray-400"> 等 {c.admins.length} 位</span>}</span>
+                      : <span className="text-gray-300">未指派</span>}
+                  </td>
                   <td className="px-5 py-3.5">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${c.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{c.isActive ? '啟用中' : '已停權'}
@@ -166,28 +176,31 @@ export default function CompaniesPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setAssign(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-5 py-4 border-b border-gray-100">
-              <h2 className="font-bold text-gray-800">指派「{assign.name}」的管理員</h2>
-              <p className="text-xs text-gray-400 mt-0.5">從已用邀請碼加入的成員中選一位；指派後會自動核准為企業會員，該員即可在 LINE LIFF 的「管理」分頁審核／移除其他成員。</p>
+              <h2 className="font-bold text-gray-800">「{assign.name}」的管理員</h2>
+              <p className="text-xs text-gray-400 mt-0.5">一個企業可有多位管理員。設為管理員會自動核准為企業會員，該員即可在 LINE LIFF「管理」分頁審核／移除其他成員。</p>
             </div>
             <div className="overflow-y-auto p-3 space-y-1">
               {membersLoading ? spinner : members.length === 0 ? (
-                <p className="text-center text-sm text-gray-400 py-8">尚無成員可指派<br />請先把邀請碼 <span className="font-mono">{assign.inviteCode}</span> 給要當管理員的人加入</p>
-              ) : members.map(m => (
-                <div key={m.id} className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">{m.user.displayName}</p>
-                    <p className="text-xs text-gray-400">{m.status === 'PENDING' ? '待審核' : m.status === 'APPROVED' ? '已核准' : '已拒絕'}</p>
+                <p className="text-center text-sm text-gray-400 py-8">尚無成員<br />請先把邀請碼 <span className="font-mono">{assign.inviteCode}</span> 給要當管理員的人加入</p>
+              ) : members.map(m => {
+                const isAdmin = m.role === 'ADMIN'
+                return (
+                  <div key={m.id} className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-gray-50">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate flex items-center gap-1.5">
+                        {m.user.displayName}
+                        {isAdmin && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded-full">管理員</span>}
+                      </p>
+                      <p className="text-xs text-gray-400">{m.status === 'PENDING' ? '待審核' : m.status === 'APPROVED' ? '已核准' : '已拒絕'}</p>
+                    </div>
+                    {isAdmin
+                      ? <button onClick={() => toggleAdmin(m.user.id, false)} disabled={busy} className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg disabled:opacity-50 font-medium">移除管理員</button>
+                      : <button onClick={() => toggleAdmin(m.user.id, true)} disabled={busy} className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">設為管理員</button>}
                   </div>
-                  {assign.adminUser?.id === m.user.id
-                    ? <span className="text-xs text-green-600 font-medium">目前管理員</span>
-                    : <button onClick={() => doAssign(m.user.id)} disabled={busy} className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg disabled:opacity-50">設為管理員</button>}
-                </div>
-              ))}
+                )
+              })}
             </div>
-            <div className="px-5 py-3 border-t border-gray-100 flex justify-between">
-              {assign.adminUser
-                ? <button onClick={() => doAssign(null)} disabled={busy} className="text-xs text-red-500 hover:text-red-600">取消指派</button>
-                : <span />}
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end">
               <button onClick={() => setAssign(null)} className="text-sm text-gray-500 hover:text-gray-700">關閉</button>
             </div>
           </div>
