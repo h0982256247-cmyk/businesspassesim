@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import TenantScopeBar from '@/components/platform/TenantScopeBar'
 import RefundConfirmDialog, { type RefundTarget } from '@/components/platform/RefundConfirmDialog'
 
 type Order = {
@@ -40,27 +39,71 @@ function OrdersContent() {
   const statusFilter = searchParams.get('status') ?? ''
   const q = searchParams.get('q') ?? ''
   const page = parseInt(searchParams.get('page') ?? '1')
+  const fromParam = searchParams.get('from') ?? ''
+  const toParam = searchParams.get('to') ?? ''
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
+  const [rangeTotal, setRangeTotal] = useState(0)
+  const [rangeCount, setRangeCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
-  const [currentRole, setCurrentRole] = useState<string | null>(null)
-  const [platformAdmins, setPlatformAdmins] = useState<{id:string;name:string;brandName:string|null}[]>([])
-  const [filterTenantId, setFilterTenantId] = useState<string>('')
 
-  useEffect(() => {
-    fetch('/api/platform/auth/me').then(r=>r.json()).then(d=>{
-      if(d.admin){setCurrentRole(d.admin.role);if(d.admin.role==='SUPER_ADMIN'){fetch('/api/platform/admins').then(r=>r.json()).then(a=>{setPlatformAdmins((a.admins??[]).filter((x:{role:string})=>x.role==='PLATFORM_ADMIN'))})}}
-    })
-  }, [])
+  // 保留現有篩選、覆寫指定參數後組成網址（清除某參數傳 undefined；page===1 省略）
+  const buildQS = (over: Record<string, string | number | undefined>) => {
+    const merged: Record<string, string | number | undefined> = { status: statusFilter, q, page, from: fromParam, to: toParam, ...over }
+    const params = new URLSearchParams()
+    for (const [k, v] of Object.entries(merged)) {
+      if (v === undefined || v === '' || (k === 'page' && Number(v) === 1)) continue
+      params.set(k, String(v))
+    }
+    const s = params.toString()
+    return `/platform/orders${s ? `?${s}` : ''}`
+  }
+
   const load = () => {
     setLoading(true)
-    fetch(`/api/platform/orders?page=${page}${statusFilter?`&status=${statusFilter}`:''}${q?`&q=${encodeURIComponent(q)}`:''}${filterTenantId?`&tenantAdminId=${filterTenantId}`:''}`)
-      .then(r=>r.status===401?(router.replace('/platform/login'),null):r.json())
-      .then(d=>{if(d){setOrders(d.orders);setTotal(d.total)}}).finally(()=>setLoading(false))
+    const qs = new URLSearchParams({ page: String(page) })
+    if (statusFilter) qs.set('status', statusFilter)
+    if (q) qs.set('q', q)
+    if (fromParam) qs.set('from', fromParam)
+    if (toParam) qs.set('to', toParam)
+    fetch(`/api/platform/orders?${qs.toString()}`)
+      .then(r => r.status === 401 ? (router.replace('/platform/login'), null) : r.json())
+      .then(d => { if (d) { setOrders(d.orders); setTotal(d.total); setRangeTotal(d.rangeTotal ?? 0); setRangeCount(d.rangeCount ?? 0) } })
+      .finally(() => setLoading(false))
   }
-  useEffect(load, [page,statusFilter,q,filterTenantId,router])
+  useEffect(load, [page, statusFilter, q, fromParam, toParam, router])
+
+  // 快捷區間：以「當地時區」算起訖瞬間送 ISO（to 為排他上界）
+  const applyPreset = (kind: 'today' | 'week' | 'month' | 'clear') => {
+    if (kind === 'clear') { router.push(buildQS({ from: undefined, to: undefined, page: 1 })); return }
+    const now = new Date()
+    const from =
+      kind === 'week'  ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6) :
+      kind === 'month' ? new Date(now.getFullYear(), now.getMonth(), 1) :
+                         new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const to =
+      kind === 'month' ? new Date(now.getFullYear(), now.getMonth() + 1, 1) :
+                         new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    router.push(buildQS({ from: from.toISOString(), to: to.toISOString(), page: 1 }))
+  }
+
+  // 手動選日期（yyyy-mm-dd，當地時區；to 取當日結束＝隔日 00:00 當排他上界）
+  const setDate = (which: 'from' | 'to', val: string) => {
+    if (!val) { router.push(buildQS({ [which]: undefined, page: 1 })); return }
+    const [y, m, d] = val.split('-').map(Number)
+    const dt = which === 'from' ? new Date(y, m - 1, d) : new Date(y, m - 1, d + 1)
+    router.push(buildQS({ [which]: dt.toISOString(), page: 1 }))
+  }
+  // ISO 瞬間 → 日期輸入框顯示值（to 是排他上界，顯示時要 -1 天）
+  const isoToDate = (iso: string, minusDay = false) => {
+    if (!iso) return ''
+    const d = new Date(iso); if (isNaN(d.getTime())) return ''
+    if (minusDay) d.setDate(d.getDate() - 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  const hasRange = !!(fromParam || toParam)
   const handleRetry = async (id:string) => { setActionLoading(id); await fetch(`/api/platform/orders/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'retry_esim'})}); setActionLoading(null); load() }
 
   // 開啟退款視窗（列表頁為單張退款）：抓退款預覽 + 判斷是否整捆全退（決定是否退券），交給 RefundConfirmDialog。
@@ -99,21 +142,36 @@ function OrdersContent() {
         <div>
           <h1 className="text-2xl font-bold text-gray-800">訂單管理</h1>
           {q
-            ? <p className="text-sm text-gray-400 mt-0.5">搜尋「<span className="text-gray-600 font-medium">{q}</span>」找到 {total} 筆 · <button onClick={()=>router.push(statusFilter?`/platform/orders?status=${statusFilter}&page=1`:'/platform/orders?page=1')} className="text-blue-600 hover:underline">清除</button></p>
+            ? <p className="text-sm text-gray-400 mt-0.5">搜尋「<span className="text-gray-600 font-medium">{q}</span>」找到 {total} 筆 · <button onClick={()=>router.push(buildQS({ q: undefined, page: 1 }))} className="text-blue-600 hover:underline">清除</button></p>
             : <p className="text-sm text-gray-400 mt-0.5">共 {total} 筆訂單</p>}
         </div>
         <div className="flex flex-wrap gap-1.5">
           {STATUS_OPTS.map(s=>(
-            <button key={s} onClick={()=>router.push(s?`/platform/orders?status=${s}&page=1`:'/platform/orders?page=1')}
+            <button key={s} onClick={()=>router.push(buildQS({ status: s || undefined, page: 1 }))}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-medium border transition ${statusFilter===s?'bg-blue-600 text-white border-blue-600':'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
               {s?(STATUS[s]?.text??s):'全部'}
             </button>
           ))}
         </div>
       </div>
-      {currentRole==='SUPER_ADMIN'&&platformAdmins.length>0&&(
-        <TenantScopeBar admins={platformAdmins} value={filterTenantId} onChange={v=>setFilterTenantId(v)} />
-      )}
+      {/* 時間區間篩選（快捷 + 手動）＋ 區間結算總額 */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="flex gap-1.5">
+          {([['today','當日'],['week','近 7 日'],['month','本月']] as const).map(([k,label])=>(
+            <button key={k} onClick={()=>applyPreset(k)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-50 text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition">{label}</button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <input type="date" value={isoToDate(fromParam)} onChange={e=>setDate('from', e.target.value)} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <span>~</span>
+          <input type="date" value={isoToDate(toParam, true)} onChange={e=>setDate('to', e.target.value)} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          {hasRange && <button onClick={()=>applyPreset('clear')} className="text-gray-400 hover:text-red-500 ml-0.5">清除</button>}
+        </div>
+        <div className="ml-auto text-right">
+          <p className="text-xs text-gray-400">{hasRange ? '此區間' : '全部'}結算總額</p>
+          <p className="text-lg font-bold text-gray-800">NT${rangeTotal.toLocaleString()}<span className="text-xs font-normal text-gray-400 ml-1.5">{rangeCount} 筆已付款</span></p>
+        </div>
+      </div>
       {loading ? <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
@@ -182,7 +240,7 @@ function OrdersContent() {
       {totalPages>1&&(
         <div className="flex justify-center gap-1.5">
           {Array.from({length:Math.min(totalPages,10)},(_,i)=>i+1).map(p=>(
-            <button key={p} onClick={()=>router.push(`/platform/orders?status=${statusFilter}&page=${p}`)}
+            <button key={p} onClick={()=>router.push(buildQS({ page: p }))}
               className={`w-9 h-9 rounded-xl text-sm font-medium transition ${p===page?'bg-blue-600 text-white':'bg-white border border-gray-200 text-gray-500 hover:bg-gray-50'}`}>{p}</button>
           ))}
         </div>

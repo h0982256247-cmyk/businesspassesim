@@ -29,7 +29,15 @@ export async function GET(req: NextRequest) {
     ],
   } : {}
 
-  const where: Prisma.OrderWhereInput = { ...statusWhere, ...searchWhere }
+  // 時間區間（createdAt）；from/to 為 ISO 瞬間字串（前端依當地時區換算後送，to 為排他上界）
+  const parseDate = (s: string | null) => { if (!s) return undefined; const d = new Date(s); return isNaN(d.getTime()) ? undefined : d }
+  const from = parseDate(req.nextUrl.searchParams.get('from'))
+  const to = parseDate(req.nextUrl.searchParams.get('to'))
+  const dateWhere: Prisma.OrderWhereInput = (from || to)
+    ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } }
+    : {}
+
+  const where: Prisma.OrderWhereInput = { ...statusWhere, ...searchWhere, ...dateWhere }
 
   // 同捆（多張 eSIM 一次結帳 = 共用 bundleId）在列表只佔一列：
   // 代表列 = 無 bundle 的單筆訂單，或 bundle 的第一張（bundleSeq=1）。
@@ -37,7 +45,14 @@ export async function GET(req: NextRequest) {
     AND: [where, { OR: [{ bundleId: null }, { bundleSeq: 1 }] }],
   }
 
-  const [reps, total] = await Promise.all([
+  // 區間結算總額：此時間區間 + 搜尋條件下、已付款（PAID/COMPLETED）訂單的實付金額加總。
+  // 不受上方狀態分頁影響，反映「這段期間實際收了多少」；含 bundle 內每一張 eSIM。
+  const settlementWhere: Prisma.OrderWhereInput = {
+    ...searchWhere, ...dateWhere,
+    status: { in: [OrderStatus.PAID, OrderStatus.COMPLETED] },
+  }
+
+  const [reps, total, settle] = await Promise.all([
     prisma.order.findMany({
       where: repWhere,
       orderBy: { createdAt: 'desc' },
@@ -62,6 +77,7 @@ export async function GET(req: NextRequest) {
       },
     }),
     prisma.order.count({ where: repWhere }),
+    prisma.order.aggregate({ where: settlementWhere, _sum: { totalPaid: true }, _count: { _all: true } }),
   ])
 
   // 同捆合計：張數與金額（不受 status filter 影響，呈現整捆全貌）
@@ -82,5 +98,9 @@ export async function GET(req: NextRequest) {
     return { ...r, esimCount: agg?.count ?? 1, bundleTotal: agg?.total ?? r.totalPaid }
   })
 
-  return NextResponse.json({ orders, total, page, pageSize })
+  return NextResponse.json({
+    orders, total, page, pageSize,
+    rangeTotal: settle._sum.totalPaid ?? 0,   // 區間結算總額（已付款實付加總）
+    rangeCount: settle._count._all,           // 區間已付款訂單數
+  })
 }
