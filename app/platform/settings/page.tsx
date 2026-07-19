@@ -39,9 +39,13 @@ export default function SettingsPage() {
   const [s, setS] = useState<Record<string, string>>({})
   const [sSaving, setSSaving] = useState(false)
   const [sMsg, setSMsg] = useState<string | null>(null)
-  // 金流
-  const [pay, setPay] = useState<{ credit: Record<string, unknown> | null; linepay: Record<string, unknown> | null }>({ credit: null, linepay: null })
-  const [paySaving, setPaySaving] = useState<string | null>(null)
+  // 金流（TapPay：Partner Key / App ID / App Key / 環境 兩種支付共用；Merchant ID 與前台啟用各自）
+  const [pay, setPay] = useState<{
+    partnerKey: string; appId: string; appKey: string; env: string
+    creditMerchantId: string; linePayMerchantId: string
+    creditActive: boolean; linePayActive: boolean
+  }>({ partnerKey: '', appId: '', appKey: '', env: 'sandbox', creditMerchantId: '', linePayMerchantId: '', creditActive: true, linePayActive: true })
+  const [paySaving, setPaySaving] = useState(false)
   const [payMsg, setPayMsg] = useState<string | null>(null)
   // eSIM
   const [esim, setEsim] = useState<Record<string, string>>({})
@@ -56,8 +60,12 @@ export default function SettingsPage() {
       lineOaUrl: d.settings.lineOaUrl ?? '', liffId: d.settings.liffId ?? '', domain: d.settings.domain ?? '',
       lineChannelToken: d.settings.lineChannelToken ?? '', benefitMarkupRate: String(d.settings.benefitMarkupRate ?? 1.5),
     }) })
-    fetch('/api/platform/payment-config').then(r => r.json()).then(d => setPay({ credit: d.credit, linepay: d.linepay })).catch(() => {})
-    fetch('/api/platform/esim-config').then(r => r.json()).then(d => { const c = d.config; setEsim({ apiUrl: c?.apiUrl ?? '', merchantId: c?.merchantId ?? '', deptId: c?.deptId ?? '', token: c?.token ?? '' }) }).catch(() => {})
+    fetch('/api/platform/payment-config').then(r => r.json()).then(d => setPay({
+      partnerKey: d.partnerKey ?? '', appId: d.appId ?? '', appKey: d.appKey ?? '', env: d.env ?? 'sandbox',
+      creditMerchantId: d.credit?.merchantId ?? '', linePayMerchantId: d.linePay?.merchantId ?? '',
+      creditActive: d.credit?.isActive ?? true, linePayActive: d.linePay?.isActive ?? true,
+    })).catch(() => {})
+    fetch('/api/platform/esim-config').then(r => r.json()).then(d => { const c = d.config; setEsim({ apiUrl: c?.apiUrl || 'https://tfmshippingsys.fastmove.com.tw', merchantId: c?.merchantId ?? '', deptId: c?.deptId ?? '', token: c?.token ?? '' }) }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -70,19 +78,21 @@ export default function SettingsPage() {
     if (r.ok) setMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); setMsg(null); alert(d.error ?? '儲存失敗') }
   }
 
-  const savePay = async (gateway: 'tappay_credit' | 'tappay_linepay') => {
-    const c = (gateway === 'tappay_credit' ? pay.credit : pay.linepay) ?? {}
-    setPaySaving(gateway); setPayMsg(null)
+  const savePay = async () => {
+    setPaySaving(true); setPayMsg(null)
     const r = await fetch('/api/platform/payment-config', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ gateway, partnerKey: c.partnerKey ?? '', merchantId: c.merchantId ?? '', env: c.env ?? 'sandbox', appId: c.appId ?? '', appKey: c.appKey ?? '' }),
+      body: JSON.stringify({
+        partnerKey: pay.partnerKey, appId: pay.appId, appKey: pay.appKey, env: pay.env,
+        creditMerchantId: pay.creditMerchantId, linePayMerchantId: pay.linePayMerchantId,
+        creditActive: pay.creditActive, linePayActive: pay.linePayActive,
+      }),
     })
-    setPaySaving(null)
+    setPaySaving(false)
     if (r.ok) setPayMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); alert(d.error ?? '儲存失敗') }
   }
 
-  const setPayField = (gw: 'credit' | 'linepay', k: string, v: unknown) =>
-    setPay(p => ({ ...p, [gw]: { ...(p[gw] ?? {}), [k]: v } }))
+  const setPayField = (k: string, v: unknown) => setPay(p => ({ ...p, [k]: v }))
 
   const saveEsim = async () => {
     setEsimSaving(true); setEsimMsg(null)
@@ -119,30 +129,46 @@ export default function SettingsPage() {
       )}
 
       {tab === '金流 (TapPay)' && (
-        <div className="space-y-4">
-          {(['credit', 'linepay'] as const).map(gw => {
-            const c = (pay[gw] ?? {}) as Record<string, unknown>
-            const gwName = gw === 'credit' ? '信用卡' : 'LINE Pay'
-            const gateway = gw === 'credit' ? 'tappay_credit' : 'tappay_linepay'
-            return (
-              <Card key={gw} title={`TapPay ${gwName}`} onSave={() => savePay(gateway)} saving={paySaving === gateway} msg={paySaving === null ? payMsg : null}>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Partner Key" hint="****＝沿用"><input className={inputCls} value={(c.partnerKey as string) ?? ''} onChange={e => setPayField(gw, 'partnerKey', e.target.value)} placeholder="partner_…" /></Field>
-                  <Field label="Merchant ID"><input className={inputCls} value={(c.merchantId as string) ?? ''} onChange={e => setPayField(gw, 'merchantId', e.target.value)} /></Field>
-                  <Field label="App ID (前端 SDK)"><input className={inputCls} value={(c.appId as string) ?? ''} onChange={e => setPayField(gw, 'appId', e.target.value)} /></Field>
-                  <Field label="App Key (前端 SDK)" hint="****＝沿用"><input className={inputCls} value={(c.appKey as string) ?? ''} onChange={e => setPayField(gw, 'appKey', e.target.value)} /></Field>
-                  <Field label="環境"><select className={`${inputCls} bg-white`} value={(c.env as string) ?? 'sandbox'} onChange={e => setPayField(gw, 'env', e.target.value)}><option value="sandbox">sandbox（測試）</option><option value="production">production（正式）</option></select></Field>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+        <Card title="TapPay 金流" onSave={savePay} saving={paySaving} msg={payMsg}>
+          <p className="text-xs text-gray-400 -mt-1">Partner Key、App ID、App Key、環境 兩種支付共用（只填一次）；Merchant ID 各自填。</p>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Partner Key" hint="信用卡與 LINE Pay 共用；****＝沿用"><input className={inputCls} value={pay.partnerKey} onChange={e => setPayField('partnerKey', e.target.value)} placeholder="partner_…" /></Field>
+            <Field label="環境" hint="測試 / 正式切換"><select className={`${inputCls} bg-white`} value={pay.env} onChange={e => setPayField('env', e.target.value)}><option value="sandbox">sandbox（測試）</option><option value="production">production（正式）</option></select></Field>
+            <Field label="App ID (前端 SDK)" hint="共用"><input className={inputCls} value={pay.appId} onChange={e => setPayField('appId', e.target.value)} /></Field>
+            <Field label="App Key (前端 SDK)" hint="共用；****＝沿用"><input className={inputCls} value={pay.appKey} onChange={e => setPayField('appKey', e.target.value)} /></Field>
+          </div>
+          <div className="border-t border-gray-100 pt-4 space-y-3">
+            <p className="text-sm font-semibold text-gray-700">各支付專屬 Merchant ID</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="信用卡 Merchant ID"><input className={inputCls} value={pay.creditMerchantId} onChange={e => setPayField('creditMerchantId', e.target.value)} /></Field>
+              <Field label="LINE Pay Merchant ID"><input className={inputCls} value={pay.linePayMerchantId} onChange={e => setPayField('linePayMerchantId', e.target.value)} /></Field>
+            </div>
+            <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={pay.creditActive} onChange={e => setPayField('creditActive', e.target.checked)} className="w-4 h-4 rounded border-gray-300" />
+                前台顯示信用卡
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={pay.linePayActive} onChange={e => setPayField('linePayActive', e.target.checked)} className="w-4 h-4 rounded border-gray-300" />
+                前台顯示 LINE Pay
+              </label>
+            </div>
+          </div>
+        </Card>
       )}
 
       {tab === 'eSIM (世界移動)' && (
         <Card title="世界移動 eSIM 供應商" onSave={saveEsim} saving={esimSaving} msg={esimMsg}>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="API 主機" hint="測試機含 tfmshippingsys；正式機為 fmshippingsys"><input className={inputCls} value={esim.apiUrl ?? ''} onChange={e => setEsim(p => ({ ...p, apiUrl: e.target.value }))} placeholder="https://…" /></Field>
+            <Field label="API 主機" hint="測試機 tfmshippingsys（自簽 SSL 已處理）／正式機 fmshippingsys">
+              <select className={`${inputCls} bg-white`} value={esim.apiUrl} onChange={e => setEsim(p => ({ ...p, apiUrl: e.target.value }))}>
+                <option value="https://tfmshippingsys.fastmove.com.tw">測試環境（tfmshippingsys）</option>
+                <option value="https://fmshippingsys.fastmove.com.tw">正式環境（fmshippingsys）</option>
+                {esim.apiUrl && !['https://tfmshippingsys.fastmove.com.tw', 'https://fmshippingsys.fastmove.com.tw'].includes(esim.apiUrl) && (
+                  <option value={esim.apiUrl}>目前設定：{esim.apiUrl}</option>
+                )}
+              </select>
+            </Field>
             <Field label="Merchant ID"><input className={inputCls} value={esim.merchantId ?? ''} onChange={e => setEsim(p => ({ ...p, merchantId: e.target.value }))} /></Field>
             <Field label="Dept ID"><input className={inputCls} value={esim.deptId ?? ''} onChange={e => setEsim(p => ({ ...p, deptId: e.target.value }))} /></Field>
             <Field label="Token" hint="****＝沿用（加密儲存）"><input className={inputCls} value={esim.token ?? ''} onChange={e => setEsim(p => ({ ...p, token: e.target.value }))} /></Field>
