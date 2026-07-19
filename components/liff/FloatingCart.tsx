@@ -113,10 +113,8 @@ export default function FloatingCart() {
 
   const badgeNumber = totalQty > 0 ? totalQty : count
 
-  // 無優惠券系統：購物車金額 = 小計（依身分顯示福利價為 Phase 5 前端再加）
+  // 無優惠券系統：應付 = 小計（subtotal 已含身分定價：企業會員福利價 / 一般價）
   const bestPrice = subtotal
-  const savedAmount = 0
-  const hasDiscount = false
 
   return (
     <>
@@ -339,24 +337,16 @@ export default function FloatingCart() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: '#64748b' }}>
                   <span>共 {totalQty} 張 eSIM</span>
-                  <span style={{ textDecoration: hasDiscount ? 'line-through' : 'none' }}>NT${subtotal.toLocaleString()}</span>
+                  <span>NT${subtotal.toLocaleString()}</span>
                 </div>
-                {hasDiscount && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#16a34a', marginTop: 4 }}>
-                    <span>優惠券折抵</span>
-                    <span>−NT${savedAmount.toLocaleString()}</span>
-                  </div>
-                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 700 }}>應付</span>
-                  <span style={{ fontSize: 22, fontWeight: 900, color: hasDiscount ? C.primary : '#1a1a1a', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 22, fontWeight: 900, color: '#1a1a1a', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
                     NT${bestPrice.toLocaleString()}
                   </span>
                 </div>
 
-                {/* Single-line, single-qty cart: route through the coupon-aware
-                    /checkout page. Multi-line or qty > 1: use the bundle flow.
-                    兩條路徑結帳都會套優惠券（bundle 折總額），預覽金額一致。 */}
+                {/* 單張單件 → /checkout 單筆流程；多張或數量 > 1 → bundle 流程 */}
                 {count === 1 && items[0] && items[0].qty === 1 ? (
                   <button
                     type="button"
@@ -398,11 +388,7 @@ export default function FloatingCart() {
                 )}
 
                 <p style={{ fontSize: 10, color: '#94a3b8', margin: '10px 0 0', textAlign: 'center' }}>
-                  {hasDiscount
-                    ? '已預估最優惠券折扣 · 結帳頁可調整'
-                    : (count === 1 && items[0]?.qty === 1
-                        ? '結帳頁可選擇優惠券折扣'
-                        : '一次刷卡完成 · 每張 eSIM 會獨立發送 · 優惠券折抵整筆總額')}
+                  一次刷卡完成 · 每張 eSIM 會獨立發送
                 </p>
               </div>
             )}

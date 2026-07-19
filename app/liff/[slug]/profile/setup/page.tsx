@@ -18,8 +18,7 @@ export default function ProfileSetup() {
   const [form, setForm] = useState({ name: '', phone: '', email: '', birthday: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(false)
-  // 已填過（phone/email 任一已有）→ 編輯模式：不再發歡迎券，文案改「儲存」。
-  // 與後端 issueCoupon 的 isFirstUpdate(!phone && !email) 判斷一致。
+  // 已填過（phone/email 任一已有）→ 編輯模式，文案改「儲存」；首次填寫則為「完成註冊」。
   const [alreadyFilled, setAlreadyFilled] = useState(false)
 
   // 進頁載入現有資料預填：再打開時看得到已存的內容（而不是空白＝看起來像沒存）。
@@ -116,19 +115,6 @@ export default function ProfileSetup() {
           <p style={{ fontSize: 14, color: S.muted, margin: 0 }}>
             {alreadyFilled ? '更新你的基本資料' : '填寫以下資料即可開始購買 eSIM'}
           </p>
-          {!alreadyFilled && (
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 14,
-              background: C.light, border: `1px solid ${C.border}`, color: C.primaryText,
-              fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 100,
-            }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={C.primaryText} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 8a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2 2 0 000-4z" />
-                <path d="M14 6.5v11" strokeDasharray="2 2.5" />
-              </svg>
-              完成註冊即領「官方 9 折券」
-            </div>
-          )}
         </div>
 
         {/* Form card */}
@@ -174,7 +160,7 @@ export default function ProfileSetup() {
                 boxShadow: loading ? 'none' : `0 6px 18px ${C.primary}40`,
               }}
             >
-              {loading ? '儲存中...' : alreadyFilled ? '儲存' : '完成註冊，領取 9 折券'}
+              {loading ? '儲存中...' : alreadyFilled ? '儲存' : '完成註冊'}
             </button>
           </form>
         </div>

@@ -92,21 +92,3 @@ export function EmptyOrdersIllustration({ size = 80 }: { size?: number }) {
     </svg>
   )
 }
-
-export function CouponIllustration({ size = 72 }: { size?: number }) {
-  return (
-    <svg width={size} height={size * 0.55} viewBox="0 0 72 40" fill="none" aria-hidden="true">
-      {/* Ticket shape */}
-      <path d="M4 4 L68 4 L68 36 L4 36 Z" stroke="#e2e8f0" strokeWidth="1.2" fill="none" rx="4" />
-      {/* Perforation line */}
-      <line x1="24" y1="4" x2="24" y2="36" stroke="#f1f5f9" strokeWidth="1" strokeDasharray="3 2" />
-      {/* % symbol suggestion */}
-      <circle cx="12" cy="14" r="3" stroke="#94a3b8" strokeWidth="1" />
-      <circle cx="12" cy="26" r="3" stroke="#94a3b8" strokeWidth="1" />
-      <line x1="7" y1="27" x2="17" y2="13" stroke="#94a3b8" strokeWidth="1" strokeLinecap="round" />
-      {/* Lines on right */}
-      <line x1="32" y1="14" x2="60" y2="14" stroke="#e2e8f0" strokeWidth="1.5" strokeLinecap="round" />
-      <line x1="32" y1="22" x2="52" y2="22" stroke="#e2e8f0" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  )
-}

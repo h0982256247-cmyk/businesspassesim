@@ -43,18 +43,9 @@ export default function SetupModal({ slug, onDismiss, colors: C, logoUrl }: Setu
         <h2 style={{ fontSize: 20, fontWeight: 800, color: '#1a1a1a', textAlign: 'center', margin: '0 0 8px' }}>
           完成個人資料綁定
         </h2>
-        <p style={{ fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 1.65, margin: '0 0 20px' }}>
-          填寫基本資料後，即可獲得
+        <p style={{ fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 1.65, margin: '0 0 28px' }}>
+          購買 eSIM 前需先填寫姓名、電話與 Email，用於 eSIM 開卡與訂單通知。現在完成，結帳更快速。
         </p>
-
-        <div style={{
-          width: '100%', background: '#F9F5E7',
-          border: '2px dashed #92400e', borderRadius: 16,
-          padding: '18px 20px 20px', marginBottom: 28, textAlign: 'center',
-        }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', margin: '0 0 6px', letterSpacing: '0.1em' }}>新用戶限定</p>
-          <p style={{ fontSize: 22, fontWeight: 900, color: '#78350f', margin: 0 }}>官方 9 折優惠券</p>
-        </div>
 
         <button
           onClick={() => router.push(`/liff/${slug}/profile/setup`)}
