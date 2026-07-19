@@ -3,7 +3,8 @@ import { Prisma, ProductStatus, SupplierProductStatus, SupplierProductType } fro
 import type { SupplierProductMap } from './esim'
 import { resolveCountry, resolveCountryByPlanCode } from '@/lib/utils/country'
 import { parseCapacityFromName } from '@/lib/utils/capacity'
-import { sellPriceForCostChange, benefitPriceFromCost, DEFAULT_MARGIN_GUARD, type MarginGuard } from '@/lib/utils/pricing'
+import { sellPriceForCostChange, benefitPriceFromCost, DEFAULT_MARGIN_GUARD, DEFAULT_BENEFIT_MARKUP, type MarginGuard } from '@/lib/utils/pricing'
+import { getPlatformSettings } from './tenant-config'
 
 export async function getActiveProducts(countryCode?: string) {
   return prisma.product.findMany({
@@ -169,8 +170,8 @@ export type ProductUpsertInput = {
 }
 
 export async function upsertProduct(id: string | undefined, input: ProductUpsertInput) {
-  // 福利價：後台未明確給值時，以成本 × 全域倍率自動帶出（單一來源 benefitPriceFromCost）
-  const benefitPrice = input.benefitPrice ?? benefitPriceFromCost(input.costPrice)
+  // 福利價：後台未明確給值時，以成本 × 後台設定倍率自動帶出（單一來源 benefitPriceFromCost）
+  const benefitPrice = input.benefitPrice ?? benefitPriceFromCost(input.costPrice, await getBenefitMarkup())
   const data = { ...input, benefitPrice }
   if (id) {
     return prisma.product.update({ where: { id }, data })
@@ -232,6 +233,13 @@ const WM_PRODUCT_TYPE_MAP: Record<number, SupplierProductType> = {
 // 若要恢復可調整，改讀 PlatformSetting（見 ROADMAP，Phase 5 併入）。
 export async function getMarginGuard(): Promise<MarginGuard> {
   return { ...DEFAULT_MARGIN_GUARD }
+}
+
+// 福利價倍率（單一來源：PlatformSetting.benefitMarkupRate，後台「福利價」分頁可調；
+// 未設定或異常則回退 DEFAULT_BENEFIT_MARKUP）。匯入 / 新增 / 驗證重算共用同一來源。
+export async function getBenefitMarkup(): Promise<number> {
+  const s = await getPlatformSettings()
+  return s.benefitMarkupRate || DEFAULT_BENEFIT_MARKUP
 }
 
 export async function batchCreateProducts(
@@ -326,6 +334,7 @@ export async function batchCreateProducts(
   type ProductUpdate = { id: string; data: ReturnType<typeof buildProductData> }
   const productUpdates: ProductUpdate[] = []
   const newProductData: ReturnType<typeof buildProductData>[] = []
+  const markup = await getBenefitMarkup()   // 全批共用同一倍率（後台設定）
   for (const row of rows) {
     const supplierId = supplierIdMap.get(row.supplierSkuId)
     if (!supplierId) throw new Error(`找不到 SupplierProduct.id for wmProductId=${row.supplierSkuId}`)
@@ -336,7 +345,7 @@ export async function batchCreateProducts(
       oldCost: row.costPrice, oldSell: row.sellPrice, newCost: wmCost,
       guardEnabled: marginGuard.enabled, minMarginRate: marginGuard.rate,
     })
-    const data = buildProductData(row, supplierId, { costPrice: wmCost, sellPrice: sell })
+    const data = buildProductData(row, supplierId, { costPrice: wmCost, sellPrice: sell }, markup)
     const existingId = row.planCode
       ? existingByPlan.get(row.planCode)
       : existingBySkuNoPlan.get(supplierId)
@@ -439,6 +448,7 @@ function buildProductData(
   row: CsvProductRow,
   supplierId: string,
   priceOverride?: { costPrice: number; sellPrice: number },
+  markup: number = DEFAULT_BENEFIT_MARKUP,
 ) {
   const costPrice = priceOverride?.costPrice ?? row.costPrice
   // 只挑 Product 真實欄位；**不可**用 `...row`：匯入端會在 row 上臨時掛
@@ -461,7 +471,7 @@ function buildProductData(
     isNativeSim:   row.isNativeSim ?? false,
     sellPrice:     priceOverride?.sellPrice ?? row.sellPrice,
     costPrice,
-    benefitPrice:  benefitPriceFromCost(costPrice),
+    benefitPrice:  benefitPriceFromCost(costPrice, markup),
     sortOrder:     row.sortOrder ?? 0,
   }
 }

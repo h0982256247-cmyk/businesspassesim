@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
 import { prisma } from '@/lib/db/prisma'
 import { fetchSupplierProductMap } from '@/lib/services/esim'
-import { getMarginGuard } from '@/lib/services/product'
-import { sellPriceForCostChange } from '@/lib/utils/pricing'
+import { getMarginGuard, getBenefitMarkup } from '@/lib/services/product'
+import { sellPriceForCostChange, benefitPriceFromCost } from '@/lib/utils/pricing'
 import { Prisma, ProductStatus, SupplierProductStatus } from '@prisma/client'
 
 // POST /api/admin/products/validate/apply
 // 重新跑一次驗證，並一次套用：
 //   1. 供應商查無 → Product.status=AUTO_INACTIVE，SupplierProduct.status=AUTO_INACTIVE
-//   2. 成本價不符 → Product.costPrice、SupplierProduct.costPrice 同步為供應商目前價
+//   2. 成本價不符 → Product.costPrice、SupplierProduct.costPrice 同步為供應商目前價；
+//      福利價一併以「新成本 × 後台倍率」重算寫回 Product.benefitPrice
 //   3. 成本「上升」時售價跟著調（業主定案）：維持固定利潤（售價+=成本漲幅）、只漲不降，
 //      且若調整後毛利 <40% 則補到剛好 40%（售價 = ⌈新成本 ÷ 0.6⌉）。成本下降不動售價。
 //   4. 觸及的 SupplierProduct 一律寫入 lastSyncAt
@@ -38,9 +39,10 @@ export async function POST(req: NextRequest) {
 
   // 毛利保護設定（售價跟漲與門檻補價共用同一條規則，見 lib/utils/pricing）
   const guard = await getMarginGuard()
+  const markup = await getBenefitMarkup()   // 福利價倍率（後台設定；成本變動時一併重算福利價）
 
   const toDisable: { productId: string; supplierProductId: string }[] = []
-  const toReprice: { productId: string; supplierProductId: string; newCost: number; newSell: number }[] = []
+  const toReprice: { productId: string; supplierProductId: string; newCost: number; newSell: number; newBenefit: number }[] = []
   let priceRaised = 0   // 售價有跟漲的筆數（回報用）
 
   for (const p of products) {
@@ -59,7 +61,8 @@ export async function POST(req: NextRequest) {
       guardEnabled: guard.enabled, minMarginRate: guard.rate,
     })
     if (newSell !== p.sellPrice) priceRaised++
-    toReprice.push({ productId: p.id, supplierProductId: sp.id, newCost, newSell })
+    const newBenefit = benefitPriceFromCost(newCost, markup)   // 福利價 = 新成本 × 後台倍率
+    toReprice.push({ productId: p.id, supplierProductId: sp.id, newCost, newSell, newBenefit })
   }
 
   const now = new Date()
@@ -91,10 +94,10 @@ export async function POST(req: NextRequest) {
   // 2. 同步成本價 + 售價跟漲（Product 兩欄一起寫；SupplierProduct 只有成本），批次 bulk SQL
   for (let i = 0; i < toReprice.length; i += CHUNK) {
     const chunk = toReprice.slice(i, i + CHUNK)
-    const pv = chunk.map(x => Prisma.sql`(${x.productId}::text, ${x.newCost}::int, ${x.newSell}::int)`)
+    const pv = chunk.map(x => Prisma.sql`(${x.productId}::text, ${x.newCost}::int, ${x.newSell}::int, ${x.newBenefit}::int)`)
     await prisma.$executeRaw`
-      UPDATE products AS p SET cost_price = v.cost, sell_price = v.sell, updated_at = NOW()
-      FROM (VALUES ${Prisma.join(pv)}) AS v(id, cost, sell)
+      UPDATE products AS p SET cost_price = v.cost, sell_price = v.sell, benefit_price = v.benefit, updated_at = NOW()
+      FROM (VALUES ${Prisma.join(pv)}) AS v(id, cost, sell, benefit)
       WHERE p.id = v.id
     `
     const sv = chunk.map(x => Prisma.sql`(${x.supplierProductId}::text, ${x.newCost}::int)`)
