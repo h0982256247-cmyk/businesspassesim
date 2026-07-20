@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/orders — 建立訂單
-// Body: { productId, couponIds?, paymentMethod }
+// Body: { productId, paymentMethod }
 export async function POST(req: NextRequest) {
   const auth = await requireLiffAuth(req)
   if (auth instanceof NextResponse) return auth

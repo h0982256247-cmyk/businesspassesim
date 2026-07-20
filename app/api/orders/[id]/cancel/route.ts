@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireLiffAuth } from '@/lib/auth/liff'
-import { getOrderByIdForUser, markOrderCancelled, markBundleFailed } from '@/lib/services/order'
+import { getOrderByIdForUser, markOrderCancelled } from '@/lib/services/order'
 import { prisma } from '@/lib/db/prisma'
 import { OrderStatus } from '@prisma/client'
 
@@ -33,8 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const reason = '使用者手動取消（金流頁取消或關閉）'
 
-  // bundle：把整組 PENDING/PROCESSING 改 FAILED（與 webhook 同條路徑，保留
-  // 共用 schema 語意）— bundle 用 markBundleFailed 內已 reset coupons
+  // bundle：整組 PENDING/PROCESSING 一起取消（手動取消，非付款失敗）
   if (order.bundleId) {
     const bundleOrders = await prisma.order.findMany({
       where: { bundleId: order.bundleId, userId: auth.userId },
@@ -57,6 +56,3 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   return NextResponse.json({ ok: true })
 }
-
-// 為了讓未來改用 markBundleFailed 行為一致，把 import 留著
-void markBundleFailed

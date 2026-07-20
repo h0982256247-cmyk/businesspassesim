@@ -26,7 +26,7 @@ export function buildLiffOrderUrl(input: BuildLiffOrderUrlInput): string {
     return `${origin}/`
   }
 
-  // 單張/多張一律回到訂單列表頁（?paid=1 觸發回購券慶祝彈窗）；多張另帶 bundleId 供列表辨識。
+  // 單張/多張一律回到訂單列表頁（?paid=1 標記付款完成落地）；多張另帶 bundleId 供列表辨識。
   const base = `${origin}/liff/${tenantSlug}`
   return isBundle
     ? `${base}/orders?bundleId=${encodeURIComponent(orderIdOrBundleId)}&paid=1`

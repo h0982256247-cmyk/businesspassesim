@@ -407,7 +407,7 @@ function CheckoutContent() {
         setSubmitting(false)
         return
       }
-      // 單張也統一回到訂單列表頁（與多張一致），由列表頁跳回購券彈窗。
+      // 單張也統一回到訂單列表頁（與多張一致）。
       // 帶 oid 供列表處理失敗/取消的 redirect（status≠0 → 自動取消該單，沿用原詳情頁邏輯）。
       successHref = `${base}/orders?paid=1&oid=${orderRes.orderId}`
       chargeBody = { orderId: orderRes.orderId, returnUrl: await buildReturnUrl(successHref) }
