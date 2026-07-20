@@ -204,7 +204,6 @@ export default function PlatformDashboard() {
   }
   if (!stats) return null
 
-  const isSuper = stats.role === 'SUPER_ADMIN'
   const mr = stats.monthlyRevenue
   const revThis = mr.at(-1)?.revenue ?? 0
   const revPrev = mr.at(-2)?.revenue ?? 0
@@ -215,13 +214,6 @@ export default function PlatformDashboard() {
   const proChange = pct(proThis, proPrev)
 
   const today = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
-
-  const setupSteps = [
-    { label: '匯入商品',   done: stats.totalProducts > 0,   href: '/platform/products', cta: '前往匯入' },
-    { label: '建立企業',   done: stats.totalCompanies > 0,  href: '/platform/groups',   cta: '前往建立' },
-  ]
-  const setupDone = setupSteps.filter(s => s.done).length
-  const showSetup = !isSuper && setupDone < setupSteps.length
 
   const hasRisk = stats.riskAlerts.systemAlerts.count > 0 || stats.riskAlerts.lossOrders.count > 0 || stats.riskAlerts.lowMarginProducts.count > 0
 
@@ -238,31 +230,6 @@ export default function PlatformDashboard() {
           查看訂單
         </Link>
       </div>
-
-      {/* 開站進度（平台商專屬，做完自動隱藏）*/}
-      {showSetup && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-base font-semibold text-gray-800">開站進度</p>
-            <span className="text-sm font-semibold text-blue-600">{setupDone}/{setupSteps.length} 完成</span>
-          </div>
-          <p className="text-sm text-gray-500 mt-0.5 mb-3">完成這幾步就能正式開始營業。</p>
-          <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-4">
-            <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${(setupDone / setupSteps.length) * 100}%` }} />
-          </div>
-          <ul className="space-y-2.5">
-            {setupSteps.map((s, i) => (
-              <li key={s.label} className="flex items-center gap-3">
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${s.done ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                  {s.done ? <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> : <span className="text-xs font-bold">{i + 1}</span>}
-                </span>
-                <span className={`flex-1 text-sm ${s.done ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>{s.label}</span>
-                {s.done ? <span className="text-xs font-medium text-emerald-600">已完成</span> : <Link href={s.href} className="text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition">{s.cta}</Link>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       {/* KPI metric cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
