@@ -256,18 +256,11 @@ export default function OrdersPage() {
     router.push(`${base}/orders/${o.id}`)
   }
 
-  // 轉贈：建立轉贈連結 → LINE shareTargetPicker 傳 Flex（含領取按鈕）
+  // 轉贈：點擊直接建立轉贈連結並開 LINE shareTargetPicker（不再有確認彈窗）
   const handleShare = (o: Order) => {
     if (!liff?.isLoggedIn()) { setToast({ message: '請先登入 LINE', tone: 'error' }); return }
     if (!liff.isApiAvailable('shareTargetPicker')) { setToast({ message: '您的 LINE 版本不支援分享', tone: 'error' }); return }
-    setDialog({
-      title: '要把這張 eSIM 轉贈給好友嗎？',
-      lines: ['轉贈後這張 eSIM 由對方安裝使用，', '你將無法自己安裝（對方領取前可取消）。'],
-      confirmLabel: '產生轉贈連結',
-      tone: 'primary',
-      icon: <IconShare size={22} />,
-      onConfirm: () => { setDialog(null); doShare(o) },
-    })
+    doShare(o)
   }
 
   const doShare = async (o: Order) => {
@@ -600,7 +593,6 @@ function PendingCard({ order, primary, onPrimary, actioning, canShare, onRedeem,
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
   const gift = giftBadge(order)
   const isReceived = order.receivedGift   // 收到的轉贈 → 不可再轉贈出去
-  const hasPendingGift = !!(order.gift && !order.gift.claimedAt && !order.gift.cancelledAt && !order.transferredAway && !isReceived && new Date(order.gift.expiresAt) > new Date())
 
   return (
     <div style={{ background: S.white, border: `1.5px solid ${primary}`, borderRadius: 16, padding: '16px', boxShadow: `0 2px 10px ${primary}22` }}>
@@ -624,26 +616,18 @@ function PendingCard({ order, primary, onPrimary, actioning, canShare, onRedeem,
         </p>
       </button>
 
-      {hasPendingGift ? (
-        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '8px 10px' }}>
-          <p style={{ fontSize: 11, color: '#9a3412', margin: 0, lineHeight: 1.5 }}>
-            已分享給朋友，等待領取。如要自己安裝，請進入訂單詳情取消分享。
-          </p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: (canShare && !isReceived) ? '2fr 1fr' : '1fr', gap: 8 }}>
-          <button onClick={onRedeem} disabled={actioning}
-            style={{ background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '11px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
+      <div style={{ display: 'grid', gridTemplateColumns: (canShare && !isReceived) ? '2fr 1fr' : '1fr', gap: 8 }}>
+        <button onClick={onRedeem} disabled={actioning}
+          style={{ background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '11px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
+        </button>
+        {canShare && !isReceived && (
+          <button onClick={onShare} disabled={actioning}
+            style={{ background: S.white, color: primary, border: `1.5px solid ${primary}`, borderRadius: 100, padding: '11px', fontSize: 13, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <IconShare size={14} /> 轉贈
           </button>
-          {canShare && !isReceived && (
-            <button onClick={onShare} disabled={actioning}
-              style={{ background: S.white, color: primary, border: `1.5px solid ${primary}`, borderRadius: 100, padding: '11px', fontSize: 13, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-              <IconShare size={14} /> 轉贈
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
