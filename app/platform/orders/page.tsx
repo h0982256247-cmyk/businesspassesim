@@ -106,18 +106,11 @@ function OrdersContent() {
   const hasRange = !!(fromParam || toParam)
   const handleRetry = async (id:string) => { setActionLoading(id); await fetch(`/api/platform/orders/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'retry_esim'})}); setActionLoading(null); load() }
 
-  // 開啟退款視窗（列表頁為單張退款）：抓退款預覽 + 判斷是否整捆全退（決定是否退券），交給 RefundConfirmDialog。
-  const openRefund = async (o: Order) => {
-    setActionLoading(o.id)
-    const j = await fetch(`/api/platform/orders/${o.id}`).then(r => r.json()).catch(() => null)
-    setActionLoading(null)
-    const esims: { id: string; status: string }[] = j?.esims ?? []
-    const othersActive = esims.some(x => x.id !== o.id && !['REFUNDED', 'CANCELLED', 'FAILED'].includes(x.status))
+  // 開啟退款視窗（列表頁為單張退款），交給 RefundConfirmDialog。
+  const openRefund = (o: Order) => {
     setRefundTarget({
       id: o.id, orderNumber: o.orderNumber, status: o.status, scope: 'single',
       amount: o.totalPaid, count: 1,
-      restoresCoupons: esims.length <= 1 ? true : !othersActive,
-      preview: j?.refundPreview ?? null,
     })
   }
 
@@ -128,11 +121,8 @@ function OrdersContent() {
       body: JSON.stringify({ action: t.scope === 'bundle' ? 'refund_bundle' : 'refund' }),
     }).then(x => x.json()).catch(() => ({ error: '連線失敗' }))
     if (r.error) return { ok: false, message: r.error }
-    const parts = [`已退還 NT$${(r.refundedAmount ?? 0).toLocaleString()}`]
-    if (r.restoredCoupons > 0) parts.push(`歸還優惠券 ${r.restoredCoupons} 張`)
-    if (r.voidedCoupons   > 0) parts.push(`作廢回購券 ${r.voidedCoupons} 張`)
     load()
-    return { ok: true, message: parts.join('\n') }
+    return { ok: true, message: `已退還 NT$${(r.refundedAmount ?? 0).toLocaleString()}` }
   }
   const totalPages = Math.ceil(total/20)
   return (

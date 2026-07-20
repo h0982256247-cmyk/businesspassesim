@@ -126,35 +126,24 @@ export default function PlatformOrderDetail() {
   }
 
   const REFUNDABLE = (s: string) => s === 'PAID' || s === 'COMPLETED' || s === 'ESIM_PENDING'
-  const ACTIVE = (s: string) => !['REFUNDED', 'CANCELLED', 'FAILED'].includes(s)
 
-  // 退款單張：抓該張預覽；判斷「退完後整捆是否全退」決定是否退券（只有全退才退券）。
-  const openRefund = async (e: Esim) => {
-    setActingId(e.id)
-    const j = await fetch(`/api/platform/orders/${e.id}`).then(x => x.json()).catch(() => null)
-    setActingId(null)
+  // 退款單張
+  const openRefund = (e: Esim) => {
     setRefundTarget({
       id: e.id, orderNumber: e.orderNumber, status: e.status, scope: 'single',
       amount: e.totalPaid, count: 1,
-      restoresCoupons: false,
-      preview: j?.refundPreview ?? null,
     })
   }
 
-  // 整捆退款：退所有仍可退的 eSIM、金額為合計，會退還／作廢優惠券。
-  const openBundleRefund = async () => {
+  // 整捆退款：退所有仍可退的 eSIM、金額為合計。
+  const openBundleRefund = () => {
     if (!d) return
     const refundable = d.esims.filter(e => REFUNDABLE(e.status))
     if (refundable.length === 0) return
-    setActingId('bundle')
-    const j = await fetch(`/api/platform/orders/${d.focusedId}?scope=bundle`).then(x => x.json()).catch(() => null)
-    setActingId(null)
     setRefundTarget({
       id: d.focusedId, orderNumber: d.orderNumber, status: refundable[0].status, scope: 'bundle',
       amount: refundable.reduce((s, e) => s + e.totalPaid, 0),
       count: refundable.length,
-      restoresCoupons: false,
-      preview: j?.refundPreview ?? null,
     })
   }
 
