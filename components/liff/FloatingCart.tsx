@@ -115,6 +115,9 @@ export default function FloatingCart() {
 
   // 無優惠券系統：應付 = 小計（subtotal 已含身分定價：企業會員福利價 / 一般價）
   const bestPrice = subtotal
+  // 企業會員福利價時，一併顯示原價（售價）並槓掉
+  const originalTotal = items.reduce((s, i) => s + i.sellPrice * i.qty, 0)
+  const hasBenefit = originalTotal > subtotal
 
   return (
     <>
@@ -310,6 +313,11 @@ export default function FloatingCart() {
                             </div>
 
                             <div style={{ textAlign: 'right' }}>
+                              {cartItemPrice(item) < item.sellPrice && (
+                                <p style={{ fontSize: 10, color: '#94a3b8', margin: 0, textDecoration: 'line-through', fontVariantNumeric: 'tabular-nums' }}>
+                                  NT${(item.sellPrice * item.qty).toLocaleString()}
+                                </p>
+                              )}
                               <p style={{ fontSize: 14, fontWeight: 800, color: C.primary, margin: 0, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
                                 NT${lineTotal.toLocaleString()}
                               </p>
@@ -337,7 +345,7 @@ export default function FloatingCart() {
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: '#64748b' }}>
                   <span>共 {totalQty} 張 eSIM</span>
-                  <span>NT${subtotal.toLocaleString()}</span>
+                  <span style={{ textDecoration: hasBenefit ? 'line-through' : 'none' }}>NT${originalTotal.toLocaleString()}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 700 }}>應付</span>
