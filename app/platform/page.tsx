@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import TenantScopeBar from '@/components/platform/TenantScopeBar'
 
 type MonthlyRevenue = { month: string; revenue: number; grossProfit: number }
 
@@ -150,27 +149,19 @@ export default function PlatformDashboard() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
   const [adminName, setAdminName] = useState<string>('')
-  const [platformAdmins, setPlatformAdmins] = useState<{ id: string; name: string; brandName: string | null }[]>([])
-  const [filterTenantId, setFilterTenantId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/platform/auth/me').then(r => r.ok ? r.json() : null).then(d => {
       if (d?.admin?.name) setAdminName(d.admin.name)
-      // Super Admin 才抓白牌清單，供儀表板下鑽到單一白牌
-      if (d?.admin?.role === 'SUPER_ADMIN') {
-        fetch('/api/platform/admins').then(r => r.json())
-          .then(a => setPlatformAdmins((a.admins ?? []).filter((x: { role: string }) => x.role === 'PLATFORM_ADMIN')))
-          .catch(() => {})
-      }
     }).catch(() => {})
   }, [])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    fetch(`/api/platform/dashboard${filterTenantId ? `?tenantAdminId=${filterTenantId}` : ''}`)
+    fetch('/api/platform/dashboard')
       .then(async r => {
         if (r.status === 401) { router.replace('/platform/login'); return }
         if (!r.ok) {
@@ -184,7 +175,7 @@ export default function PlatformDashboard() {
       .catch(e => { if (!cancelled) setError(e?.message || '儀表板載入失敗，請重新整理；若持續發生請重新登入。') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [router, filterTenantId])
+  }, [router])
 
   if (loading) {
     return (
@@ -214,9 +205,6 @@ export default function PlatformDashboard() {
   if (!stats) return null
 
   const isSuper = stats.role === 'SUPER_ADMIN'
-  const selectedAdmin = platformAdmins.find(a => a.id === filterTenantId)
-  const scoped = isSuper && !!filterTenantId
-  const scopeLabel = isSuper ? (scoped ? (selectedAdmin?.brandName ?? selectedAdmin?.name ?? '單一白牌') : '全平台合計') : '本平台'
   const mr = stats.monthlyRevenue
   const revThis = mr.at(-1)?.revenue ?? 0
   const revPrev = mr.at(-2)?.revenue ?? 0
@@ -242,12 +230,7 @@ export default function PlatformDashboard() {
       {/* Page header（歡迎 + 日期 + 角色範圍）*/}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-gray-800">數據駕駛艙</h1>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${scoped ? 'bg-blue-50 text-blue-600' : isSuper ? 'bg-violet-50 text-violet-600' : 'bg-blue-50 text-blue-600'}`}>
-              {scopeLabel}
-            </span>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-800">數據駕駛艙</h1>
           <p className="text-sm text-gray-400 mt-1">歡迎回來{adminName ? `，${adminName}` : ''}，今天是 {today}</p>
         </div>
         <Link href="/platform/orders" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition">
@@ -255,11 +238,6 @@ export default function PlatformDashboard() {
           查看訂單
         </Link>
       </div>
-
-      {/* Super Admin：切換白牌下鑽單一平台數據 */}
-      {isSuper && platformAdmins.length > 0 && (
-        <TenantScopeBar admins={platformAdmins} value={filterTenantId} onChange={setFilterTenantId} />
-      )}
 
       {/* 開站進度（平台商專屬，做完自動隱藏）*/}
       {showSetup && (
