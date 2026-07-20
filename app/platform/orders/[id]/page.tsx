@@ -102,6 +102,10 @@ export default function PlatformOrderDetail() {
   const [actingId, setActingId] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [partial, setPartial] = useState(false)
+  const [partialAmt, setPartialAmt] = useState('')
+  const [partialBusy, setPartialBusy] = useState(false)
+  const [partialMsg, setPartialMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const load = useCallback(async () => {
     const r = await fetch(`/api/platform/orders/${id}`)
@@ -158,6 +162,22 @@ export default function PlatformOrderDetail() {
     return { ok: true, message: parts.join('\n') }
   }
 
+  const doPartialRefund = async () => {
+    if (!d) return
+    const amt = Math.floor(Number(partialAmt))
+    if (!Number.isFinite(amt) || amt <= 0) { setPartialMsg({ ok: false, text: '請輸入大於 0 的金額' }); return }
+    setPartialBusy(true); setPartialMsg(null)
+    const r = await fetch(`/api/platform/orders/${d.focusedId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'refund_partial', amount: amt }),
+    }).then(x => x.json()).catch(() => ({ error: '連線失敗' }))
+    setPartialBusy(false)
+    if (r.error) { setPartialMsg({ ok: false, text: r.error }); return }
+    setPartial(false)
+    setMsg({ ok: true, text: `已部分退款 NT$${(r.refundedAmount ?? amt).toLocaleString()}` })
+    load()
+  }
+
   if (loading) return <div className="text-gray-400 text-sm p-8">載入中…</div>
   if (!d) return <div className="p-8 text-center text-gray-400 text-sm">訂單不存在</div>
 
@@ -205,6 +225,12 @@ export default function PlatformOrderDetail() {
                 )}
               </>
             )}
+          {refundableCount > 0 && (
+            <button onClick={() => { setPartialAmt(''); setPartialMsg(null); setPartial(true) }}
+              className={`text-sm font-medium px-4 py-2 rounded-xl transition ${btn.refundOutline}`}>
+              部分退款
+            </button>
+          )}
         </div>
       </div>
       {msg && <p className={`text-sm mb-4 ${msg.ok ? 'text-green-600' : 'text-red-500'}`}>{msg.text}</p>}
@@ -369,6 +395,41 @@ export default function PlatformOrderDetail() {
       </div>
 
       <RefundConfirmDialog target={refundTarget} onClose={() => setRefundTarget(null)} onConfirm={doRefund} />
+
+      {partial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onClick={() => { if (!partialBusy) setPartial(false) }}>
+          <div className="bg-white rounded-3xl shadow-2xl ring-1 ring-black/5 w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center mb-4">
+                <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l6-6m0 0H9.5M15 8v5.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-bold text-gray-900">部分退款</h2>
+              <p className="text-xs text-gray-400 mt-0.5 font-mono">{d.orderNumber ?? `#${d.focusedId.slice(-8).toUpperCase()}`}</p>
+              <p className="mt-3 text-sm text-gray-500">本交易實付 <b className="text-gray-800">NT${totalPaid.toLocaleString()}</b>。輸入要退回的金額（可小於實付）。</p>
+              <div className="mt-4">
+                <label className="text-xs text-gray-500 block mb-1">退款金額（NT$）</label>
+                <input type="number" min={1} value={partialAmt} onChange={e => setPartialAmt(e.target.value)} placeholder="例如 100"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-400" />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {[50, 100, Math.floor(totalPaid / 2)].filter((v, i, a) => v > 0 && v < totalPaid && a.indexOf(v) === i).map(v => (
+                  <button key={v} onClick={() => setPartialAmt(String(v))} className="text-xs px-2.5 py-1 rounded-lg bg-gray-50 text-gray-500 hover:bg-gray-100">NT${v.toLocaleString()}</button>
+                ))}
+              </div>
+              {partialMsg && <p className={`mt-3 text-sm ${partialMsg.ok ? 'text-green-600' : 'text-red-500'}`}>{partialMsg.text}</p>}
+              <p className="mt-3 text-xs text-amber-600">部分退款只退回款項，不會取消 eSIM，也不標記整筆為已退款。退到滿額才會轉為已退款。</p>
+              <div className="mt-6 flex gap-2.5">
+                <button onClick={() => setPartial(false)} disabled={partialBusy} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50 transition">取消</button>
+                <button onClick={doPartialRefund} disabled={partialBusy} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition">
+                  {partialBusy ? '退款中…' : '確定退款'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -187,9 +187,10 @@ model Order {
   priceTier PriceTier @default(GENERAL) @map("price_tier") // GENERAL＝一般售價 / BENEFIT＝福利價
 
   // 金額
-  subtotal  Int // 含稅金額（台幣）
-  totalPaid Int @map("total_paid") // 實付含稅金額
-  taxAmount Int @default(0) @map("tax_amount")
+  subtotal       Int // 含稅金額（台幣）
+  totalPaid      Int @map("total_paid") // 實付含稅金額
+  taxAmount      Int @default(0) @map("tax_amount")
+  refundedAmount Int @default(0) @map("refunded_amount") // 累計已退金額（部分退款用；達 totalPaid 即全退）
 
   // 系統訂單號
   orderNumber String? @unique @map("order_number")
