@@ -2,9 +2,6 @@
 
 import { createContext, useContext, type ReactNode } from 'react'
 
-export type HomeTemplate = 'landmark' | 'gradient' | 'minimal'
-export type ProductsTemplate = 'classic' | 'magazine' | 'compact'
-
 export interface TenantConfig {
   id: string
   slug: string
@@ -12,8 +9,6 @@ export interface TenantConfig {
   liffId: string
   logoUrl: string | null
   primaryColor: string | null
-  homeTemplate: HomeTemplate | null
-  productsTemplate: ProductsTemplate | null
   lineOaUrl: string | null   // LINE 官方帳號／客服連結（後台設定；前台客服按鈕導向）
   transferEnabled: boolean   // 是否開放 eSIM 轉贈（後台開關）
 }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useLiff } from '@/components/liff/LiffProvider'
 import { useTenant, useTenantColors } from '@/components/liff/TenantContext'
-import { HOME_TEMPLATES } from '@/components/liff/templates/registry'
+import ClassicHome from '@/components/liff/templates/home/ClassicHome'
 import SetupModal from '@/components/liff/SetupModal'
 import { BeeLogoSVG } from '@/components/liff/LiffIllustrations'
 import { hasSeenSplash, markSplashSeen } from '@/lib/utils/splash'
@@ -95,9 +95,6 @@ export default function LiffHomePage() {
     router.push(routes[path] ?? `/liff/${slug}/${path}`)
   }
 
-  const templateKey = tenant?.homeTemplate ?? 'landmark'
-  const HomeTemplate = HOME_TEMPLATES[templateKey]
-
   if (error) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: 24 }}>
@@ -160,7 +157,7 @@ export default function LiffHomePage() {
         {showSetup && (
           <SetupModal slug={slug} onDismiss={() => setShowSetup(false)} colors={C} logoUrl={tenant?.logoUrl ?? null} />
         )}
-        <HomeTemplate
+        <ClassicHome
           tenant={tenant}
           slug={slug}
           countries={countries}

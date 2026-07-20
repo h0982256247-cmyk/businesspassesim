@@ -14,8 +14,6 @@ async function brand(): Promise<TenantConfig> {
     liffId: s.liffId || process.env.NEXT_PUBLIC_LIFF_ID || '',
     logoUrl: s.logoUrl || process.env.NEXT_PUBLIC_BRAND_LOGO || null,
     primaryColor: s.primaryColor || process.env.NEXT_PUBLIC_BRAND_COLOR || null,
-    homeTemplate: null,
-    productsTemplate: null,
     lineOaUrl: s.lineOaUrl || process.env.NEXT_PUBLIC_LINE_OA_URL || null,
     transferEnabled: s.transferEnabled,
   }

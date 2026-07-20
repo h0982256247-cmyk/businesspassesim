@@ -9,7 +9,7 @@ import { peekCache, setCache, productsCacheKey } from '@/hooks/useCachedData'
 
 type ProductsApiResponse = { countries?: Country[]; products?: Product[] }
 import { GlobeIllustration } from '@/components/liff/LiffIllustrations'
-import { PRODUCTS_TEMPLATES } from '@/components/liff/templates/registry'
+import ClassicShop from '@/components/liff/templates/products/ClassicShop'
 import SetupModal from '@/components/liff/SetupModal'
 import { useCart } from '@/components/liff/CartProvider'
 import type { Country, Product, DayFilterControls, CartControls } from '@/components/liff/templates/products/types'
@@ -205,13 +205,10 @@ function ProductsContent() {
 
   if (loading) return <Spinner />
 
-  const templateKey = tenant?.productsTemplate ?? 'classic'
-  const Template = PRODUCTS_TEMPLATES[templateKey]
-
   return (
     <>
       {showSetup && <SetupModal slug={slug} onDismiss={dismissSetup} colors={C} logoUrl={tenant?.logoUrl ?? null} />}
-      <Template
+      <ClassicShop
         slug={slug}
         countries={countries}
         products={filteredProducts}
