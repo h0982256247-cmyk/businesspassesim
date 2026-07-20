@@ -29,9 +29,10 @@ export function useTenant(): TenantConfig | null {
 }
 
 // Returns the primary color or the default brand blue
+const DEFAULT_PRIMARY_COLOR = '#0284c7'
 export function usePrimaryColor(): string {
   const tenant = useTenant()
-  return tenant?.primaryColor ?? '#0284c7'
+  return tenant?.primaryColor ?? DEFAULT_PRIMARY_COLOR
 }
 
 // ─── Color utilities ────────────────────────────────────────────────────────

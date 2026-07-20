@@ -37,7 +37,7 @@ export default function LiffHomePage() {
   const C = useTenantColors()
 
   const brandName = tenant?.brandName ?? 'eSIM'
-  const primary   = tenant?.primaryColor ?? '#0284c7'
+  const primary   = C.primary
 
   // ── 過場：只有「本次 session 第一次」進入才播放 ──
   // 用 sessionStorage 記錄已看過；之後在 App 內回到主頁直接略過過場，

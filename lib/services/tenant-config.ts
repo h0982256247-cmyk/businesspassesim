@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db/prisma'
 import { encrypt, safeDecrypt } from '@/lib/utils/crypto'
+import { DEFAULT_BENEFIT_MARKUP } from '@/lib/utils/pricing'
 
 // 單一品牌全域整合設定（世界移動 eSIM / TapPay 金流）。
 // 原白標版是 per-tenant（by adminId），改單品牌後收斂為 singleton 設定表：
@@ -145,7 +146,7 @@ const SETTING_ID = 'singleton'
 export async function getPlatformSettings() {
   const s = await prisma.platformSetting.findUnique({ where: { id: SETTING_ID } })
   return {
-    benefitMarkupRate: s ? Number(s.benefitMarkupRate) : 1.5,
+    benefitMarkupRate: s ? Number(s.benefitMarkupRate) : DEFAULT_BENEFIT_MARKUP,
     brandName: s?.brandName ?? null,
     logoUrl: s?.logoUrl ?? null,
     primaryColor: s?.primaryColor ?? null,

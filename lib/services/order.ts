@@ -356,7 +356,7 @@ export async function markOrderRefunded(orderId: string) {
 // （已送出／3DS 進行中但使用者放棄、銀行未回傳 notify）——後者若稍後仍收到成功
 // notify，notify route 會走「訂單已 CANCELLED → 自動退款」保護路徑，不會誤發卡。
 export async function cancelExpiredPendingOrders(): Promise<number> {
-  const cutoff = new Date(Date.now() - 30 * 60 * 1000)
+  const cutoff = new Date(Date.now() - ORDER_EXPIRY_MS)
 
   const result = await prisma.order.updateMany({
     where: {
