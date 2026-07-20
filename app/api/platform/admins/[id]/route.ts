@@ -49,31 +49,3 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   return NextResponse.json({ error: '無效請求' }, { status: 400 })
 }
-
-// DELETE /api/platform/admins/:id — 移除帳號（僅 SUPER_ADMIN，不可刪自己或其他 SUPER_ADMIN）
-export async function DELETE(req: NextRequest, { params }: Params) {
-  const auth = await requirePlatformAuth(req)
-  if (auth instanceof NextResponse) return auth
-
-  if (auth.role !== AdminRole.SUPER_ADMIN) {
-    return NextResponse.json({ error: '只有 Super Admin 可移除帳號' }, { status: 403 })
-  }
-
-  const { id } = await params
-  if (id === auth.adminId) {
-    return NextResponse.json({ error: '不可刪除自己的帳號' }, { status: 400 })
-  }
-
-  const target = await prisma.adminUser.findUnique({ where: { id }, select: { role: true } })
-  if (!target) return NextResponse.json({ error: '帳號不存在' }, { status: 404 })
-  if (target.role === AdminRole.SUPER_ADMIN) {
-    return NextResponse.json({ error: '不可刪除 Super Admin 帳號' }, { status: 400 })
-  }
-
-  try {
-    await prisma.adminUser.delete({ where: { id } })
-    return NextResponse.json({ ok: true })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 400 })
-  }
-}
