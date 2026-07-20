@@ -77,6 +77,17 @@ export default function SettingsPage() {
   const [esim, setEsim] = useState<Record<string, string>>({})
   const [esimSaving, setEsimSaving] = useState(false)
   const [esimMsg, setEsimMsg] = useState<string | null>(null)
+  // 功能開關：eSIM 轉贈
+  const [transferEnabled, setTransferEnabled] = useState(false)
+  const [transferSaving, setTransferSaving] = useState(false)
+
+  const saveTransfer = async (val: boolean) => {
+    setTransferSaving(true)
+    const r = await fetch('/api/platform/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transferEnabled: val }) })
+    setTransferSaving(false)
+    if (r.ok) setTransferEnabled(val)
+    else { const d = await r.json().catch(() => ({})); alert(d.error ?? '儲存失敗') }
+  }
 
   const authed = (r: Response) => { if (r.status === 401) { router.replace('/platform/login'); return false }; return true }
 
@@ -95,11 +106,14 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
-    fetch('/api/platform/settings').then(r => authed(r) ? r.json() : null).then(d => { if (d) setS({
-      brandName: d.settings.brandName ?? '', logoUrl: d.settings.logoUrl ?? '', primaryColor: d.settings.primaryColor ?? '#635BFF',
-      lineOaUrl: d.settings.lineOaUrl ?? '', liffId: d.settings.liffId ?? '', domain: d.settings.domain ?? '',
-      lineChannelToken: d.settings.lineChannelToken ?? '', benefitMarkupRate: String(d.settings.benefitMarkupRate ?? 1.5),
-    }) })
+    fetch('/api/platform/settings').then(r => authed(r) ? r.json() : null).then(d => { if (d) {
+      setS({
+        brandName: d.settings.brandName ?? '', logoUrl: d.settings.logoUrl ?? '', primaryColor: d.settings.primaryColor ?? '#635BFF',
+        lineOaUrl: d.settings.lineOaUrl ?? '', liffId: d.settings.liffId ?? '', domain: d.settings.domain ?? '',
+        lineChannelToken: d.settings.lineChannelToken ?? '', benefitMarkupRate: String(d.settings.benefitMarkupRate ?? 1.5),
+      })
+      setTransferEnabled(!!d.settings.transferEnabled)
+    } })
     fetch('/api/platform/payment-config').then(r => r.json()).then(d => setPay({
       partnerKey: d.partnerKey ?? '', appId: d.appId ?? '', appKey: d.appKey ?? '', env: d.env ?? 'sandbox',
       creditMerchantId: d.credit?.merchantId ?? '', linePayMerchantId: d.linePay?.merchantId ?? '',
@@ -233,11 +247,24 @@ export default function SettingsPage() {
       )}
 
       {tab === '福利價' && (
-        <Card title="企業福利價倍率" onSave={() => saveSettings(['benefitMarkupRate'], setSSaving, setSMsg)} saving={sSaving} msg={sMsg}>
-          <Field label="倍率" hint="福利價 = 成本 × 倍率（1~5，預設 1.5）。新匯入/新增商品時套用；既有商品可於商品管理個別覆寫。">
-            <input type="number" min={1} max={5} step={0.1} className={`${inputCls} w-32`} value={s.benefitMarkupRate ?? '1.5'} onChange={e => setS(p => ({ ...p, benefitMarkupRate: e.target.value }))} />
-          </Field>
-        </Card>
+        <div className="space-y-4">
+          <Card title="企業福利價倍率" onSave={() => saveSettings(['benefitMarkupRate'], setSSaving, setSMsg)} saving={sSaving} msg={sMsg}>
+            <Field label="倍率" hint="福利價 = 成本 × 倍率（1~5，預設 1.5）。新匯入/新增商品時套用；既有商品可於商品管理個別覆寫。">
+              <input type="number" min={1} max={5} step={0.1} className={`${inputCls} w-32`} value={s.benefitMarkupRate ?? '1.5'} onChange={e => setS(p => ({ ...p, benefitMarkupRate: e.target.value }))} />
+            </Field>
+          </Card>
+
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h2 className="font-semibold text-gray-800 mb-3">eSIM 轉贈</h2>
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-gray-500">開啟後，會員可把「已備好、尚未安裝」的 eSIM 透過 LINE 分享／轉贈給好友，好友領取後由對方安裝使用（一張只能一人使用）。關閉則前台不顯示轉贈。</p>
+              <button onClick={() => saveTransfer(!transferEnabled)} disabled={transferSaving}
+                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${transferEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${transferEnabled ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

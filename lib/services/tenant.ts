@@ -17,6 +17,7 @@ async function brand(): Promise<TenantConfig> {
     homeTemplate: null,
     productsTemplate: null,
     lineOaUrl: s.lineOaUrl || process.env.NEXT_PUBLIC_LINE_OA_URL || null,
+    transferEnabled: s.transferEnabled,
   }
 }
 

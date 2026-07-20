@@ -15,6 +15,7 @@ export interface TenantConfig {
   homeTemplate: HomeTemplate | null
   productsTemplate: ProductsTemplate | null
   lineOaUrl: string | null   // LINE 官方帳號／客服連結（後台設定；前台客服按鈕導向）
+  transferEnabled: boolean   // 是否開放 eSIM 轉贈（後台開關）
 }
 
 const TenantContext = createContext<TenantConfig | null>(null)

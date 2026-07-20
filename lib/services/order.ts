@@ -60,6 +60,7 @@ export async function createOrder(input: CreateOrderInput): Promise<CreateOrderR
   const order = await prisma.order.create({
     data: {
       userId: input.userId,
+      currentOwnerId: input.userId,   // 擁有權初始＝買家（轉贈後會變）
       companyId,
       priceTier,
       orderNumber,
@@ -192,6 +193,7 @@ export async function createBundleOrders(input: CreateBundleOrdersInput): Promis
         const o = await tx.order.create({
           data: {
             userId: input.userId,
+            currentOwnerId: input.userId,   // 擁有權初始＝買家（轉贈後會變）
             companyId,
             priceTier,
             orderNumber: orderNumbers[i],
@@ -395,8 +397,9 @@ export async function markOrderCompleted(orderId: string, esimData: {
 // ─── 查詢 ─────────────────────────────────────────────────────────
 
 export async function getUserOrders(userId: string) {
-  return prisma.order.findMany({
-    where: { userId },
+  // 「我的 eSIM」＝我目前擁有的（含轉贈收到的）＋ 我買過但已轉贈出去的（歷史顯示）
+  const orders = await prisma.order.findMany({
+    where: { OR: [{ currentOwnerId: userId }, { userId }] },
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
@@ -409,6 +412,7 @@ export async function getUserOrders(userId: string) {
       paidAt: true,
       createdAt: true,
       userId: true,
+      currentOwnerId: true,
       bundleId: true,
       failureReason: true,
       cancelReason: true,
@@ -424,26 +428,47 @@ export async function getUserOrders(userId: string) {
         // 故另 join 目前商品的流量(dataCapacity) 供列表卡片區分方案。
         select: { productName: true, qty: true, unitPrice: true, product: { select: { dataCapacity: true } } },
       },
+      transfer: {
+        select: {
+          claimedAt: true, cancelledAt: true, expiresAt: true,
+          fromUser: { select: { displayName: true } },
+          toUser: { select: { displayName: true } },
+        },
+      },
     },
   })
+  return orders.map(({ currentOwnerId, transfer, ...o }) => ({
+    ...o,
+    transferredAway: o.userId === userId && currentOwnerId !== userId,   // 我買的、已轉贈出去
+    receivedGift: currentOwnerId === userId && o.userId !== userId,      // 我收到的轉贈
+    gift: transfer ? {
+      claimedAt: transfer.claimedAt ? transfer.claimedAt.toISOString() : null,
+      cancelledAt: transfer.cancelledAt ? transfer.cancelledAt.toISOString() : null,
+      expiresAt: transfer.expiresAt.toISOString(),
+      toName: transfer.toUser?.displayName ?? null,
+      fromName: transfer.fromUser?.displayName ?? null,
+    } : null,
+  }))
 }
 
-// LIFF 使用者存取「自己的」訂單的單一入口（fail-closed）：owner 條件進 where，
-// 漏帶或非擁有者一律查不到（回 null → route 統一 404，不洩漏訂單存在性）。select 由呼叫端決定。
+// LIFF 使用者存取「自己目前擁有」訂單的單一入口（fail-closed）：以 currentOwnerId 過濾，
+// 非目前擁有者一律查不到（回 null → route 統一 404）。安裝/查流量都應由目前擁有者操作。
+// select 由呼叫端決定。
 export function getOrderForOwner<S extends Prisma.OrderSelect>(
   orderId: string,
   userId: string,
   select: S,
 ): Promise<Prisma.OrderGetPayload<{ select: S }> | null> {
   return prisma.order.findFirst({
-    where: { id: orderId, userId },
+    where: { id: orderId, currentOwnerId: userId },
     select,
   }) as Promise<Prisma.OrderGetPayload<{ select: S }> | null>
 }
 
 export async function getOrderByIdForUser(orderId: string, userId: string) {
-  return prisma.order.findFirst({
-    where: { id: orderId, userId },
+  // 可存取條件：我目前擁有（含收到的轉贈）或我是買家（已轉贈出去也看得到歷史）
+  const o = await prisma.order.findFirst({
+    where: { id: orderId, OR: [{ currentOwnerId: userId }, { userId }] },
     select: {
       id: true,
       orderNumber: true,
@@ -456,6 +481,7 @@ export async function getOrderByIdForUser(orderId: string, userId: string) {
       createdAt: true,
       updatedAt: true,
       userId: true,
+      currentOwnerId: true,
       bundleId: true,
       failureReason: true,
       cancelReason: true,
@@ -470,8 +496,30 @@ export async function getOrderByIdForUser(orderId: string, userId: string) {
       orderItems: {
         select: { productName: true, qty: true, unitPrice: true, product: { select: { dataCapacity: true } } },
       },
+      transfer: {
+        select: {
+          claimedAt: true, cancelledAt: true, expiresAt: true,
+          fromUser: { select: { displayName: true } },
+          toUser: { select: { displayName: true } },
+        },
+      },
     },
   })
+  if (!o) return null
+  const { currentOwnerId, transfer, ...rest } = o
+  return {
+    ...rest,
+    isCurrentOwner: currentOwnerId === userId,                           // 只有目前擁有者可安裝/轉贈
+    transferredAway: rest.userId === userId && currentOwnerId !== userId,
+    receivedGift: currentOwnerId === userId && rest.userId !== userId,
+    gift: transfer ? {
+      claimedAt: transfer.claimedAt ? transfer.claimedAt.toISOString() : null,
+      cancelledAt: transfer.cancelledAt ? transfer.cancelledAt.toISOString() : null,
+      expiresAt: transfer.expiresAt.toISOString(),
+      toName: transfer.toUser?.displayName ?? null,
+      fromName: transfer.fromUser?.displayName ?? null,
+    } : null,
+  }
 }
 
 // ─── Retry 計數 ───────────────────────────────────────────────────

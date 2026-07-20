@@ -153,6 +153,7 @@ export async function getPlatformSettings() {
     liffId: s?.liffId ?? null,
     lineChannelToken: s?.lineChannelToken ? safeDecrypt(s.lineChannelToken) : null,
     domain: s?.domain ?? null,
+    transferEnabled: s?.transferEnabled ?? false,
   }
 }
 
@@ -165,6 +166,7 @@ export interface UpdatePlatformSettingsInput {
   liffId?: string | null
   lineChannelToken?: string | null  // 明文；傳入遮罩值（****開頭）代表沿用、不覆寫
   domain?: string | null
+  transferEnabled?: boolean
 }
 
 export async function updatePlatformSettings(input: UpdatePlatformSettingsInput) {
@@ -176,6 +178,7 @@ export async function updatePlatformSettings(input: UpdatePlatformSettingsInput)
   if (input.lineOaUrl !== undefined) data.lineOaUrl = input.lineOaUrl
   if (input.liffId !== undefined) data.liffId = input.liffId
   if (input.domain !== undefined) data.domain = input.domain?.toLowerCase().split(':')[0].trim() || null
+  if (input.transferEnabled !== undefined) data.transferEnabled = input.transferEnabled
   if (input.lineChannelToken !== undefined) {
     // 遮罩值沿用（不覆寫既有加密 token）；空字串清除；其餘加密後寫入
     if (!(input.lineChannelToken && input.lineChannelToken.startsWith('****'))) {

@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
-import { useTenantColors } from '@/components/liff/TenantContext'
+import { useLiff } from '@/components/liff/LiffProvider'
+import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
 import { useCachedData } from '@/hooks/useCachedData'
 import PageSkeleton from '@/components/liff/PageSkeleton'
 import { EmptyOrdersIllustration } from '@/components/liff/LiffIllustrations'
@@ -11,7 +12,7 @@ import {
   deriveEsimStatus, groupOf,
   TAB_ORDER, TAB_LABEL, type OrdersTab,
 } from '@/lib/esimStatus'
-import { IconSim, IconQr, IconInstall, IconClock } from '@/components/liff/EsimIcons'
+import { IconSim, IconQr, IconInstall, IconClock, IconShare, IconGift } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
 import type { ReactNode } from 'react'
@@ -35,6 +36,9 @@ type Order = {
   redeemedAt: string | null
   activatedAt: string | null
   orderItems: { productName: string; qty: number; unitPrice: number; product?: { dataCapacity: string | null } | null }[]
+  transferredAway: boolean   // 我買的、已轉贈出去（歷史顯示）
+  receivedGift: boolean      // 我收到的轉贈
+  gift: { claimedAt: string | null; cancelledAt: string | null; expiresAt: string; toName: string | null; fromName: string | null } | null
 }
 
 type EsimUsage = {
@@ -59,12 +63,30 @@ function formatData(mb: number, unit: string): string {
   return `${mb.toLocaleString()} MB`
 }
 
+// 轉贈狀態 pill（收到轉贈 / 等待對方領取）。已轉贈出去改在歷史列顯示「已轉贈給 ○○○」。
+function giftBadge(o: Order): { text: string; bg: string; color: string; kind: 'received' | 'waiting' } | null {
+  if (o.receivedGift && o.gift?.fromName) {
+    return { text: `由 ${o.gift.fromName} 轉贈`, bg: '#ede9fe', color: '#6d28d9', kind: 'received' }
+  }
+  const g = o.gift
+  if (g && !g.claimedAt && !g.cancelledAt && !o.transferredAway && new Date(g.expiresAt) > new Date()) {
+    return { text: '等待領取', bg: '#ffedd5', color: '#c2410c', kind: 'waiting' }
+  }
+  return null
+}
+
+function GiftBadgeIcon({ kind }: { kind: 'received' | 'waiting' }) {
+  return kind === 'received' ? <IconGift size={11} /> : <IconShare size={11} />
+}
+
 // ─── Page ──────────────────────────────────────────────────────
 
 export default function OrdersPage() {
   const router = useRouter()
   const base = useLiffBase()
   const C = useTenantColors()
+  const tenant = useTenant()
+  const { liff } = useLiff()
   const searchParams = useSearchParams()
   const bundleIdParam = searchParams.get('bundleId')
 
@@ -120,6 +142,8 @@ export default function OrdersPage() {
     const awaitingPayment: Order[] = [] // 處理中橫幅：等付款確認
     const preparing: Order[] = []       // 處理中橫幅：已付款開卡中
     for (const o of orders) {
+      // 已轉贈出去的訂單一律歸到歷史（顯示「已轉贈給 ○○○」，無任何操作）
+      if (o.transferredAway) { history.push(o); continue }
       const phase = deriveEsimStatus(o).phase
       switch (groupOf(phase)) {
         case 'active':  active.push(o); break
@@ -230,6 +254,66 @@ export default function OrdersPage() {
     }
     // 兌換觸發成功 → 導去詳情頁等 QR
     router.push(`${base}/orders/${o.id}`)
+  }
+
+  // 轉贈：建立轉贈連結 → LINE shareTargetPicker 傳 Flex（含領取按鈕）
+  const handleShare = (o: Order) => {
+    if (!liff?.isLoggedIn()) { setToast({ message: '請先登入 LINE', tone: 'error' }); return }
+    if (!liff.isApiAvailable('shareTargetPicker')) { setToast({ message: '您的 LINE 版本不支援分享', tone: 'error' }); return }
+    setDialog({
+      title: '要把這張 eSIM 轉贈給好友嗎？',
+      lines: ['轉贈後這張 eSIM 由對方安裝使用，', '你將無法自己安裝（對方領取前可取消）。'],
+      confirmLabel: '產生轉贈連結',
+      tone: 'primary',
+      icon: <IconShare size={22} />,
+      onConfirm: () => { setDialog(null); doShare(o) },
+    })
+  }
+
+  const doShare = async (o: Order) => {
+    if (!liff) return
+    setActioning(o.id)
+    try {
+      const r = await fetch(`/api/orders/${o.id}/gift`, { method: 'POST' }).then(x => x.json())
+      if (!r.ok) { setToast({ message: `轉贈失敗：${r.error}`, tone: 'error' }); setActioning(null); return }
+      const fullUrl = `${window.location.origin}${base}/gift/${r.token}`
+      let giftLink = fullUrl
+      try { giftLink = await liff.permanentLink.createUrlBy(fullUrl) } catch {}
+
+      const item = o.orderItems[0]
+      const cap = item?.product?.dataCapacity
+      const planLabel = cap && !item.productName.includes(cap) ? `${item.productName} · ${cap}` : (item?.productName ?? 'eSIM')
+      const brandName = tenant?.brandName ?? 'eSIM'
+      const flex = {
+        type: 'flex' as const,
+        altText: `你收到一張來自「${brandName}」的 eSIM：${planLabel}`,
+        contents: {
+          type: 'bubble' as const,
+          body: {
+            type: 'box' as const, layout: 'vertical' as const, spacing: 'md',
+            contents: [
+              { type: 'text' as const, text: `你收到一張來自「${brandName}」的 eSIM`, weight: 'bold' as const, size: 'lg' as const, color: '#1a1a1a', wrap: true },
+              { type: 'text' as const, text: planLabel, size: 'md' as const, weight: 'bold' as const, wrap: true, color: C.primaryText },
+              { type: 'text' as const, text: '點下方按鈕領取，即可安裝使用', size: 'sm' as const, color: '#475569', wrap: true },
+              { type: 'separator' as const, margin: 'md' as const },
+              { type: 'text' as const, text: '⚠ 連結 7 天內有效，請盡快領取', size: 'xs' as const, color: '#94a3b8', wrap: true },
+            ],
+          },
+          footer: {
+            type: 'box' as const, layout: 'vertical' as const, spacing: 'sm',
+            contents: [
+              { type: 'button' as const, style: 'primary' as const, color: C.primaryText,
+                action: { type: 'uri' as const, label: '領取這張 eSIM', uri: giftLink } },
+            ],
+          },
+        },
+      }
+      await liff.shareTargetPicker([flex])
+      await refresh()
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : '轉贈失敗', tone: 'error' })
+    }
+    setActioning(null)
   }
 
   // ─── Render ──────────────────────────────────────────────────
@@ -351,7 +435,8 @@ export default function OrdersPage() {
                   if (phase === 'readyToInstall') return (
                     <PendingCard key={o.id} order={o} primary={C.primary} onPrimary={C.onPrimary}
                       actioning={actioning === o.id}
-                      onRedeem={() => handleRedeem(o)}
+                      canShare={!!tenant?.transferEnabled}
+                      onRedeem={() => handleRedeem(o)} onShare={() => handleShare(o)}
                       onClick={() => router.push(`${base}/orders/${o.id}`)} />
                   )
                   if (phase === 'installable') return (
@@ -507,12 +592,15 @@ function InstallableCard({ order, primary, onClick }: { order: Order; primary: s
   )
 }
 
-function PendingCard({ order, primary, onPrimary, actioning, onRedeem, onClick }: {
-  order: Order; primary: string; onPrimary: string; actioning: boolean;
-  onRedeem: () => void; onClick: () => void
+function PendingCard({ order, primary, onPrimary, actioning, canShare, onRedeem, onShare, onClick }: {
+  order: Order; primary: string; onPrimary: string; actioning: boolean; canShare: boolean;
+  onRedeem: () => void; onShare: () => void; onClick: () => void
 }) {
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
+  const gift = giftBadge(order)
+  const isReceived = order.receivedGift   // 收到的轉贈 → 不可再轉贈出去
+  const hasPendingGift = !!(order.gift && !order.gift.claimedAt && !order.gift.cancelledAt && !order.transferredAway && !isReceived && new Date(order.gift.expiresAt) > new Date())
 
   return (
     <div style={{ background: S.white, border: `1.5px solid ${primary}`, borderRadius: 16, padding: '16px', boxShadow: `0 2px 10px ${primary}22` }}>
@@ -521,6 +609,11 @@ function PendingCard({ order, primary, onPrimary, actioning, onRedeem, onClick }
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: primary, color: onPrimary, padding: '3px 10px', borderRadius: 100 }}>
             <IconSim size={11} /> 可以安裝
           </span>
+          {gift && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: gift.bg, color: gift.color, padding: '3px 10px', borderRadius: 100 }}>
+              <GiftBadgeIcon kind={gift.kind} />{gift.text}
+            </span>
+          )}
         </div>
         <p style={{ fontSize: 16, fontWeight: 700, color: S.ink, margin: '0 0 4px' }}>
           {productName}
@@ -531,10 +624,26 @@ function PendingCard({ order, primary, onPrimary, actioning, onRedeem, onClick }
         </p>
       </button>
 
-      <button onClick={onRedeem} disabled={actioning}
-        style={{ width: '100%', background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '11px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
-      </button>
+      {hasPendingGift ? (
+        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 10, padding: '8px 10px' }}>
+          <p style={{ fontSize: 11, color: '#9a3412', margin: 0, lineHeight: 1.5 }}>
+            已分享給朋友，等待領取。如要自己安裝，請進入訂單詳情取消分享。
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: (canShare && !isReceived) ? '2fr 1fr' : '1fr', gap: 8 }}>
+          <button onClick={onRedeem} disabled={actioning}
+            style={{ background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '11px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
+          </button>
+          {canShare && !isReceived && (
+            <button onClick={onShare} disabled={actioning}
+              style={{ background: S.white, color: primary, border: `1.5px solid ${primary}`, borderRadius: 100, padding: '11px', fontSize: 13, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+              <IconShare size={14} /> 轉贈
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -568,9 +677,11 @@ function ProcessingRow({ order, stage, boxed, onClick }: {
 
 function CompactRow({ order, onClick }: { order: Order; onClick: () => void }) {
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
+  const gifted = order.transferredAway
+  const giftedTo = order.gift?.toName ?? '朋友'
   const view = deriveEsimStatus(order)
-  const label = view.label
-  const color = view.phase === 'failed' ? '#b91c1c' : view.phase === 'ended' ? '#15803d' : S.faint
+  const label = gifted ? `已轉贈給 ${giftedTo}` : view.label
+  const color = gifted ? '#6d28d9' : view.phase === 'failed' ? '#b91c1c' : view.phase === 'ended' ? '#15803d' : S.faint
   return (
     <button onClick={onClick}
       style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: S.white, border: `1px solid ${S.line}`, borderRadius: 12, padding: '12px 14px', opacity: 0.85 }}>

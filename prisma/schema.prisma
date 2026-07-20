@@ -31,6 +31,9 @@ model User {
   managedCompany  Group?         @relation("CompanyAdmin") // 若為某企業的管理員（在 LIFF 審核成員）
   reviewedMembers GroupMember[]  @relation("MemberReviewer") // 我（企業管理員）審核過的成員
   orders          Order[]
+  ownedOrders     Order[]        @relation("OrderCurrentOwner") // 目前擁有的訂單（含轉贈收到的）
+  transfersFrom   EsimTransfer[] @relation("TransferFrom")
+  transfersTo     EsimTransfer[] @relation("TransferTo")
   notifications   Notification[]
   savedCard       SavedCard?
 
@@ -174,9 +177,10 @@ enum ProductStatus {
 // ============================================================
 
 model Order {
-  id     String      @id @default(cuid())
-  userId String      @map("user_id")
-  status OrderStatus @default(PENDING)
+  id             String      @id @default(cuid())
+  userId         String      @map("user_id")
+  currentOwnerId String?     @map("current_owner_id") // 目前擁有者（轉贈後會變；預設＝買家 userId）
+  status         OrderStatus @default(PENDING)
 
   // 購買身分與企業歸屬（PRD 七：訂單保存會員、企業）
   companyId String?   @map("company_id") // 下單當下所屬企業；null＝一般會員
@@ -232,13 +236,37 @@ model Order {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user       User        @relation(fields: [userId], references: [id])
-  company    Group?      @relation(fields: [companyId], references: [id])
-  orderItems OrderItem[]
+  user         User          @relation(fields: [userId], references: [id])
+  currentOwner User?         @relation("OrderCurrentOwner", fields: [currentOwnerId], references: [id])
+  company      Group?        @relation(fields: [companyId], references: [id])
+  orderItems   OrderItem[]
+  transfer     EsimTransfer?
 
   @@index([bundleId])
   @@index([companyId])
+  @@index([currentOwnerId])
   @@map("orders")
+}
+
+// eSIM 轉贈：買家把「已備好但未安裝」的 eSIM 分享給好友，好友領取後擁有權轉移。
+// 一張訂單同時只有一筆進行中轉贈（orderId @unique；取消/過期後可重建同一列）。
+model EsimTransfer {
+  id          String    @id @default(cuid())
+  orderId     String    @unique @map("order_id")
+  token       String    @unique
+  fromUserId  String    @map("from_user_id")
+  toUserId    String?   @map("to_user_id")
+  expiresAt   DateTime  @map("expires_at")
+  claimedAt   DateTime? @map("claimed_at")
+  cancelledAt DateTime? @map("cancelled_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  order    Order @relation(fields: [orderId], references: [id])
+  fromUser User  @relation("TransferFrom", fields: [fromUserId], references: [id])
+  toUser   User? @relation("TransferTo", fields: [toUserId], references: [id])
+
+  @@map("esim_transfers")
 }
 
 enum OrderStatus {
@@ -331,6 +359,8 @@ model PlatformSetting {
   lineChannelToken  String?  @map("line_channel_token") // LINE Messaging push token（加密儲存）
   // 網域
   domain            String?  // 自訂網域（純 host，如 esim.example.com）
+  // 功能開關
+  transferEnabled   Boolean  @default(false) @map("transfer_enabled") // 是否開放 eSIM 轉贈給好友
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
