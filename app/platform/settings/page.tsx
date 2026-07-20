@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 
-const TABS = ['品牌與網域', '金流 (TapPay)', 'eSIM (世界移動)', '福利價'] as const
+const TABS = ['品牌與網域', '金流 (TapPay)', 'eSIM (世界移動)', '福利價', '轉贈'] as const
 type Tab = typeof TABS[number]
 
 const inputCls = 'w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400'
@@ -247,22 +247,22 @@ export default function SettingsPage() {
       )}
 
       {tab === '福利價' && (
-        <div className="space-y-4">
-          <Card title="企業福利價倍率" onSave={() => saveSettings(['benefitMarkupRate'], setSSaving, setSMsg)} saving={sSaving} msg={sMsg}>
-            <Field label="倍率" hint="福利價 = 成本 × 倍率（1~5，預設 1.5）。新匯入/新增商品時套用；既有商品可於商品管理個別覆寫。">
-              <input type="number" min={1} max={5} step={0.1} className={`${inputCls} w-32`} value={s.benefitMarkupRate ?? '1.5'} onChange={e => setS(p => ({ ...p, benefitMarkupRate: e.target.value }))} />
-            </Field>
-          </Card>
+        <Card title="企業福利價倍率" onSave={() => saveSettings(['benefitMarkupRate'], setSSaving, setSMsg)} saving={sSaving} msg={sMsg}>
+          <Field label="倍率" hint="福利價 = 成本 × 倍率（1~5，預設 1.5）。新匯入/新增商品時套用；既有商品可於商品管理個別覆寫。">
+            <input type="number" min={1} max={5} step={0.1} className={`${inputCls} w-32`} value={s.benefitMarkupRate ?? '1.5'} onChange={e => setS(p => ({ ...p, benefitMarkupRate: e.target.value }))} />
+          </Field>
+        </Card>
+      )}
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h2 className="font-semibold text-gray-800 mb-3">eSIM 轉贈</h2>
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-sm text-gray-500">開啟後，會員可把「已備好、尚未安裝」的 eSIM 透過 LINE 分享／轉贈給好友，好友領取後由對方安裝使用（一張只能一人使用）。關閉則前台不顯示轉贈。</p>
-              <button onClick={() => saveTransfer(!transferEnabled)} disabled={transferSaving}
-                className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${transferEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${transferEnabled ? 'translate-x-5' : ''}`} />
-              </button>
-            </div>
+      {tab === '轉贈' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="font-semibold text-gray-800 mb-3">eSIM 轉贈</h2>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-gray-500">開啟後，會員可把「已備好、尚未安裝」的 eSIM 透過 LINE 分享／轉贈給好友，好友領取後由對方安裝使用（一張只能一人使用）。關閉則前台不顯示轉贈。</p>
+            <button onClick={() => saveTransfer(!transferEnabled)} disabled={transferSaving}
+              className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 disabled:opacity-50 ${transferEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}>
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${transferEnabled ? 'translate-x-5' : ''}`} />
+            </button>
           </div>
         </div>
       )}
