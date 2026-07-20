@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       lineOaUrl: s.lineOaUrl,
       liffId: s.liffId,
       domain: s.domain,
+      transferEnabled: s.transferEnabled,
       lineChannelToken: s.lineChannelToken ? maskSecret(s.lineChannelToken) : '',
       lineChannelTokenSet: !!s.lineChannelToken,
     },
