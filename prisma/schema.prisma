@@ -28,7 +28,6 @@ model User {
 
   // 關聯
   groupMembership GroupMember? // 一人最多屬於一個企業
-  managedCompany  Group?         @relation("CompanyAdmin") // 若為某企業的管理員（在 LIFF 審核成員）
   reviewedMembers GroupMember[]  @relation("MemberReviewer") // 我（企業管理員）審核過的成員
   orders          Order[]
   ownedOrders     Order[]        @relation("OrderCurrentOwner") // 目前擁有的訂單（含轉贈收到的）
@@ -51,11 +50,9 @@ model Group {
   inviteCode  String   @unique @map("invite_code") // 企業邀請碼
   inviteLink  String?  @map("invite_link")
   isActive    Boolean  @default(true) @map("is_active") // 企業本身啟用/停權（由 Super Admin 控制）
-  adminUserId String?  @unique @map("admin_user_id") // 已棄用：管理員改記於 GroupMember.role=ADMIN（可多位）。此欄保留避免部署空窗，待後續清理
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  adminUser User?         @relation("CompanyAdmin", fields: [adminUserId], references: [id])
   members   GroupMember[]
   orders    Order[]
 
@@ -317,7 +314,7 @@ model OrderItem {
 
 // ============================================================
 // 後台帳號（商務通平台管理者）
-// 企業管理員不是後台帳號，而是被指派的 LINE User（Group.adminUserId），在 LIFF 操作。
+// 企業管理員不是後台帳號，而是被指派的 LINE User（GroupMember.role=ADMIN），在 LIFF 操作。
 // ============================================================
 
 model AdminUser {
