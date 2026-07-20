@@ -17,17 +17,25 @@ export function redirectToPaymentUrl(url: string): void {
   console.log('[payment-redirect]', url)
   const tp = (window as unknown as { TPDirect?: TPDirectLike }).TPDirect
   if (tp && typeof tp.redirect === 'function') {
-    tp.redirect(url)
-    // TPDirect.redirect 內部如果 URL validation 失敗（xe(t) 回 false）會 console.error
-    // 後直接 return，不會 navigate。為了避免使用者卡在「付款中」，掛一個 200ms 的
-    // 保險：若到時 window.location 沒換過，直接強制 window.location.href 跳過去。
+    // 導轉一旦開始（含 3DS / LINE Pay 常用的表單送出）會觸發 pagehide / beforeunload →
+    // 標記 navigating。TPDirect.redirect 的導轉未必同步反映到 window.location.href
+    // （表單送出時尚未 commit），若在那空窗期用 fallback 再打一次，就會對「一次性的
+    // 3DS 網址」二次請求，TapPay 回「Duplicate Request（重複請求驗證）」。
     const before = window.location.href
+    let navigating = false
+    const mark = () => { navigating = true }
+    window.addEventListener('pagehide', mark, { once: true })
+    window.addEventListener('beforeunload', mark, { once: true })
+    tp.redirect(url)
+    // 只有「確定沒開始導轉」時才 fallback（TPDirect 內部 URL validation 失敗會 return、
+    // 不 navigate）。拉長到 3s 讓真正的導轉先 commit（慢網路下 3DS 表單送出到 commit
+    // 可能較久），避免二次請求一次性網址。
     setTimeout(() => {
-      if (window.location.href === before) {
+      if (!navigating && window.location.href === before) {
         console.warn('[payment-redirect] TPDirect.redirect did not navigate, forcing window.location.href')
         window.location.href = url
       }
-    }, 200)
+    }, 3000)
     return
   }
   // SDK 沒載入或不支援時 fallback。
