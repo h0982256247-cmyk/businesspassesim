@@ -4,7 +4,7 @@ import { getPlatformSettings } from './tenant-config'
 import { OrderStatus } from '@prisma/client'
 
 // eSIM 轉贈：買家把「已備好但未安裝」的 eSIM 分享給好友，好友領取後擁有權（currentOwnerId）轉移。
-// 防呆：只有目前擁有者可轉、已安裝（redeemedAt/activatedAt）不可轉、領取用 claimedAt 原子鎖防重複。
+// 防呆：只有原始購買人可轉（受贈的卡不可再轉，嚴格 one-hop）、已安裝（redeemedAt/activatedAt）不可轉、領取用 claimedAt 原子鎖防重複。
 
 const EXPIRY_DAYS = 7
 
@@ -21,9 +21,13 @@ export async function createTransfer(orderId: string, fromUserId: string): Promi
 
   const order = await prisma.order.findFirst({
     where: { id: orderId, currentOwnerId: fromUserId },
-    select: { id: true, status: true, esimRcode: true, redeemedAt: true, activatedAt: true },
+    select: { id: true, userId: true, status: true, esimRcode: true, redeemedAt: true, activatedAt: true },
   })
   if (!order) return { ok: false, reason: '找不到這張 eSIM 或你已不是擁有者' }
+  // 受贈得來的 eSIM 不可再轉出：只有原始購買人（userId）可轉，嚴格 one-hop（與前端 isReceived 一致）
+  if (order.userId !== fromUserId) {
+    return { ok: false, reason: '受贈的 eSIM 無法再轉贈' }
+  }
   if (order.status !== OrderStatus.COMPLETED || !order.esimRcode) {
     return { ok: false, reason: 'eSIM 尚未備妥，無法轉贈' }
   }
