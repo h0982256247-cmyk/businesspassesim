@@ -70,17 +70,6 @@ export function SignalIllustration({ size = 64 }: { size?: number }) {
   )
 }
 
-export function SimCardIllustration({ size = 64 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 64 80" fill="none" aria-hidden="true">
-      <path d="M10 18 L22 6 L54 6 L54 74 L10 74 Z" stroke="#cbd5e1" strokeWidth="1.5" fill="none" strokeLinejoin="round" />
-      <rect x="22" y="28" width="20" height="24" rx="3" stroke="#94a3b8" strokeWidth="1.2" />
-      <line x1="22" y1="35" x2="42" y2="35" stroke="#cbd5e1" strokeWidth="0.8" />
-      <line x1="22" y1="42" x2="42" y2="42" stroke="#cbd5e1" strokeWidth="0.8" />
-    </svg>
-  )
-}
-
 export function EmptyOrdersIllustration({ size = 80 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 80 80" fill="none" aria-hidden="true">

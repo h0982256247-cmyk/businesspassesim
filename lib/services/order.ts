@@ -521,12 +521,3 @@ export async function getOrderByIdForUser(orderId: string, userId: string) {
     } : null,
   }
 }
-
-// ─── Retry 計數 ───────────────────────────────────────────────────
-
-export async function incrementRetryCount(orderId: string) {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: { retryCount: { increment: 1 }, lastRetryAt: new Date() },
-  })
-}

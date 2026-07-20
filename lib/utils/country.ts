@@ -68,12 +68,6 @@ export const CODE_TO_NAME_ZH: Record<string, string> = (() => {
   return out
 })()
 
-export function countryNameToCode(name: string): string | null {
-  if (!name) return null
-  const trimmed = name.trim()
-  return COUNTRY_NAME_TO_CODE[trimmed] ?? null
-}
-
 // 在任意字串中找出最先出現的國家／區域名稱。例如：
 //   「日本Softbank」 → { code: 'JP', zh: '日本' }
 //   「東南亞7國方案」 → { code: 'SEA', zh: '東南亞' }

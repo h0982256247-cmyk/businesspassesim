@@ -261,13 +261,6 @@ export async function getUserMembership(userId: string) {
   })
 }
 
-export async function getCompanyByInviteCode(inviteCode: string) {
-  return prisma.group.findUnique({
-    where: { inviteCode },
-    select: { id: true, name: true, description: true, isActive: true },
-  })
-}
-
 // 取價依據（Phase 5）：是否為「已核准且企業啟用中」的企業會員。
 // 是 → 享福利價（benefitPrice）；否 → 一般售價（sellPrice）。
 export async function isApprovedMember(

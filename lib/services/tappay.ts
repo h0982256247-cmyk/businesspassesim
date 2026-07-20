@@ -263,21 +263,6 @@ export async function tapPayQueryTrade(
   }
 }
 
-// ─── Webhook 驗章（已棄用：header 比對無效）─────────────────────────
-// ⚠ 實測 TapPay 的 backend_notify 不帶 x-api-key header，下面這支以 header 比對
-//   的方式永遠失敗。notify 已改用 tapPayQueryTrade（Record API）驗真。此函式僅
-//   保留相容，勿用於新流程。
-// TapPay 未提供 HMAC signature；防偽靠 partner_key header 比對
-
-export async function verifyTapPayWebhook(req: Request): Promise<boolean> {
-  const key = req.headers.get('x-api-key')
-  const cfg = await getPaymentConfig('tappay_credit')  // partnerKey 已解密
-  if (cfg && cfg.isActive) {
-    return key === cfg.partnerKey
-  }
-  return key === process.env.TAPPAY_PARTNER_KEY
-}
-
 // ─── 退款 ──────────────────────────────────────────────────────────
 
 export async function tapPayRefund(

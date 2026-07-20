@@ -32,9 +32,3 @@ export async function cleanupRateLimits(): Promise<number> {
     return 0
   }
 }
-
-// 取請求來源 IP（Vercel 走 x-forwarded-for）；取不到回 'unknown'
-export function clientIp(req: Request): string {
-  const xff = req.headers.get('x-forwarded-for')
-  return (xff ? xff.split(',')[0]?.trim() : '') || req.headers.get('x-real-ip') || 'unknown'
-}
