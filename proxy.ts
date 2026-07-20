@@ -12,14 +12,12 @@ import { verifyPlatformSession, PLATFORM_COOKIE } from '@/lib/auth/platform'
 //                          ⚠ 只放行 /notify 子路徑；父路徑 /api/payment/tappay（前端
 //                          發動扣款）仍需 session，不可放行。
 //   /api/cron/            — Vercel Cron，由 route 內部驗證 CRON_SECRET
-//   /api/gifts/           — 轉贈連結預覽 (GET 不需登入)；claim 子路徑由 route 內部驗 session
 const PUBLIC_API = [
   '/api/auth/line',
   '/api/platform/auth/',
   '/api/webhooks/',
   '/api/payment/tappay/notify',
   '/api/cron/',
-  '/api/gifts/',
 ]
 
 // 平台後台路由前綴（使用 PLATFORM_COOKIE 驗證）

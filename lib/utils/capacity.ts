@@ -1,6 +1,5 @@
 // Parse data capacity from CSV product names, plan codes, or SKU strings.
-// Shared by CSV import and the admin "recompute meta" tool so they classify
-// rows consistently. Returns a display string (e.g. "吃到飽" / "1GB/天" /
+// Used by CSV import to classify rows consistently. Returns a display string (e.g. "吃到飽" / "1GB/天" /
 // "500MB") or null when nothing recognisable is found.
 
 // 「token 前後是否為國家／詞邊界」 - 寬鬆版：允許前面是數字（10MAX-1D 也算）

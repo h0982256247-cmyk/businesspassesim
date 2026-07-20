@@ -1,5 +1,5 @@
-// Country / region name resolution shared by CSV import and the admin
-// "recompute countries" tool. Two flavours of identifier coexist on purpose:
+// Country / region name resolution used by CSV product import.
+// Two flavours of identifier coexist on purpose:
 //   - ISO 3166-1 alpha-2 (JP, US, TH …) for single countries
 //   - custom 3-letter codes (SEA, ANZ, NMY …) for multi-country bundles
 //     the merchant carves out in the back office.
@@ -100,73 +100,6 @@ export function countryCodeToFlag(code: string): string {
   const [a, b] = code.toUpperCase().split('')
   const toRI = (c: string) => String.fromCodePoint(c.codePointAt(0)! + 127397)
   return toRI(a) + toRI(b)
-}
-
-// Plan code 前綴 → 標準中文國名。商家自訂 plan code 規則差異很大，這張表混了：
-//   - ISO 3166-1 alpha-3（JPN/KOR/THA/...）
-//   - 商家自己用的縮寫（IND=印尼/SGMA=新馬）
-//   - 自訂多國 region 代碼（NMY/SEA/ANZ ...）
-// 之後新格式增加直接補在這裡即可。
-const PLAN_CODE_PREFIX_TO_NAME: Record<string, string> = {
-  // 商家觀察到的自訂縮寫（從 CSV 截圖）
-  IND: '印尼',   // 注意：ISO3 IND 是印度，但本商家用來代表印尼
-  IDN: '印尼',
-  SGMA: '新馬',
-  // ISO 3166-1 alpha-3 標準
-  JPN: '日本',  KOR: '韓國',  TWN: '台灣',  CHN: '中國',
-  HKG: '香港',  MAC: '澳門',  SGP: '新加坡', MYS: '馬來西亞',
-  THA: '泰國',  VNM: '越南',  PHL: '菲律賓',
-  KHM: '柬埔寨', LAO: '寮國',  MMR: '緬甸',
-  PAK: '巴基斯坦', BGD: '孟加拉', LKA: '斯里蘭卡', NPL: '尼泊爾',
-  TUR: '土耳其', ISR: '以色列', ARE: '阿聯', SAU: '沙烏地阿拉伯',
-  GBR: '英國',  FRA: '法國',  DEU: '德國',  ITA: '義大利',
-  ESP: '西班牙', PRT: '葡萄牙', NLD: '荷蘭',  BEL: '比利時',
-  CHE: '瑞士',  AUT: '奧地利', SWE: '瑞典',  NOR: '挪威',
-  DNK: '丹麥',  FIN: '芬蘭',  ISL: '冰島',  IRL: '愛爾蘭',
-  POL: '波蘭',  CZE: '捷克',  HUN: '匈牙利', GRC: '希臘',
-  RUS: '俄羅斯', UKR: '烏克蘭',
-  USA: '美國',  CAN: '加拿大', MEX: '墨西哥', BRA: '巴西',
-  ARG: '阿根廷', CHL: '智利',  COL: '哥倫比亞', PER: '秘魯',
-  ZAF: '南非',  EGY: '埃及',  MAR: '摩洛哥', KEN: '肯亞',
-  AUS: '澳洲',  NZL: '紐西蘭',
-}
-
-// 預先排序：先試長的前綴避免「SGMA」被「SG」誤匹配
-const PLAN_CODE_PREFIXES = Object.keys(PLAN_CODE_PREFIX_TO_NAME).sort((a, b) => b.length - a.length)
-
-// 從 planCode 開頭抓國家／區域代碼。例如：
-//   「IND-TI-1D」 → { code: 'ID', zh: '印尼' }   (查 PLAN_CODE_PREFIX_TO_NAME)
-//   「TH-T50-30D」 → { code: 'TH', zh: '泰國' }  (2 字母 ISO)
-//   「NMY-TI-1D」 → { code: 'NMY', zh: '新馬' }  (3 字母自訂 region)
-// 找不到回傳 null，讓呼叫端 fallback 其他資訊。
-export function resolveCountryByPlanCode(
-  planCode: string,
-): { code: string; zh: string; flag: string } | null {
-  if (!planCode) return null
-  const upper = planCode.toUpperCase()
-
-  // 1. 商家自訂前綴 / ISO3（長前綴優先）
-  for (const prefix of PLAN_CODE_PREFIXES) {
-    if (upper.startsWith(prefix + '-') || upper === prefix) {
-      const zh = PLAN_CODE_PREFIX_TO_NAME[prefix]
-      const code = COUNTRY_NAME_TO_CODE[zh]
-      if (code) return { code, zh, flag: countryCodeToFlag(code) }
-    }
-  }
-
-  // 2. 開頭 3 字母直接命中 CODE_TO_NAME_ZH（例如自訂 region NMY/SEA/ANZ）
-  const m3 = upper.match(/^([A-Z]{3})-/)
-  if (m3 && CODE_TO_NAME_ZH[m3[1]]) {
-    return { code: m3[1], zh: CODE_TO_NAME_ZH[m3[1]], flag: countryCodeToFlag(m3[1]) }
-  }
-
-  // 3. 開頭 2 字母 ISO（TH/JP/KR/...）
-  const m2 = upper.match(/^([A-Z]{2})-/)
-  if (m2 && CODE_TO_NAME_ZH[m2[1]]) {
-    return { code: m2[1], zh: CODE_TO_NAME_ZH[m2[1]], flag: countryCodeToFlag(m2[1]) }
-  }
-
-  return null
 }
 
 // 從商品名稱（C 欄）+ CSV 各欄位解析出「顯示國家/區域」。業主定案 2026-06：
