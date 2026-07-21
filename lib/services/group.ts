@@ -143,12 +143,32 @@ export async function joinByInviteCode(userId: string, inviteCode: string): Prom
   return { ok: true, companyName: group.name, status: 'PENDING' }
 }
 
+// 判斷 userId 是否為該企業「最後一位」在籍管理員（退出/移除後企業會變 0 管理員）。
+// 非在籍 ADMIN 一律回 false（移除他不影響管理員數）。與 setMemberAdmin 的守門同語意。
+async function isLastAdmin(groupId: string, userId: string): Promise<boolean> {
+  const member = await prisma.groupMember.findUnique({
+    where: { userId },
+    select: { role: true, groupId: true, leftAt: true },
+  })
+  if (!member || member.leftAt || member.groupId !== groupId || member.role !== GroupMemberRole.ADMIN) {
+    return false
+  }
+  const otherAdmins = await prisma.groupMember.count({
+    where: { groupId, role: GroupMemberRole.ADMIN, leftAt: null, userId: { not: userId } },
+  })
+  return otherAdmins === 0
+}
+
 export async function leaveCompany(userId: string): Promise<{ ok: boolean; reason?: string }> {
   const membership = await prisma.groupMember.findUnique({
     where: { userId },
-    select: { leftAt: true },
+    select: { leftAt: true, groupId: true },
   })
   if (!membership || membership.leftAt) return { ok: false, reason: '尚未加入任何企業' }
+  // 最後一位管理員不可退出（否則沒人能在 LIFF 審核成員 → 企業凍結）
+  if (await isLastAdmin(membership.groupId, userId)) {
+    return { ok: false, reason: '你是唯一的企業管理員，請先指派其他管理員後再退出' }
+  }
   await prisma.groupMember.update({ where: { userId }, data: { leftAt: new Date() } })
   return { ok: true }
 }
@@ -209,7 +229,13 @@ export async function rejectMember(actingUserId: string, targetUserId: string) {
 
 // 移除成員（企業管理員）：標記離開，該員恢復成一般會員（看一般售價）
 export async function removeMember(actingUserId: string, targetUserId: string) {
-  await assertCompanyAdmin(actingUserId, targetUserId)
+  const membership = await assertCompanyAdmin(actingUserId, targetUserId)
+  // 不可移除自己（自我退出改走 leaveCompany，一併受最後管理員守門）
+  if (actingUserId === targetUserId) throw new Error('不可移除自己，請改用「退出企業」')
+  // 不可移除最後一位管理員（否則企業沒人能審核成員）
+  if (await isLastAdmin(membership.groupId, targetUserId)) {
+    throw new Error('無法移除唯一的企業管理員，請先指派其他管理員')
+  }
   return prisma.groupMember.update({ where: { userId: targetUserId }, data: { leftAt: new Date() } })
 }
 
