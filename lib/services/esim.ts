@@ -84,33 +84,45 @@ interface WmEsimResult {
   activationEnd?: Date
 }
 
+// 2.3 eSIM 訂單查詢：異常情況（如收不到 2.2 callback）時主動查回兌換碼。
+// 端點 /Api/SOrder/querybuyesim；encStr = SHA1(merchantId + orderId + token)（不含 deptId、不含 body）。
+// 回應與 2.2 callback 同結構：itemList[0].redemptionCode → esimRcode、iccid → esimIccid；
+// 此階段尚無 QR/LPA/PIN/PUK（要兌換後 3.2 callback 才有）。
 async function fetchEsimCodes(wmOrderId: string): Promise<WmEsimResult | null> {
+  const { apiUrl, merchantId, token } = await getWmConfig()
+  const encStr = crypto.createHash('sha1').update(merchantId + wmOrderId + token).digest('hex')
   try {
-    const data = await wmPost('/api/order/esim/query', { orderId: wmOrderId }) as Record<string, unknown>
-
-    if (!data || data.code !== '0000') return null
-
-    const item = (data.data as Record<string, unknown>[] | undefined)?.[0]
-    if (!item) return null
-
+    const res = await fetch(`${apiUrl}/Api/SOrder/querybuyesim`, wmFetchInit(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ merchantId, orderId: wmOrderId, encStr }),
+    }))
+    let data: Record<string, unknown> | null = null
+    try { data = await res.json() as Record<string, unknown> } catch { /* 非 JSON */ }
+    // 不靜默吞錯：查詢失敗（HTTP error / code 非 0）記告警，否則「補發為何沒成功」查無可查。
+    if (!res.ok || !data || data.code !== 0) {
+      await recordAlert('wm_query_failed', {
+        wmOrderId,
+        httpStatus: res.status,
+        wmCode: data?.code ?? null,
+        wmMsg: (data?.msg ?? data?.message ?? null) as string | null,
+      })
+      return null
+    }
+    const item = (data.itemList as Record<string, unknown>[] | undefined)?.[0]
+    if (!item?.redemptionCode) return null
     return {
       wmOrderId,
-      wmOrderSn: item.orderSn as string | undefined,
-      wmOrderTime: item.orderTime as string | undefined,
-      esimRcode: item.rCode as string | undefined,
-      esimQrcode: item.qrCode as string | undefined,
-      esimLpa: item.lpa as string | undefined,
-      esimPin1: item.pin1 as string | undefined,
-      esimPin2: item.pin2 as string | undefined,
-      esimPuk1: item.puk1 as string | undefined,
-      esimPuk2: item.puk2 as string | undefined,
-      esimCfCode: item.cfCode as string | undefined,
-      esimApnExplain: item.apnExplain as string | undefined,
+      wmOrderSn: data.orderSN as string | undefined,
+      wmOrderTime: data.orderTime as string | undefined,
+      esimRcode: item.redemptionCode as string | undefined,
       esimIccid: item.iccid as string | undefined,
-      activationStart: item.activationStart ? new Date(item.activationStart as string) : undefined,
-      activationEnd: item.activationEnd ? new Date(item.activationEnd as string) : undefined,
     }
-  } catch {
+  } catch (err) {
+    await recordAlert('wm_query_exception', {
+      wmOrderId,
+      error: err instanceof Error ? err.message : String(err),
+    })
     return null
   }
 }
