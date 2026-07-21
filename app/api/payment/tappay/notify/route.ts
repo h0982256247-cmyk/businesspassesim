@@ -113,7 +113,8 @@ export async function POST(req: NextRequest) {
   // record_status 0 = 已授權（即使尚未請款 is_captured=false 也算付款成立，TapPay
   // 會在 cap_millis 自動請款）。金額需與訂單相符。
   if (!verify.ok || verify.amount !== expectedAmount || verify.recordStatus !== 0) {
-    console.warn('[tappay-notify] Record API 驗真失敗，不標記 PAID', { order_number: tapPayOrderId, expectedAmount, verify })
+    // 只印純量：verify 內含 raw（TapPay 原始交易紀錄，帶持卡人 PII / 卡片資訊），不可落地 log
+    console.warn('[tappay-notify] Record API 驗真失敗，不標記 PAID', { order_number: tapPayOrderId, expectedAmount, ok: verify.ok, gotAmount: verify.ok ? verify.amount : null, recordStatus: verify.ok ? verify.recordStatus : null })
     await recordAlert('payment_verify_failed', {
       orderId: order.id,
       orderNumber: tapPayOrderId, expectedAmount,
