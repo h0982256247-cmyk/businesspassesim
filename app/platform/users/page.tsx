@@ -83,8 +83,8 @@ function UsersContent() {
       </form>
 
       {loading ? <Spinner /> : error ? <ErrorState message={error} onRetry={() => location.reload()} /> : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['會員', '企業歸屬', '訂單', '加入時間', ''].map(h => (

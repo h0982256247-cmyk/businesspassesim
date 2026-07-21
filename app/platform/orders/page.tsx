@@ -169,8 +169,8 @@ function OrdersContent() {
         </div>
       </div>
       {loading ? <Spinner /> : error ? <ErrorState message={error} onRetry={load} /> : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[860px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['訂單','會員','金額','付款方式','狀態','時間','操作'].map(h=>(
@@ -206,7 +206,10 @@ function OrdersContent() {
                       <OrderStatusBadge status={o.status} />
                       {o.retryCount>0&&<span className="block text-xs text-gray-400 mt-0.5">重試 {o.retryCount} 次</span>}
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString('zh-TW')}</td>
+                    <td className="px-5 py-3.5 text-xs text-gray-400 whitespace-nowrap">
+                      {new Date(o.createdAt).toLocaleDateString('zh-TW')}
+                      <span className="block text-[10px] text-gray-300">{new Date(o.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </td>
                     <td className="px-5 py-3.5 whitespace-nowrap" onClick={e=>e.stopPropagation()}>
                       {o.esimCount>1 ? (
                         // 同捆：補發/退款逐張不同，導去詳情頁逐張或整捆處理，避免在列表誤觸單張

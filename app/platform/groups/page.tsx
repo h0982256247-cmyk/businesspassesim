@@ -128,8 +128,8 @@ export default function CompaniesPage() {
       )}
 
       {loading ? spinner : error ? <ErrorState message={error} onRetry={load} /> : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['企業名稱', '邀請碼', '成員', '管理員', '狀態', '操作'].map(h => (
