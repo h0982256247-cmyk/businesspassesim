@@ -5,6 +5,12 @@ export interface LineUserInfo {
   email?: string
 }
 
+// LIFF ID 格式為 {channelId}-{liffAppId}，前半即該 LIFF 所屬的 LINE Login channel ID。
+// 供登入時從後台 LIFF ID 取得 channel ID → 換 LINE 帳號只需改後台 LIFF ID、不必動 env。
+export function channelIdFromLiffId(liffId: string | null | undefined): string | undefined {
+  return liffId?.split('-')[0] || undefined
+}
+
 export async function verifyLineIdToken(idToken: string, clientId?: string): Promise<LineUserInfo> {
   // clientId 優先使用傳入值（從 LIFF ID 拆解），fallback 到 env var
   const channelId = clientId ?? process.env.LINE_CHANNEL_ID

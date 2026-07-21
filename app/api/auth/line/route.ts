@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyLineIdToken } from '@/lib/auth/line'
+import { verifyLineIdToken, channelIdFromLiffId } from '@/lib/auth/line'
 import { createSession, SESSION_COOKIE } from '@/lib/auth/session'
 import { findOrCreateUser, isProfileComplete } from '@/lib/services/user'
+import { getPlatformSettings } from '@/lib/services/tenant-config'
 
 // POST /api/auth/line
 // Body: { idToken: string }
@@ -13,10 +14,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'idToken is required' }, { status: 400 })
   }
 
-  // 單一品牌：用 env 設定的 LINE Login channel 驗證 id_token
+  // LINE Login channel ID 由後台 LIFF ID 拆出（{channelId}-...）驗證 id_token，
+  // 換帳號只需改後台 LIFF ID、不必動 env；後台未設時 fallback 到 LINE_CHANNEL_ID env。
   let lineInfo
   try {
-    lineInfo = await verifyLineIdToken(idToken)
+    const { liffId } = await getPlatformSettings()
+    lineInfo = await verifyLineIdToken(idToken, channelIdFromLiffId(liffId))
   } catch {
     return NextResponse.json({ error: 'Invalid LINE token' }, { status: 401 })
   }
