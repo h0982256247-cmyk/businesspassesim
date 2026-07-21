@@ -37,7 +37,11 @@ export async function GET(req: NextRequest) {
     ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lt: to } : {}) } }
     : {}
 
-  const where: Prisma.OrderWhereInput = { ...statusWhere, ...searchWhere, ...dateWhere }
+  // 企業篩選（下拉選特定企業；空＝全部企業）
+  const companyId = req.nextUrl.searchParams.get('companyId')
+  const companyWhere: Prisma.OrderWhereInput = companyId ? { companyId } : {}
+
+  const where: Prisma.OrderWhereInput = { ...statusWhere, ...searchWhere, ...dateWhere, ...companyWhere }
 
   // 同捆（多張 eSIM 一次結帳 = 共用 bundleId）在列表只佔一列：
   // 代表列 = 無 bundle 的單筆訂單，或 bundle 的第一張（bundleSeq=1）。
@@ -48,7 +52,7 @@ export async function GET(req: NextRequest) {
   // 區間結算總額：此時間區間 + 搜尋條件下、已付款（PAID/COMPLETED）訂單的實付金額加總。
   // 不受上方狀態分頁影響，反映「這段期間實際收了多少」；含 bundle 內每一張 eSIM。
   const settlementWhere: Prisma.OrderWhereInput = {
-    ...searchWhere, ...dateWhere,
+    ...searchWhere, ...dateWhere, ...companyWhere,
     status: { in: [OrderStatus.PAID, OrderStatus.COMPLETED] },
   }
 

@@ -41,6 +41,8 @@ function OrdersContent() {
   const page = parseInt(searchParams.get('page') ?? '1')
   const fromParam = searchParams.get('from') ?? ''
   const toParam = searchParams.get('to') ?? ''
+  const companyId = searchParams.get('companyId') ?? ''
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
   const [rangeTotal, setRangeTotal] = useState(0)
@@ -51,7 +53,7 @@ function OrdersContent() {
 
   // 保留現有篩選、覆寫指定參數後組成網址（清除某參數傳 undefined；page===1 省略）
   const buildQS = (over: Record<string, string | number | undefined>) => {
-    const merged: Record<string, string | number | undefined> = { status: statusFilter, q, page, from: fromParam, to: toParam, ...over }
+    const merged: Record<string, string | number | undefined> = { status: statusFilter, q, page, from: fromParam, to: toParam, companyId, ...over }
     const params = new URLSearchParams()
     for (const [k, v] of Object.entries(merged)) {
       if (v === undefined || v === '' || (k === 'page' && Number(v) === 1)) continue
@@ -68,12 +70,18 @@ function OrdersContent() {
     if (q) qs.set('q', q)
     if (fromParam) qs.set('from', fromParam)
     if (toParam) qs.set('to', toParam)
+    if (companyId) qs.set('companyId', companyId)
     fetch(`/api/platform/orders?${qs.toString()}`)
       .then(r => r.status === 401 ? (router.replace('/platform/login'), null) : r.json())
       .then(d => { if (d) { setOrders(d.orders); setTotal(d.total); setRangeTotal(d.rangeTotal ?? 0); setRangeCount(d.rangeCount ?? 0) } })
       .finally(() => setLoading(false))
   }
-  useEffect(load, [page, statusFilter, q, fromParam, toParam, router])
+  useEffect(load, [page, statusFilter, q, fromParam, toParam, companyId, router])
+
+  // 企業下拉選項（一次載入）
+  useEffect(() => {
+    fetch('/api/admin/groups').then(r => r.ok ? r.json() : null).then(d => { if (d?.companies) setCompanies(d.companies) }).catch(() => {})
+  }, [])
 
   // 快捷區間：以「當地時區」算起訖瞬間送 ISO（to 為排他上界）
   const applyPreset = (kind: 'today' | 'week' | 'month' | 'clear') => {
@@ -157,6 +165,11 @@ function OrdersContent() {
           <input type="date" value={isoToDate(toParam, true)} onChange={e=>setDate('to', e.target.value)} className="border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-400" />
           {hasRange && <button onClick={()=>applyPreset('clear')} className="text-gray-400 hover:text-red-500 ml-0.5">清除</button>}
         </div>
+        <select value={companyId} onChange={e=>router.push(buildQS({ companyId: e.target.value || undefined, page: 1 }))}
+          className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-600 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400">
+          <option value="">全部企業</option>
+          {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
         <div className="ml-auto text-right">
           <p className="text-xs text-gray-400">{hasRange ? '此區間' : '全部'}結算總額</p>
           <p className="text-lg font-bold text-gray-800">NT${rangeTotal.toLocaleString()}<span className="text-xs font-normal text-gray-400 ml-1.5">{rangeCount} 筆已付款</span></p>

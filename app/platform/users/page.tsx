@@ -23,19 +23,29 @@ function UsersContent() {
   const searchParams = useSearchParams()
   const page = parseInt(searchParams.get('page') ?? '1')
   const q = searchParams.get('q') ?? ''
+  const companyId = searchParams.get('companyId') ?? ''
 
   const [users, setUsers] = useState<User[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(q)
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/platform/users?page=${page}&q=${encodeURIComponent(q)}`)
+    const qs = new URLSearchParams({ page: String(page) })
+    if (q) qs.set('q', q)
+    if (companyId) qs.set('companyId', companyId)
+    fetch(`/api/platform/users?${qs.toString()}`)
       .then(r => r.status === 401 ? (router.replace('/platform/login'), null) : r.json())
       .then(d => { if (d) { setUsers(d.users); setTotal(d.total) } })
       .finally(() => setLoading(false))
-  }, [page, q, router])
+  }, [page, q, companyId, router])
+
+  // 企業下拉選項（一次載入）
+  useEffect(() => {
+    fetch('/api/admin/groups').then(r => r.ok ? r.json() : null).then(d => { if (d?.companies) setCompanies(d.companies) }).catch(() => {})
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,6 +72,11 @@ function UsersContent() {
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400" />
         </div>
         <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-5 py-2.5 text-sm font-medium transition">搜尋</button>
+        <select value={companyId} onChange={e=>router.push(`/platform/users?${new URLSearchParams({ ...(q?{q}:{}), ...(e.target.value?{companyId:e.target.value}:{}), page:'1' }).toString()}`)}
+          className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400">
+          <option value="">全部企業</option>
+          {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
       </form>
 
       {loading ? (

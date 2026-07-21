@@ -11,9 +11,10 @@ export async function GET(req: NextRequest) {
 
   const page = parseInt(req.nextUrl.searchParams.get('page') ?? '1')
   const q = req.nextUrl.searchParams.get('q') ?? ''
+  const companyId = req.nextUrl.searchParams.get('companyId')
   const pageSize = 20
 
-  const where: Prisma.UserWhereInput = q
+  const qWhere: Prisma.UserWhereInput = q
     ? {
         OR: [
           { displayName: { contains: q, mode: 'insensitive' as const } },
@@ -21,6 +22,11 @@ export async function GET(req: NextRequest) {
         ],
       }
     : {}
+  // 企業篩選：該企業「未離開」的成員（含待審／已核准）
+  const companyWhere: Prisma.UserWhereInput = companyId
+    ? { groupMembership: { groupId: companyId, leftAt: null } }
+    : {}
+  const where: Prisma.UserWhereInput = { ...qWhere, ...companyWhere }
 
   const [users, total] = await Promise.all([
     prisma.user.findMany({
