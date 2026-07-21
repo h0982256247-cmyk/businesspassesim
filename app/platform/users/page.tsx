@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Spinner, ErrorState } from '@/components/platform/states'
 
 type User = {
   id: string; lineUid: string; displayName: string; avatarUrl: string | null
@@ -28,17 +29,19 @@ function UsersContent() {
   const [users, setUsers] = useState<User[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState(q)
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([])
 
   useEffect(() => {
-    setLoading(true)
+    setLoading(true); setError(null)
     const qs = new URLSearchParams({ page: String(page) })
     if (q) qs.set('q', q)
     if (companyId) qs.set('companyId', companyId)
     fetch(`/api/platform/users?${qs.toString()}`)
       .then(r => r.status === 401 ? (router.replace('/platform/login'), null) : r.json())
       .then(d => { if (d) { setUsers(d.users); setTotal(d.total) } })
+      .catch(() => setError('會員載入失敗，請稍後再試'))
       .finally(() => setLoading(false))
   }, [page, q, companyId, router])
 
@@ -79,9 +82,7 @@ function UsersContent() {
         </select>
       </form>
 
-      {loading ? (
-        <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
-      ) : (
+      {loading ? <Spinner /> : error ? <ErrorState message={error} onRetry={() => location.reload()} /> : (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead>

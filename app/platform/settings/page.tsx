@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from '@/components/platform/Toast'
 
 const TABS = ['品牌與網域', '金流 (TapPay)', 'eSIM (世界移動)', '福利價', '轉贈'] as const
 type Tab = typeof TABS[number]
@@ -86,7 +87,7 @@ export default function SettingsPage() {
     const r = await fetch('/api/platform/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transferEnabled: val }) })
     setTransferSaving(false)
     if (r.ok) setTransferEnabled(val)
-    else { const d = await r.json().catch(() => ({})); alert(d.error ?? '儲存失敗') }
+    else { const d = await r.json().catch(() => ({})); toast.error(d.error ?? '儲存失敗') }
   }
 
   const authed = (r: Response) => { if (r.status === 401) { router.replace('/platform/login'); return false }; return true }
@@ -95,13 +96,13 @@ export default function SettingsPage() {
     const file = e.target.files?.[0]
     e.target.value = ''   // 允許重選同一張
     if (!file) return
-    if (!file.type.startsWith('image/')) { alert('請選擇圖片檔'); return }
-    if (file.size > 5 * 1024 * 1024) { alert('圖片請小於 5MB'); return }
+    if (!file.type.startsWith('image/')) { toast.error('請選擇圖片檔'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('圖片請小於 5MB'); return }
     setLogoBusy(true)
     try {
       const dataUrl = await resizeImage(file, 256)
       setS(p => ({ ...p, logoUrl: dataUrl }))
-    } catch { alert('圖片處理失敗，請換一張試試') }
+    } catch { toast.error('圖片處理失敗，請換一張試試') }
     setLogoBusy(false)
   }
 
@@ -129,7 +130,7 @@ export default function SettingsPage() {
     for (const f of fields) body[f] = f === 'benefitMarkupRate' ? Number(s[f]) : s[f]
     const r = await fetch('/api/platform/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     setSaving(false)
-    if (r.ok) setMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); setMsg(null); alert(d.error ?? '儲存失敗') }
+    if (r.ok) setMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); setMsg(null); toast.error(d.error ?? '儲存失敗') }
   }
 
   const savePay = async () => {
@@ -143,7 +144,7 @@ export default function SettingsPage() {
       }),
     })
     setPaySaving(false)
-    if (r.ok) setPayMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); alert(d.error ?? '儲存失敗') }
+    if (r.ok) setPayMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); toast.error(d.error ?? '儲存失敗') }
   }
 
   const setPayField = (k: string, v: unknown) => setPay(p => ({ ...p, [k]: v }))
@@ -152,7 +153,7 @@ export default function SettingsPage() {
     setEsimSaving(true); setEsimMsg(null)
     const r = await fetch('/api/platform/esim-config', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(esim) })
     setEsimSaving(false)
-    if (r.ok) setEsimMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); alert(d.error ?? '儲存失敗') }
+    if (r.ok) setEsimMsg('已儲存 ✓'); else { const d = await r.json().catch(() => ({})); toast.error(d.error ?? '儲存失敗') }
   }
 
   return (

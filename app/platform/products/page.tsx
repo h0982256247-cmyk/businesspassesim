@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { CountryFlag } from '@/components/common/CountryFlag'
+import { toast } from '@/components/platform/Toast'
+import { confirmDialog } from '@/components/platform/ConfirmDialog'
 
 type Product = {
   id: string
@@ -222,9 +224,11 @@ export default function PlatformProductsPage() {
     const lastMs = latestSyncMs()
     if (lastMs != null && Date.now() - lastMs < THROTTLE_MS) {
       const rel = formatRelativeTime(new Date(lastMs).toISOString())
-      const ok = window.confirm(
-        `上次同步在 ${rel}。\n世界移動建議每週查詢一次，過於頻繁可能會被鎖 IP。\n\n仍要再次驗證嗎？`,
-      )
+      const ok = await confirmDialog({
+        title: '要再次驗證嗎？',
+        message: `上次同步在 ${rel}。\n世界移動建議每週查詢一次，過於頻繁可能會被鎖 IP。`,
+        confirmText: '仍要驗證',
+      })
       if (!ok) return
     }
 
@@ -249,13 +253,13 @@ export default function PlatformProductsPage() {
     const disable = validateResult.issues.notFound.length
     const reprice = validateResult.issues.priceMismatch.length
     const confirmMsg = `將執行：\n• 自動下架 ${disable} 筆查無方案\n• 更新 ${reprice} 筆成本價\n• 成本上升的方案，售價維持原利潤跟漲（毛利不足 40% 補到 40%）；成本下降不動售價\n• 依目前福利價倍率重算福利價（成本未變、但倍率有調整過的商品也一起更新）\n\n確定要套用嗎？`
-    if (!window.confirm(confirmMsg)) return
+    if (!(await confirmDialog({ title: '套用商品變更？', message: confirmMsg, confirmText: '確定套用' }))) return
 
     setApplying(true)
     const r = await fetch('/api/admin/products/validate/apply', { method: 'POST' }).then(x => x.json())
     setApplying(false)
     if (r.error) {
-      window.alert(`套用失敗：${r.error}`)
+      toast.error(`套用失敗：${r.error}`)
       return
     }
     setApplyResult(r)
@@ -279,7 +283,7 @@ export default function PlatformProductsPage() {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
     }).then(x => x.json()).catch(() => null)
     setGuardBusy(false)
-    if (r?.error) window.alert(r.error)
+    if (r?.error) toast.error(r.error)
     else if (r) setGuard(r)
   }
 
@@ -288,12 +292,12 @@ export default function PlatformProductsPage() {
     const preview = guard.samples.slice(0, 3)
       .map(s => `• ${s.country} ${s.days}天 ${s.cap ?? ''}：NT$${s.sell} → NT$${s.newSell}`).join('\n')
     const more = guard.belowCount > 3 ? `\n…等共 ${guard.belowCount} 筆` : ''
-    if (!window.confirm(`將把毛利低於 ${guard.rate}% 的 ${guard.belowCount} 筆商品售價補到 ${guard.rate}% 毛利：\n${preview}${more}\n\n確定要套用嗎？`)) return
+    if (!(await confirmDialog({ title: '補足毛利？', message: `將把毛利低於 ${guard.rate}% 的 ${guard.belowCount} 筆商品售價補到 ${guard.rate}% 毛利：\n${preview}${more}`, confirmText: '確定補價' }))) return
     setGuardBusy(true)
     const r = await fetch('/api/admin/products/margin-guard', { method: 'POST' }).then(x => x.json()).catch(() => null)
     setGuardBusy(false)
-    if (r?.error) { window.alert(r.error); return }
-    window.alert(`已補價 ${r.raised} 筆`)
+    if (r?.error) { toast.error(r.error); return }
+    toast.success(`已補價 ${r.raised} 筆`)
     loadGuard(); load()
   }
 

@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Toaster } from '@/components/platform/Toast'
+import { ConfirmHost } from '@/components/platform/ConfirmDialog'
 
 type AdminInfo = {
   id: string
@@ -290,6 +292,8 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
+      <Toaster />
+      <ConfirmHost />
     </div>
   )
 }

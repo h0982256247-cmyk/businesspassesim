@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import RefundConfirmDialog, { type RefundTarget } from '@/components/platform/RefundConfirmDialog'
+import { OrderStatusBadge } from '@/components/platform/OrderStatusBadge'
 
 type OrderItem = { productName: string; qty: number }
 type Esim = {
@@ -34,26 +35,7 @@ type Detail = {
   esims: Esim[]
 }
 
-const STATUS: Record<string, { text: string; cls: string }> = {
-  PENDING:      { text: '待付款',   cls: 'bg-yellow-50 text-yellow-600' },
-  PROCESSING:   { text: '待付款',   cls: 'bg-yellow-50 text-yellow-600' },
-  PAID:         { text: '已付款',   cls: 'bg-blue-50 text-blue-600' },
-  COMPLETED:    { text: '已完成發送', cls: 'bg-green-50 text-green-600' },
-  ESIM_PENDING: { text: '待發送',   cls: 'bg-orange-50 text-orange-600' },
-  FAILED:       { text: '付款失敗', cls: 'bg-red-50 text-red-500' },
-  CANCELLED:    { text: '已取消',   cls: 'bg-gray-100 text-gray-400' },
-  REFUNDED:     { text: '已退款',   cls: 'bg-red-50 text-red-500' },
-}
 function dt(s: string | null) { return s ? new Date(s).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' }
-
-function Pill({ status }: { status: string }) {
-  const s = STATUS[status] ?? { text: status, cls: 'bg-gray-100 text-gray-500' }
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${s.cls}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />{s.text}
-    </span>
-  )
-}
 
 function CopyBtn({ text }: { text: string }) {
   const [done, setDone] = useState(false)
@@ -203,7 +185,7 @@ export default function PlatformOrderDetail() {
         <h1 className="font-mono text-lg font-bold text-gray-800">{d.orderNumber ?? `#${d.focusedId.slice(-8).toUpperCase()}`}</h1>
         {isBundle
           ? <span className="text-xs font-semibold text-violet-600 bg-violet-50 px-2.5 py-1 rounded-full">合購 · {esims.length} 張 eSIM</span>
-          : <Pill status={single.status} />}
+          : <OrderStatusBadge status={single.status} />}
         <div className="ml-auto flex gap-2">
           {isBundle
             ? (refundableCount > 1 && (
@@ -254,7 +236,7 @@ export default function PlatformOrderDetail() {
                     {isBundle && (
                       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                         <span className="text-xs font-bold text-white bg-gray-900 rounded-md px-1.5 py-0.5">eSIM {i + 1}</span>
-                        <Pill status={e.status} />
+                        <OrderStatusBadge status={e.status} />
                       </div>
                     )}
                     <p className="text-base font-bold text-gray-800 truncate">{pname}</p>
