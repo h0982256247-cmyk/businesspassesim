@@ -8,6 +8,7 @@ import { deriveEsimStatus, daysLeftOf, TONE_STYLE } from '@/lib/esimStatus'
 import { IconSim, IconInstall, IconCheck, IconClock, IconAlert } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
+import { S } from '@/lib/liff/tokens'
 import type { ReactNode } from 'react'
 
 type OrderDetail = {
@@ -42,10 +43,16 @@ type EsimUsage = {
   unit: string
 }
 
-const S = {
-  white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8',
-  line: 'rgba(0,0,0,0.07)',
-} as const
+// 啟動碼／LPA 複製鈕：mono 長字串手選極易出錯，一鍵複製 + Toast 回饋。
+function CopyBtn({ color, onClick }: { color: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="liff-press" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color, fontSize: 12, fontWeight: 700, WebkitTapHighlightColor: 'transparent' }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>複製
+    </button>
+  )
+}
 
 function UsageBar({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0
@@ -104,6 +111,11 @@ export default function OrderDetailPage() {
   // 輕量提示（取代 alert）
   const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null)
   const dismissToast = useCallback(() => setToast(null), [])
+  const copyText = useCallback((text: string, label: string) => {
+    navigator.clipboard?.writeText(text)
+      .then(() => setToast({ message: `已複製${label}`, tone: 'success' }))
+      .catch(() => setToast({ message: '複製失敗，請長按文字手動選取', tone: 'error' }))
+  }, [])
 
   useEffect(() => { setCanOneClick(supportsOneClickEsim()) }, [])
 
@@ -384,12 +396,18 @@ export default function OrderDetailPage() {
             <summary style={{ fontSize: 12, color: S.muted, cursor: 'pointer' }}>進階：手動安裝資料</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, marginTop: 10 }}>
               <div>
-                <span style={{ color: S.muted, display: 'block', marginBottom: 2 }}>啟動碼</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ color: S.muted }}>啟動碼</span>
+                  <CopyBtn color={C.primaryText} onClick={() => copyText(order.esimRcode!, '啟動碼')} />
+                </div>
                 <span style={{ fontFamily: 'ui-monospace, monospace', color: S.ink, wordBreak: 'break-all', fontWeight: 600 }}>{order.esimRcode}</span>
               </div>
               {order.esimLpa && (
                 <div>
-                  <span style={{ color: S.muted, display: 'block', marginBottom: 2 }}>LPA</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ color: S.muted }}>LPA</span>
+                    <CopyBtn color={C.primaryText} onClick={() => copyText(order.esimLpa!, 'LPA')} />
+                  </div>
                   <span style={{ fontFamily: 'ui-monospace, monospace', color: S.ink, fontSize: 11, wordBreak: 'break-all' }}>{order.esimLpa}</span>
                 </div>
               )}
