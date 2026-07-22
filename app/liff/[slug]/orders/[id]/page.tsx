@@ -82,6 +82,12 @@ function supportsOneClickEsim(): boolean {
   return major > 17 || (major === 17 && minor >= 4)
 }
 
+// 是否 iOS 裝置（決定安裝步驟預設分頁）
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/.test(navigator.userAgent)
+}
+
 // 把 LPA 字串轉成 Apple 一鍵安裝 URL
 function buildAppleOneClickUrl(lpa: string): string {
   return `https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=${encodeURIComponent(lpa)}`
@@ -103,6 +109,7 @@ export default function OrderDetailPage() {
   const [redeemError, setRedeemError] = useState<string | null>(null)
   const [redeemTimeout, setRedeemTimeout] = useState(false)
   const [canOneClick, setCanOneClick] = useState(false)
+  const [installOS, setInstallOS] = useState<'ios' | 'android'>('ios')
   // 自訂確認彈窗（取代 window.confirm，避免 LINE 內建瀏覽器露出網址）
   const [dialog, setDialog] = useState<null | {
     title: string; lines: string[]; confirmLabel: string;
@@ -117,7 +124,7 @@ export default function OrderDetailPage() {
       .catch(() => setToast({ message: '複製失敗，請長按文字手動選取', tone: 'error' }))
   }, [])
 
-  useEffect(() => { setCanOneClick(supportsOneClickEsim()) }, [])
+  useEffect(() => { setCanOneClick(supportsOneClickEsim()); setInstallOS(isIOSDevice() ? 'ios' : 'android') }, [])
 
   // 從 TapPay (LINE Pay / 3DS) 跳轉回來時，網址會帶 ?status=<n>。
   // status=0 是付款成功（等 webhook fan-out），非零代表失敗或使用者取消。
@@ -374,12 +381,28 @@ export default function OrderDetailPage() {
           {/* 安裝步驟指引（尚未啟用時顯示） */}
           {!order.activatedAt && (
             <div style={{ background: '#f8fafc', border: `1px solid ${S.line}`, borderRadius: 12, padding: '12px 14px', margin: '0 0 14px' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: S.ink, margin: '0 0 8px' }}>安裝步驟</p>
-              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
-                <li>用上方「一鍵安裝」或長按 QR 碼，把 eSIM 加入手機</li>
-                <li>到手機<strong style={{ color: S.ink }}>設定 → 行動服務／行動網路</strong>，開啟此 eSIM 的「行動數據」與「數據漫遊」</li>
-                <li>連上網路後，本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
-              </ol>
+              {/* iOS / Android 加入 eSIM 的路徑不同，分頁切換（預設依裝置） */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 10, background: '#eef2f7', borderRadius: 9, padding: 3 }}>
+                {([['ios', 'iPhone'], ['android', 'Android']] as const).map(([os, label]) => (
+                  <button key={os} type="button" onClick={() => setInstallOS(os)} className="liff-press"
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: installOS === os ? S.white : 'transparent', color: installOS === os ? S.ink : S.faint, boxShadow: installOS === os ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {installOS === 'ios' ? (
+                <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
+                  <li>用上方「一鍵安裝」或長按 QR 碼，把 eSIM 加入手機</li>
+                  <li>到手機<strong style={{ color: S.ink }}>設定 → 行動服務</strong>，開啟此 eSIM 的「行動數據」與「數據漫遊」</li>
+                  <li>連上網路後，本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
+                </ol>
+              ) : (
+                <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
+                  <li>到手機<strong style={{ color: S.ink }}>設定 → 行動網路 → 新增 eSIM</strong>（部分機型在「連線」或「SIM 卡管理員」）</li>
+                  <li>選「掃描 QR 碼」對準上方 QR；或選手動輸入，貼上剛複製的<strong style={{ color: S.ink }}>啟動碼</strong></li>
+                  <li>開啟此 eSIM 的「行動數據」與「數據漫遊」，連上網路後本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
+                </ol>
+              )}
             </div>
           )}
 
