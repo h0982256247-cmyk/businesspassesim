@@ -4,13 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import PageSkeleton from '@/components/liff/PageSkeleton'
+import { S } from '@/lib/liff/tokens'
 
 type Membership = {
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   group: { id: string; name: string; description: string | null; isActive: boolean }
 } | null
-
-const S = { white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8', line: 'rgba(0,0,0,0.07)' } as const
 
 export default function CompanyPage() {
   const base = useLiffBase()

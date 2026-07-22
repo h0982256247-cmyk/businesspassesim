@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { invalidateCache } from '@/hooks/useCachedData'
+import { S as BASE } from '@/lib/liff/tokens'
 
-const S = {
-  ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8', line: '#e2e8f0',
-} as const
+// 沿用共用中性色，分隔線維持本頁原本較淺的 #e2e8f0（零視覺變化）
+const S = { ...BASE, line: '#e2e8f0' } as const
 
 export default function ProfileSetup() {
   const router = useRouter()

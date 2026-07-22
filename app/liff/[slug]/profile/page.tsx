@@ -5,6 +5,7 @@ import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { useCachedData } from '@/hooks/useCachedData'
 import PageSkeleton from '@/components/liff/PageSkeleton'
+import { S } from '@/lib/liff/tokens'
 
 type UserInfo = {
   id: string
@@ -13,11 +14,6 @@ type UserInfo = {
   profileComplete: boolean
   membership?: { status: string; group: { name: string } } | null
 }
-
-const S = {
-  white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8',
-  line: 'rgba(0,0,0,0.07)',
-} as const
 
 function ChevronRight() {
   return (

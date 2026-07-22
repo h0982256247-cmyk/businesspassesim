@@ -8,6 +8,7 @@ import { useTenantColors } from '@/components/liff/TenantContext'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { useCart } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge, parseNetworkType } from '@/components/liff/ProductBadges'
+import { S } from '@/lib/liff/tokens'
 
 type Product = {
   id: string
@@ -23,15 +24,6 @@ type Product = {
   sellPrice: number
   benefitPrice?: number   // 企業會員福利價（API 依身分回傳）
 }
-
-const S = {
-  bg: '#f9f9f9',
-  white: '#ffffff',
-  ink: '#1a1a1a',
-  muted: '#4b5563',
-  faint: '#94a3b8',
-  line: 'rgba(0,0,0,0.07)',
-} as const
 
 function BackArrow() {
   return (

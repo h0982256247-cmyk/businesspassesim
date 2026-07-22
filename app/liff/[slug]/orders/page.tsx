@@ -7,6 +7,7 @@ import { useLiff } from '@/components/liff/LiffProvider'
 import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
 import { useCachedData } from '@/hooks/useCachedData'
 import PageSkeleton from '@/components/liff/PageSkeleton'
+import { S } from '@/lib/liff/tokens'
 import { EmptyOrdersIllustration } from '@/components/liff/LiffIllustrations'
 import {
   deriveEsimStatus, groupOf,
@@ -48,13 +49,6 @@ type EsimUsage = {
   remainingData: number
   unit: string
 }
-
-// ─── Constants ────────────────────────────────────────────────
-
-const S = {
-  white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8',
-  line: 'rgba(0,0,0,0.07)',
-} as const
 
 // ─── Helpers ──────────────────────────────────────────────────
 
