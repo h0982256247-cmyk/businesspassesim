@@ -76,7 +76,6 @@ export default function ClassicHome({
     <div style={{
       background: '#EEEEF8', minHeight: '100vh', paddingBottom: 100,
       width: '100%', overflowX: 'hidden',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif',
     }}>
 
       {/* ── Header ── */}

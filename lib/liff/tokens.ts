@@ -18,3 +18,6 @@ export const S = {
   line:  'rgba(0,0,0,0.07)',   // 邊框／分隔線
   bg:    '#f9f9f9',            // 內頁畫布底色（首頁 hero 的 #EEEEF8 為刻意特色，不納入）
 } as const
+
+/** 全站字體堆疊。LINE webview：iOS 走 SF Pro、Android fallback 系統 sans-serif。 */
+export const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif'

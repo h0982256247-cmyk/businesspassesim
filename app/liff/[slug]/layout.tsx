@@ -7,6 +7,7 @@ import { TenantProvider } from '@/components/liff/TenantContext'
 import { CartProvider } from '@/components/liff/CartProvider'
 import FloatingCart from '@/components/liff/FloatingCart'
 import { getTenantBySlug } from '@/lib/services/tenant'
+import { S, FONT } from '@/lib/liff/tokens'
 
 interface Props {
   children: ReactNode
@@ -30,7 +31,7 @@ export default async function TenantLiffLayout({ children, params }: Props) {
     <TenantProvider tenant={tenant}>
       <LiffProvider liffId={tenant.liffId} tenantSlug={slug}>
         <CartProvider>
-          <div className="min-h-screen pb-16 liff-root" style={{ background: '#f9f9f9' }}>
+          <div className="min-h-screen pb-16 liff-root" style={{ background: S.bg, fontFamily: FONT }}>
             {children}
           </div>
           <FloatingCart />
