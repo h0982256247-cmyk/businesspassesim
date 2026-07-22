@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import PageSkeleton from '@/components/liff/PageSkeleton'
+import { S } from '@/lib/liff/tokens'
 
 type Gift = {
   fromName: string
@@ -14,8 +15,6 @@ type Gift = {
   isMine: boolean
   claimedByMe: boolean
 } | null
-
-const S = { white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8' } as const
 
 export default function GiftClaimPage() {
   const router = useRouter()

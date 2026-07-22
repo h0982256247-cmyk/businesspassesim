@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { OrderStatusBadge } from '@/components/platform/OrderStatusBadge'
 
 type Order = {
   id: string
@@ -26,16 +27,6 @@ type UserDetail = {
   createdAt: string
   groupMembership: { status: string; role: string; joinedAt: string; group: { id: string; name: string } } | null
   orders: Order[]
-}
-
-const STATUS_META: Record<string, { text: string; bg: string; color: string }> = {
-  PENDING:      { text: '待付款',      bg: '#fef9c3', color: '#a16207' },
-  PROCESSING:   { text: '待付款',      bg: '#fef9c3', color: '#a16207' },
-  PAID:         { text: '付款成功',    bg: '#dcfce7', color: '#15803d' },
-  COMPLETED:    { text: '已完成發送',  bg: '#dcfce7', color: '#15803d' },
-  FAILED:       { text: '付款失敗',    bg: '#fee2e2', color: '#b91c1c' },
-  ESIM_PENDING: { text: '待發送',     bg: '#fff7ed', color: '#c2410c' },
-  REFUNDED:     { text: '已退款',      bg: '#f1f5f9', color: '#475569' },
 }
 
 const MEMBER_STATUS: Record<string, { text: string; cls: string }> = {
@@ -196,7 +187,6 @@ export default function UserDetailPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {user.orders.map(o => {
-                  const sm = STATUS_META[o.status] ?? { text: o.status, bg: '#f1f5f9', color: '#475569' }
                   return (
                     <tr key={o.id} onClick={() => router.push(`/platform/orders/${o.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer">
                       <td className="px-5 py-3.5 font-mono text-xs text-blue-600">#{o.id.slice(-8).toUpperCase()}</td>
@@ -207,10 +197,7 @@ export default function UserDetailPage() {
                         </div>
                       </td>
                       <td className="px-5 py-3.5">
-                        <span className="text-xs font-medium px-2 py-1 rounded-full"
-                          style={{ background: sm.bg, color: sm.color }}>
-                          {sm.text}
-                        </span>
+                        <OrderStatusBadge status={o.status} />
                       </td>
                       <td className="px-5 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
                         NT${(o.esimCount>1?o.bundleTotal:o.totalPaid).toLocaleString()}

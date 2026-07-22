@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from '@/components/platform/Toast'
+import { ErrorState } from '@/components/platform/states'
 
 type Company = {
   id: string
@@ -25,6 +27,7 @@ export default function CompaniesPage() {
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
@@ -38,10 +41,11 @@ export default function CompaniesPage() {
   const [delError, setDelError] = useState<string | null>(null)
 
   const load = () => {
-    setLoading(true)
+    setLoading(true); setError(null)
     fetch('/api/admin/groups')
       .then(r => (r.status === 401 ? (router.replace('/platform/login'), null) : r.json()))
       .then(d => { if (d) setCompanies(d.companies) })
+      .catch(() => setError('企業載入失敗，請稍後再試'))
       .finally(() => setLoading(false))
   }
   useEffect(load, [router])
@@ -55,7 +59,7 @@ export default function CompaniesPage() {
     })
     setCreating(false)
     if (r.ok) { setNewName(''); setNewDesc(''); setShowCreate(false); load() }
-    else { const d = await r.json().catch(() => ({})); window.alert(d.error ?? '建立失敗') }
+    else { const d = await r.json().catch(() => ({})); toast.error(d.error ?? '建立失敗') }
   }
 
   const openAssign = async (c: Company) => {
@@ -72,7 +76,7 @@ export default function CompaniesPage() {
       body: JSON.stringify({ userId, makeAdmin }),
     }).catch(() => null)
     setBusy(false)
-    if (!r || !r.ok) { const d = r ? await r.json().catch(() => ({})) : {}; window.alert(d.error ?? '操作失敗'); return }
+    if (!r || !r.ok) { const d = r ? await r.json().catch(() => ({})) : {}; toast.error(d.error ?? '操作失敗'); return }
     // 重新載入該企業成員（反映角色）＋ 企業列表（更新管理員欄）
     const d = await fetch(`/api/admin/groups/${assign.id}`).then(x => x.json()).catch(() => null)
     setMembers(d?.members ?? [])
@@ -123,9 +127,9 @@ export default function CompaniesPage() {
         </div>
       )}
 
-      {loading ? spinner : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+      {loading ? spinner : error ? <ErrorState message={error} onRetry={load} /> : (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['企業名稱', '邀請碼', '成員', '管理員', '狀態', '操作'].map(h => (

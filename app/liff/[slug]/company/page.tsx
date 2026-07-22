@@ -4,13 +4,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import PageSkeleton from '@/components/liff/PageSkeleton'
+import { S } from '@/lib/liff/tokens'
+import ConfirmDialog from '@/components/liff/ConfirmDialog'
 
 type Membership = {
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   group: { id: string; name: string; description: string | null; isActive: boolean }
 } | null
-
-const S = { white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8', line: 'rgba(0,0,0,0.07)' } as const
 
 export default function CompanyPage() {
   const base = useLiffBase()
@@ -21,6 +21,7 @@ export default function CompanyPage() {
   const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [confirmLeave, setConfirmLeave] = useState(false)
 
   const load = useCallback(async () => {
     const [g, adminOk] = await Promise.all([
@@ -57,7 +58,7 @@ export default function CompanyPage() {
   }
 
   const leave = async () => {
-    if (!window.confirm('確定要退出目前企業嗎？退出後購買將恢復一般售價。')) return
+    setConfirmLeave(false)
     setBusy(true)
     await fetch('/api/groups/leave', { method: 'POST' }).catch(() => {})
     setBusy(false)
@@ -91,7 +92,7 @@ export default function CompanyPage() {
             </a>
           )}
           <button
-            onClick={leave}
+            onClick={() => setConfirmLeave(true)}
             disabled={busy}
             style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'transparent', border: `1px solid ${S.line}`, color: '#dc2626', fontWeight: 600, fontSize: 13, cursor: busy ? 'default' : 'pointer' }}
           >
@@ -125,6 +126,17 @@ export default function CompanyPage() {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmLeave}
+        title="退出企業"
+        lines={['退出後購買將恢復一般售價。']}
+        confirmLabel="退出"
+        tone="danger"
+        colors={C}
+        onConfirm={leave}
+        onCancel={() => setConfirmLeave(false)}
+      />
     </div>
   )
 }

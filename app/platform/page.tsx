@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { OrderStatusBadge } from '@/components/platform/OrderStatusBadge'
 
 type MonthlyRevenue = { month: string; revenue: number; grossProfit: number }
 
@@ -41,17 +42,6 @@ type Stats = {
     lossOrders: { count: number; examples: { id: string; orderNo: string; totalPaid: number; cost: number; loss: number }[] }
     lowMarginProducts: { count: number; examples: { id: string; name: string; sellPrice: number; costPrice: number; marginRate: number }[] }
   }
-}
-
-const ORDER_STATUS: Record<string, { label: string; cls: string }> = {
-  PAID:          { label: '已付款',     cls: 'bg-blue-50 text-blue-600' },
-  COMPLETED:     { label: '已完成發送', cls: 'bg-green-50 text-green-600' },
-  PENDING:       { label: '待付款',     cls: 'bg-yellow-50 text-yellow-600' },
-  PROCESSING:    { label: '待付款',     cls: 'bg-yellow-50 text-yellow-600' },
-  FAILED:        { label: '付款失敗',   cls: 'bg-red-50 text-red-500' },
-  ESIM_PENDING:  { label: '待發送',     cls: 'bg-orange-50 text-orange-600' },
-  CANCELLED:     { label: '已取消',     cls: 'bg-gray-100 text-gray-400' },
-  REFUNDED:      { label: '已退款',     cls: 'bg-red-50 text-red-500' },
 }
 
 // ── 圖表（純 SVG，無第三方套件）─────────────────────────────────────
@@ -222,8 +212,7 @@ export default function PlatformDashboard() {
       {/* Page header（歡迎 + 日期 + 角色範圍）*/}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">數據駕駛艙</h1>
-          <p className="text-sm text-gray-400 mt-1">歡迎回來{adminName ? `，${adminName}` : ''}，今天是 {today}</p>
+          <p className="text-sm text-gray-400">歡迎回來{adminName ? `，${adminName}` : ''}，今天是 {today}</p>
         </div>
         <Link href="/platform/orders" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -366,7 +355,6 @@ export default function PlatformDashboard() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {stats.recentOrders.map(o => {
-                const s = ORDER_STATUS[o.status] ?? { label: o.status, cls: 'bg-gray-100 text-gray-500' }
                 return (
                   <tr key={o.id} onClick={() => router.push(`/platform/orders/${o.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer">
                     <td className="px-5 py-3.5 whitespace-nowrap">
@@ -382,9 +370,7 @@ export default function PlatformDashboard() {
                     <td className="px-5 py-3.5 text-gray-600">{o.productName}</td>
                     <td className="px-5 py-3.5 font-semibold text-gray-800">NT$ {o.totalPaid.toLocaleString()}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full ${s.cls}`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 opacity-70" />{s.label}
-                      </span>
+                      <OrderStatusBadge status={o.status} />
                     </td>
                   </tr>
                 )

@@ -4,11 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { useLiffBase } from '@/hooks/useLiffBase'
-
-const S = {
-  ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8',
-  line: 'rgba(0,0,0,0.07)', white: '#ffffff',
-} as const
+import { S } from '@/lib/liff/tokens'
 
 type Os = 'ios' | 'android'
 type IconKey = 'wifi' | 'simAdd' | 'qr' | 'signal' | 'toggleOff' | 'pin' | 'simCheck' | 'toggleOn'

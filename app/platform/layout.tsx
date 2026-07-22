@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { Toaster } from '@/components/platform/Toast'
+import { ConfirmHost } from '@/components/platform/ConfirmDialog'
 
 type AdminInfo = {
   id: string
@@ -104,14 +106,15 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
   const [notifOpen, setNotifOpen] = useState(false)
 
   // 頂欄搜尋：像訂單編號（含「-」或 ESM/ORD 開頭）→ 訂單管理；否則 → 會員管理（依暱稱）。
+  // term / isOrder 提到 render scope，讓輸入框即時顯示「會搜去哪」的提示。
+  const searchTerm = searchQ.trim().replace(/^#/, '')
+  const searchIsOrder = searchTerm.includes('-') || /^(esm|ord)/i.test(searchTerm)
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    const term = searchQ.trim().replace(/^#/, '')
-    if (!term) return
-    const looksLikeOrder = term.includes('-') || /^(esm|ord)/i.test(term)
-    router.push(looksLikeOrder
-      ? `/platform/orders?q=${encodeURIComponent(term)}`
-      : `/platform/users?q=${encodeURIComponent(term)}&page=1`)
+    if (!searchTerm) return
+    router.push(searchIsOrder
+      ? `/platform/orders?q=${encodeURIComponent(searchTerm)}`
+      : `/platform/users?q=${encodeURIComponent(searchTerm)}&page=1`)
   }
 
   useEffect(() => {
@@ -239,8 +242,13 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
               value={searchQ}
               onChange={e => setSearchQ(e.target.value)}
               placeholder="搜尋訂單編號、會員…"
-              className="pl-9 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl w-56 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+              className="pl-9 pr-16 py-2 text-sm bg-gray-50 border border-gray-200 rounded-xl w-56 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
             />
+            {searchTerm && (
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-medium text-gray-500 bg-white border border-gray-200 rounded px-1.5 py-0.5 pointer-events-none">
+                {searchIsOrder ? '搜訂單' : '搜會員'}
+              </span>
+            )}
           </form>
           {/* 通知鈴：待辦佇列計數，紅點只在有待辦時亮 */}
           <div className="relative">
@@ -290,6 +298,8 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-6">{children}</main>
       </div>
+      <Toaster />
+      <ConfirmHost />
     </div>
   )
 }

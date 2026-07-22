@@ -85,14 +85,21 @@ function CardTypeBadge({ type }: { type: number }) {
   )
 }
 
+// 結帳載入骨架：鏡射摘要卡＋付款方式卡＋小計卡，取代白屏轉圈。
+function CheckoutSkeleton() {
+  return (
+    <div style={{ maxWidth: 520, margin: '0 auto', padding: '20px 16px 120px' }}>
+      <div className="liff-shimmer" style={{ borderRadius: 16, height: 96, marginBottom: 16 }} />
+      <div className="liff-shimmer" style={{ borderRadius: 16, height: 72, marginBottom: 12 }} />
+      <div className="liff-shimmer" style={{ borderRadius: 16, height: 72, marginBottom: 12 }} />
+      <div className="liff-shimmer" style={{ borderRadius: 16, height: 88 }} />
+    </div>
+  )
+}
+
 export default function CheckoutPage() {
   return (
-    <Suspense fallback={
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ width: 28, height: 28, border: '2.5px solid #fde68a', borderTopColor: '#FFC107', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      </div>
-    }>
+    <Suspense fallback={<CheckoutSkeleton />}>
       <CheckoutContent />
     </Suspense>
   )
@@ -533,14 +540,7 @@ function CheckoutContent() {
   }
 
   const pageReady = bundleMode ? cart.hydrated : (!loading && !!product)
-  if (!pageReady) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ width: 28, height: 28, border: `2.5px solid ${C.light}`, borderTopColor: C.primary, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      </div>
-    )
-  }
+  if (!pageReady) return <CheckoutSkeleton />
 
   // 多張模式但購物車空了
   // 付款進行中會先清空購物車再導轉，這段時間不可閃出「購物車是空的」(submitting 時略過，

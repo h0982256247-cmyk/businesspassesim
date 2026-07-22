@@ -165,7 +165,7 @@ export default function LiffBottomNav() {
                 width: 44, height: 28, borderRadius: 10,
                 background: C.primary,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#ffffff',
+                color: C.onPrimary,
                 transition: 'background 0.2s',
               } : {
                 width: 44, height: 28,

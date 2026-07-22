@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import RefundConfirmDialog, { type RefundTarget } from '@/components/platform/RefundConfirmDialog'
+import { OrderStatusBadge, ORDER_STATUS_META } from '@/components/platform/OrderStatusBadge'
+import { Spinner, ErrorState } from '@/components/platform/states'
 
 type Order = {
   id: string; status: string; totalPaid: number; paymentMethod: string
@@ -15,17 +17,6 @@ type Order = {
 // 「待付款」filter 同時涵蓋 PENDING 與 PROCESSING（金流送出、收到 notify 前皆顯示待付款），
 // 故 filter 不另列 PROCESSING；ESIM_PENDING 已自流程移除，亦不列入 filter。
 const STATUS_OPTS = ['','PENDING','PAID','COMPLETED','FAILED','REFUNDED','CANCELLED']
-const STATUS: Record<string,{text:string;cls:string}> = {
-  PENDING:      {text:'待付款',cls:'bg-yellow-50 text-yellow-600'},
-  PROCESSING:   {text:'待付款',cls:'bg-yellow-50 text-yellow-600'},
-  PAID:         {text:'付款成功',cls:'bg-blue-50 text-blue-600'},
-  COMPLETED:    {text:'已完成發送',cls:'bg-green-50 text-green-600'},
-  FAILED:       {text:'付款失敗',cls:'bg-red-50 text-red-500'},
-  // ESIM_PENDING 已不再產生新訂單；保留標籤讓歷史資料仍能正常顯示
-  ESIM_PENDING: {text:'待發送',cls:'bg-orange-50 text-orange-600'},
-  REFUNDED:     {text:'已退款',cls:'bg-gray-100 text-gray-400'},
-  CANCELLED:    {text:'已取消',cls:'bg-gray-100 text-gray-400'},
-}
 const COLORS=['bg-blue-500','bg-violet-500','bg-emerald-500','bg-amber-500','bg-rose-500']
 const avatarCls=(n:string)=>COLORS[n.charCodeAt(0)%COLORS.length]
 const initials=(n:string)=>n.slice(0,2).toUpperCase()
@@ -48,6 +39,7 @@ function OrdersContent() {
   const [rangeTotal, setRangeTotal] = useState(0)
   const [rangeCount, setRangeCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
 
@@ -64,7 +56,7 @@ function OrdersContent() {
   }
 
   const load = () => {
-    setLoading(true)
+    setLoading(true); setError(null)
     const qs = new URLSearchParams({ page: String(page) })
     if (statusFilter) qs.set('status', statusFilter)
     if (q) qs.set('q', q)
@@ -74,6 +66,7 @@ function OrdersContent() {
     fetch(`/api/platform/orders?${qs.toString()}`)
       .then(r => r.status === 401 ? (router.replace('/platform/login'), null) : r.json())
       .then(d => { if (d) { setOrders(d.orders); setTotal(d.total); setRangeTotal(d.rangeTotal ?? 0); setRangeCount(d.rangeCount ?? 0) } })
+      .catch(() => setError('訂單載入失敗，請稍後再試'))
       .finally(() => setLoading(false))
   }
   useEffect(load, [page, statusFilter, q, fromParam, toParam, companyId, router])
@@ -147,7 +140,7 @@ function OrdersContent() {
           {STATUS_OPTS.map(s=>(
             <button key={s} onClick={()=>router.push(buildQS({ status: s || undefined, page: 1 }))}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-medium border transition ${statusFilter===s?'bg-blue-600 text-white border-blue-600':'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>
-              {s?(STATUS[s]?.text??s):'全部'}
+              {s?(ORDER_STATUS_META[s]?.label??s):'全部'}
             </button>
           ))}
         </div>
@@ -175,9 +168,9 @@ function OrdersContent() {
           <p className="text-lg font-bold text-gray-800">NT${rangeTotal.toLocaleString()}<span className="text-xs font-normal text-gray-400 ml-1.5">{rangeCount} 筆已付款</span></p>
         </div>
       </div>
-      {loading ? <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" /></div> : (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
+      {loading ? <Spinner /> : error ? <ErrorState message={error} onRetry={load} /> : (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+          <table className="w-full text-sm min-w-[860px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {['訂單','會員','金額','付款方式','狀態','時間','操作'].map(h=>(
@@ -187,7 +180,6 @@ function OrdersContent() {
             </thead>
             <tbody className="divide-y divide-gray-50">
               {orders.map(o=>{
-                const s=STATUS[o.status]??{text:o.status,cls:'bg-gray-100 text-gray-500'}
                 return (
                   <tr key={o.id} onClick={()=>router.push(`/platform/orders/${o.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer">
                     <td className="px-5 py-3.5">
@@ -211,12 +203,13 @@ function OrdersContent() {
                     </td>
                     <td className="px-5 py-3.5 text-xs text-gray-500">{o.paymentMethod==='CREDIT_CARD'?'信用卡':'LINE Pay'}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${s.cls}`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70"/>{s.text}
-                      </span>
+                      <OrderStatusBadge status={o.status} />
                       {o.retryCount>0&&<span className="block text-xs text-gray-400 mt-0.5">重試 {o.retryCount} 次</span>}
                     </td>
-                    <td className="px-5 py-3.5 text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString('zh-TW')}</td>
+                    <td className="px-5 py-3.5 text-xs text-gray-400 whitespace-nowrap">
+                      {new Date(o.createdAt).toLocaleDateString('zh-TW')}
+                      <span className="block text-[10px] text-gray-300">{new Date(o.createdAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}</span>
+                    </td>
                     <td className="px-5 py-3.5 whitespace-nowrap" onClick={e=>e.stopPropagation()}>
                       {o.esimCount>1 ? (
                         // 同捆：補發/退款逐張不同，導去詳情頁逐張或整捆處理，避免在列表誤觸單張

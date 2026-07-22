@@ -318,7 +318,7 @@ export default function FloatingCart() {
                                   NT${(item.sellPrice * item.qty).toLocaleString()}
                                 </p>
                               )}
-                              <p style={{ fontSize: 14, fontWeight: 800, color: C.primary, margin: 0, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
+                              <p style={{ fontSize: 14, fontWeight: 800, color: C.primaryText, margin: 0, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>
                                 NT${lineTotal.toLocaleString()}
                               </p>
                               {item.qty > 1 && (
@@ -349,7 +349,7 @@ export default function FloatingCart() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6, marginBottom: 6 }}>
                   <span style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 700 }}>應付</span>
-                  <span style={{ fontSize: 22, fontWeight: 900, color: '#1a1a1a', letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ fontSize: 22, fontWeight: 900, color: C.primaryText, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
                     NT${bestPrice.toLocaleString()}
                   </span>
                 </div>

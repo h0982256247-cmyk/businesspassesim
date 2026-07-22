@@ -5,6 +5,7 @@ import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { useCachedData } from '@/hooks/useCachedData'
 import PageSkeleton from '@/components/liff/PageSkeleton'
+import { S } from '@/lib/liff/tokens'
 
 type UserInfo = {
   id: string
@@ -13,11 +14,6 @@ type UserInfo = {
   profileComplete: boolean
   membership?: { status: string; group: { name: string } } | null
 }
-
-const S = {
-  white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8',
-  line: 'rgba(0,0,0,0.07)',
-} as const
 
 function ChevronRight() {
   return (
@@ -119,6 +115,7 @@ export default function ProfilePage() {
       {!user.profileComplete && (
         <button
           onClick={() => router.push(`${base}/profile/setup`)}
+          className="liff-press"
           style={{
             width: '100%', marginBottom: 14,
             background: '#fff7ed', border: '1px solid #fed7aa',
@@ -144,6 +141,7 @@ export default function ProfilePage() {
         {menuItems.map((item, i) => (
           <button
             key={item.label}
+            className="liff-press"
             onClick={() => router.push(item.href)}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 14,

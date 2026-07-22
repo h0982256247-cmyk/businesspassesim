@@ -5,6 +5,8 @@ import { useTenantColors, type TenantColors } from '@/components/liff/TenantCont
 import { useLiff } from '@/components/liff/LiffProvider'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import PageSkeleton from '@/components/liff/PageSkeleton'
+import ConfirmDialog from '@/components/liff/ConfirmDialog'
+import { S } from '@/lib/liff/tokens'
 
 type Member = {
   id: string
@@ -16,8 +18,6 @@ type Managed = {
   company: { id: string; name: string; inviteCode: string; isActive: boolean }
   members: Member[]
 } | null
-
-const S = { white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8', line: 'rgba(0,0,0,0.07)' } as const
 
 function btn(bg: string, color: string, border?: string): CSSProperties {
   return {
@@ -59,6 +59,7 @@ export default function CompanyAdminPage() {
   const [forbidden, setForbidden] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
 
   // 一鍵分享邀請碼：LINE 內用 shareTargetPicker 傳 Flex（含邀請碼 + 一鍵加入連結，
   // 連結帶 ?code= 到「加入企業」頁自動預填）；不支援時退回複製邀請碼。
@@ -116,7 +117,6 @@ export default function CompanyAdminPage() {
   const act = async (userId: string, action: 'approve' | 'reject' | 'remove') => {
     setBusyId(userId)
     if (action === 'remove') {
-      if (!window.confirm('確定移除此成員？移除後對方將恢復一般售價。')) { setBusyId(null); return }
       await fetch(`/api/company-admin/members/${userId}`, { method: 'DELETE' }).catch(() => {})
     } else {
       await fetch(`/api/company-admin/members/${userId}`, {
@@ -171,10 +171,21 @@ export default function CompanyAdminPage() {
         <SectionTitle title={`已核准成員（${approved.length}）`} />
         {approved.length === 0 ? <Empty text="尚無已核准成員" /> : approved.map(m => (
           <MemberRow key={m.id} m={m}>
-            <button onClick={() => act(m.user.id, 'remove')} disabled={busyId === m.user.id} style={btn('transparent', '#dc2626', '#fecaca')}>移除</button>
+            <button onClick={() => setConfirmRemove(m.user.id)} disabled={busyId === m.user.id} style={btn('transparent', '#dc2626', '#fecaca')}>移除</button>
           </MemberRow>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove !== null}
+        title="移除成員"
+        lines={['移除後對方將恢復一般售價。']}
+        confirmLabel="移除"
+        tone="danger"
+        colors={C}
+        onConfirm={() => { const id = confirmRemove; setConfirmRemove(null); if (id) act(id, 'remove') }}
+        onCancel={() => setConfirmRemove(null)}
+      />
     </div>
   )
 }

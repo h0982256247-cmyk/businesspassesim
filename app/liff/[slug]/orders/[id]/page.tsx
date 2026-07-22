@@ -8,6 +8,7 @@ import { deriveEsimStatus, daysLeftOf, TONE_STYLE } from '@/lib/esimStatus'
 import { IconSim, IconInstall, IconCheck, IconClock, IconAlert } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
+import { S } from '@/lib/liff/tokens'
 import type { ReactNode } from 'react'
 
 type OrderDetail = {
@@ -42,17 +43,36 @@ type EsimUsage = {
   unit: string
 }
 
-const S = {
-  white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8',
-  line: 'rgba(0,0,0,0.07)',
-} as const
-
-function UsageBar({ used, total }: { used: number; total: number }) {
-  const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0
-  const color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
+// 啟動碼／LPA 複製鈕：mono 長字串手選極易出錯，一鍵複製 + Toast 回饋。
+function CopyBtn({ color, onClick }: { color: string; onClick: () => void }) {
   return (
-    <div style={{ background: '#f1f5f9', borderRadius: 100, height: 8, overflow: 'hidden' }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 100, transition: 'width 0.6s ease' }} />
+    <button type="button" onClick={onClick} className="liff-press" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color, fontSize: 12, fontWeight: 700, WebkitTapHighlightColor: 'transparent' }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+      </svg>複製
+    </button>
+  )
+}
+
+// 流量圓環：中心顯示剩餘百分比，弧色隨用量分級（綠→橘→紅）。
+function UsageDonut({ used, total }: { used: number; total: number }) {
+  const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0
+  const remainPct = Math.round(100 - pct)
+  const color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
+  const r = 32
+  const circ = 2 * Math.PI * r
+  const dash = ((100 - pct) / 100) * circ
+  return (
+    <div style={{ position: 'relative', width: 84, height: 84, flexShrink: 0 }}>
+      <svg width={84} height={84} viewBox="0 0 84 84">
+        <circle cx="42" cy="42" r={r} fill="none" stroke="#f1f5f9" strokeWidth="8" />
+        <circle cx="42" cy="42" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ}`} transform="rotate(-90 42 42)" style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: 18, fontWeight: 900, color: S.ink, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{remainPct}<span style={{ fontSize: 10, fontWeight: 700 }}>%</span></span>
+        <span style={{ fontSize: 9, color: S.faint, marginTop: 1 }}>剩餘</span>
+      </div>
     </div>
   )
 }
@@ -73,6 +93,12 @@ function supportsOneClickEsim(): boolean {
   const major = parseInt(m[1])
   const minor = parseInt(m[2])
   return major > 17 || (major === 17 && minor >= 4)
+}
+
+// 是否 iOS 裝置（決定安裝步驟預設分頁）
+function isIOSDevice(): boolean {
+  if (typeof navigator === 'undefined') return false
+  return /iPhone|iPad|iPod/.test(navigator.userAgent)
 }
 
 // 把 LPA 字串轉成 Apple 一鍵安裝 URL
@@ -96,6 +122,7 @@ export default function OrderDetailPage() {
   const [redeemError, setRedeemError] = useState<string | null>(null)
   const [redeemTimeout, setRedeemTimeout] = useState(false)
   const [canOneClick, setCanOneClick] = useState(false)
+  const [installOS, setInstallOS] = useState<'ios' | 'android'>('ios')
   // 自訂確認彈窗（取代 window.confirm，避免 LINE 內建瀏覽器露出網址）
   const [dialog, setDialog] = useState<null | {
     title: string; lines: string[]; confirmLabel: string;
@@ -104,8 +131,13 @@ export default function OrderDetailPage() {
   // 輕量提示（取代 alert）
   const [toast, setToast] = useState<{ message: string; tone?: 'success' | 'error' | 'info' } | null>(null)
   const dismissToast = useCallback(() => setToast(null), [])
+  const copyText = useCallback((text: string, label: string) => {
+    navigator.clipboard?.writeText(text)
+      .then(() => setToast({ message: `已複製${label}`, tone: 'success' }))
+      .catch(() => setToast({ message: '複製失敗，請長按文字手動選取', tone: 'error' }))
+  }, [])
 
-  useEffect(() => { setCanOneClick(supportsOneClickEsim()) }, [])
+  useEffect(() => { setCanOneClick(supportsOneClickEsim()); setInstallOS(isIOSDevice() ? 'ios' : 'android') }, [])
 
   // 從 TapPay (LINE Pay / 3DS) 跳轉回來時，網址會帶 ?status=<n>。
   // status=0 是付款成功（等 webhook fan-out），非零代表失敗或使用者取消。
@@ -331,9 +363,25 @@ export default function OrderDetailPage() {
         <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px', marginBottom: 12 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: S.ink, margin: '0 0 14px' }}>安裝你的 eSIM</h2>
 
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={order.esimQrcode} alt="eSIM QR Code" style={{ width: 200, height: 200, borderRadius: 12, background: '#fff', padding: 8 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ position: 'relative', padding: 12, background: '#fff', borderRadius: 18, border: `1px solid ${S.line}`, boxShadow: `0 8px 24px ${C.light}, 0 2px 8px rgba(15,23,42,0.06)` }}>
+              {/* 品牌色四角掃描框，增加交付儀式感 */}
+              <span style={{ position: 'absolute', width: 15, height: 15, top: 5, left: 5, borderTop: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderTopLeftRadius: 5 }} />
+              <span style={{ position: 'absolute', width: 15, height: 15, top: 5, right: 5, borderTop: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderTopRightRadius: 5 }} />
+              <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, left: 5, borderBottom: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderBottomLeftRadius: 5 }} />
+              <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, right: 5, borderBottom: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderBottomRightRadius: 5 }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={order.esimQrcode} alt="eSIM QR Code" style={{ width: 200, height: 200, display: 'block', borderRadius: 6 }} />
+            </div>
+            <p style={{ fontSize: 11, color: S.faint, margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
+              掃碼前建議調高螢幕亮度
+            </p>
+            <a href={order.esimQrcode} download="esim-qrcode.png" className="liff-press"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '7px 16px', borderRadius: 100, background: C.light, color: C.primaryText, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+              儲存 QR 到相簿
+            </a>
           </div>
 
           {/* iOS 17.4+ 一鍵安裝 */}
@@ -362,12 +410,28 @@ export default function OrderDetailPage() {
           {/* 安裝步驟指引（尚未啟用時顯示） */}
           {!order.activatedAt && (
             <div style={{ background: '#f8fafc', border: `1px solid ${S.line}`, borderRadius: 12, padding: '12px 14px', margin: '0 0 14px' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: S.ink, margin: '0 0 8px' }}>安裝步驟</p>
-              <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
-                <li>用上方「一鍵安裝」或長按 QR 碼，把 eSIM 加入手機</li>
-                <li>到手機<strong style={{ color: S.ink }}>設定 → 行動服務／行動網路</strong>，開啟此 eSIM 的「行動數據」與「數據漫遊」</li>
-                <li>連上網路後，本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
-              </ol>
+              {/* iOS / Android 加入 eSIM 的路徑不同，分頁切換（預設依裝置） */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 10, background: '#eef2f7', borderRadius: 9, padding: 3 }}>
+                {([['ios', 'iPhone'], ['android', 'Android']] as const).map(([os, label]) => (
+                  <button key={os} type="button" onClick={() => setInstallOS(os)} className="liff-press"
+                    style={{ flex: 1, padding: '7px 0', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: installOS === os ? S.white : 'transparent', color: installOS === os ? S.ink : S.faint, boxShadow: installOS === os ? '0 1px 3px rgba(0,0,0,0.1)' : 'none' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {installOS === 'ios' ? (
+                <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
+                  <li>用上方「一鍵安裝」或長按 QR 碼，把 eSIM 加入手機</li>
+                  <li>到手機<strong style={{ color: S.ink }}>設定 → 行動服務</strong>，開啟此 eSIM 的「行動數據」與「數據漫遊」</li>
+                  <li>連上網路後，本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
+                </ol>
+              ) : (
+                <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
+                  <li>到手機<strong style={{ color: S.ink }}>設定 → 行動網路 → 新增 eSIM</strong>（部分機型在「連線」或「SIM 卡管理員」）</li>
+                  <li>選「掃描 QR 碼」對準上方 QR；或選手動輸入，貼上剛複製的<strong style={{ color: S.ink }}>啟動碼</strong></li>
+                  <li>開啟此 eSIM 的「行動數據」與「數據漫遊」，連上網路後本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
+                </ol>
+              )}
             </div>
           )}
 
@@ -384,12 +448,18 @@ export default function OrderDetailPage() {
             <summary style={{ fontSize: 12, color: S.muted, cursor: 'pointer' }}>進階：手動安裝資料</summary>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, marginTop: 10 }}>
               <div>
-                <span style={{ color: S.muted, display: 'block', marginBottom: 2 }}>啟動碼</span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                  <span style={{ color: S.muted }}>啟動碼</span>
+                  <CopyBtn color={C.primaryText} onClick={() => copyText(order.esimRcode!, '啟動碼')} />
+                </div>
                 <span style={{ fontFamily: 'ui-monospace, monospace', color: S.ink, wordBreak: 'break-all', fontWeight: 600 }}>{order.esimRcode}</span>
               </div>
               {order.esimLpa && (
                 <div>
-                  <span style={{ color: S.muted, display: 'block', marginBottom: 2 }}>LPA</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ color: S.muted }}>LPA</span>
+                    <CopyBtn color={C.primaryText} onClick={() => copyText(order.esimLpa!, 'LPA')} />
+                  </div>
                   <span style={{ fontFamily: 'ui-monospace, monospace', color: S.ink, fontSize: 11, wordBreak: 'break-all' }}>{order.esimLpa}</span>
                 </div>
               )}
@@ -455,16 +525,25 @@ export default function OrderDetailPage() {
               {usageError && <p style={{ fontSize: 12, color: '#ef4444', margin: '0 0 8px' }}>{usageError}</p>}
 
               {usage ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <UsageBar used={usage.usedData} total={usage.totalData} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                    <span style={{ color: S.muted }}>已用 <strong style={{ color: S.ink }}>{formatData(usage.usedData, usage.unit)}</strong></span>
-                    <span style={{ color: S.muted }}>剩餘 <strong style={{ color: '#16a34a' }}>{formatData(usage.remainingData, usage.unit)}</strong></span>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <UsageDonut used={usage.usedData} total={usage.totalData} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 12, color: S.muted }}>剩餘</span>
+                        <strong style={{ fontSize: 15, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.remainingData, usage.unit)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 12, color: S.muted }}>已用</span>
+                        <span style={{ fontSize: 12, color: S.ink, fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.usedData, usage.unit)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 12, color: S.muted }}>總量</span>
+                        <span style={{ fontSize: 12, color: S.ink, fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.totalData, usage.unit)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: S.faint }}>總流量 {formatData(usage.totalData, usage.unit)}</span>
-                    <span style={{ fontSize: 11, color: S.faint }}>ICCID: {usage.iccid.slice(-8)}</span>
-                  </div>
+                  <p style={{ fontSize: 10, color: S.faint, margin: '10px 0 0', textAlign: 'right' }}>ICCID: {usage.iccid.slice(-8)}</p>
                 </div>
               ) : !usageError && (
                 <p style={{ fontSize: 12, color: S.faint, margin: 0 }}>點擊「查詢流量」取得即時用量資料</p>
