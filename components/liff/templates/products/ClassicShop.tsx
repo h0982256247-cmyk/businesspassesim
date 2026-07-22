@@ -85,9 +85,9 @@ export default function ClassicShop({
           <div style={{
             position: 'relative', overflow: 'hidden',
             borderRadius: 24, padding: '24px 22px 26px',
-            background: 'linear-gradient(135deg, #6D28D9 0%, #7C3AED 55%, #A78BFA 100%)',
-            boxShadow: '0 12px 28px rgba(109,40,217,0.25)',
-            border: '1px solid rgba(109,40,217,0.2)',
+            background: `linear-gradient(135deg, ${C.primaryText} 0%, ${C.primary} 100%)`,
+            boxShadow: `0 12px 28px ${C.border}`,
+            border: `1px solid ${C.border}`,
           }}>
             {/* 裝飾性世界地圖點點 */}
             <svg width="220" height="160" viewBox="0 0 220 160" style={{ position: 'absolute', right: -28, top: -10, opacity: 0.18 }}>
@@ -126,7 +126,7 @@ export default function ClassicShop({
         <div style={{ padding: '24px 20px 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
             display: 'inline-flex', width: 4, height: 18, borderRadius: 3,
-            background: 'linear-gradient(180deg, #7C3AED, #C4B5FD)',
+            background: `linear-gradient(180deg, ${C.primary}, ${C.soft})`,
           }} />
           <p style={{ fontSize: 16, fontWeight: 900, color: S.ink, margin: 0, letterSpacing: '-0.02em' }}>所有目的地</p>
           {countries.length > 0 && (
@@ -475,7 +475,7 @@ export default function ClassicShop({
                         NT${p.sellPrice.toLocaleString()}
                       </p>
                     )}
-                    <p style={{ fontSize: 22, fontWeight: 900, color: C.primary, margin: 0, letterSpacing: '-0.035em', lineHeight: 1.1 }}>
+                    <p style={{ fontSize: 22, fontWeight: 900, color: C.primaryText, margin: 0, letterSpacing: '-0.035em', lineHeight: 1.1 }}>
                       <span style={{ fontSize: 12, fontWeight: 700 }}>NT$</span>{bestPrice.toLocaleString()}
                     </p>
                   </div>
