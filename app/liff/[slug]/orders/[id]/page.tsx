@@ -350,9 +350,25 @@ export default function OrderDetailPage() {
         <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px', marginBottom: 12 }}>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: S.ink, margin: '0 0 14px' }}>安裝你的 eSIM</h2>
 
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={order.esimQrcode} alt="eSIM QR Code" style={{ width: 200, height: 200, borderRadius: 12, background: '#fff', padding: 8 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ position: 'relative', padding: 12, background: '#fff', borderRadius: 18, border: `1px solid ${S.line}`, boxShadow: `0 8px 24px ${C.light}, 0 2px 8px rgba(15,23,42,0.06)` }}>
+              {/* 品牌色四角掃描框，增加交付儀式感 */}
+              <span style={{ position: 'absolute', width: 15, height: 15, top: 5, left: 5, borderTop: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderTopLeftRadius: 5 }} />
+              <span style={{ position: 'absolute', width: 15, height: 15, top: 5, right: 5, borderTop: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderTopRightRadius: 5 }} />
+              <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, left: 5, borderBottom: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderBottomLeftRadius: 5 }} />
+              <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, right: 5, borderBottom: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderBottomRightRadius: 5 }} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={order.esimQrcode} alt="eSIM QR Code" style={{ width: 200, height: 200, display: 'block', borderRadius: 6 }} />
+            </div>
+            <p style={{ fontSize: 11, color: S.faint, margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
+              掃碼前建議調高螢幕亮度
+            </p>
+            <a href={order.esimQrcode} download="esim-qrcode.png" className="liff-press"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '7px 16px', borderRadius: 100, background: C.light, color: C.primaryText, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+              儲存 QR 到相簿
+            </a>
           </div>
 
           {/* iOS 17.4+ 一鍵安裝 */}
