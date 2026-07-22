@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
-import { deriveEsimStatus, daysLeftOf, TONE_STYLE } from '@/lib/esimStatus'
+import { deriveEsimStatus, TONE_STYLE } from '@/lib/esimStatus'
 import { IconSim, IconInstall, IconCheck, IconClock, IconAlert } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
@@ -470,24 +470,26 @@ export default function OrderDetailPage() {
           {order.activatedAt && (
             <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
               {(() => {
-                const dl = daysLeftOf(order.activationEnd)
-                const expiring = dl !== null && dl >= 0 && dl <= 3
-                const expired = dl !== null && dl < 0
-                const box = expired
-                  ? { bg: '#f8fafc', border: '#e2e8f0', fg: '#64748b', sub: '#94a3b8', title: '已結束', Icon: IconClock }
-                  : expiring
-                    ? { bg: '#fff7ed', border: '#fed7aa', fg: '#c2410c', sub: '#9a3412', title: '即將到期', Icon: IconAlert }
-                    : { bg: '#f0fdf4', border: '#86efac', fg: '#15803d', sub: '#166534', title: '已激活使用中', Icon: IconCheck }
+                // 配色走 esimStatus 的 TONE_STYLE 單一來源（active/warn/ended）；
+                // icon/標題/次文字色是詳情頁本地語意。
+                const sv = deriveEsimStatus(order)
+                const ts = TONE_STYLE[sv.tone]
+                const meta = sv.tone === 'ended'
+                  ? { sub: '#94a3b8', title: '已結束', Icon: IconClock }
+                  : sv.tone === 'warn'
+                    ? { sub: '#9a3412', title: '即將到期', Icon: IconAlert }
+                    : { sub: '#166534', title: '已激活使用中', Icon: IconCheck }
+                const dl = sv.daysLeft
                 const remain = dl === null ? null : dl < 0 ? '使用期間已過' : dl === 0 ? '今天到期' : `剩 ${dl} 天`
                 return (
-                  <div style={{ background: box.bg, border: `1px solid ${box.border}`, borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ background: ts.bg, border: `1px solid ${ts.border}`, borderRadius: 12, padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: box.fg, margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}><box.Icon size={14} /> {box.title}</p>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: ts.fg, margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}><meta.Icon size={14} /> {meta.title}</p>
                       {remain && (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: box.fg }}>{remain}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: ts.fg }}>{remain}</span>
                       )}
                     </div>
-                    <p style={{ fontSize: 11, color: box.sub, margin: '4px 0 0', lineHeight: 1.5 }}>
+                    <p style={{ fontSize: 11, color: meta.sub, margin: '4px 0 0', lineHeight: 1.5 }}>
                       已於 {new Date(order.activatedAt).toLocaleDateString('zh-TW')} 激活
                       {order.activationEnd ? ` · ${new Date(order.activationEnd).toLocaleDateString('zh-TW')} 到期` : ''}
                     </p>
