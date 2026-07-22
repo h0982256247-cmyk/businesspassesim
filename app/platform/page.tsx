@@ -212,8 +212,7 @@ export default function PlatformDashboard() {
       {/* Page header（歡迎 + 日期 + 角色範圍）*/}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">數據駕駛艙</h1>
-          <p className="text-sm text-gray-400 mt-1">歡迎回來{adminName ? `，${adminName}` : ''}，今天是 {today}</p>
+          <p className="text-sm text-gray-400">歡迎回來{adminName ? `，${adminName}` : ''}，今天是 {today}</p>
         </div>
         <Link href="/platform/orders" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-4 py-2 text-sm font-medium shadow-sm transition">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
