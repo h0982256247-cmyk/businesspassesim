@@ -9,12 +9,11 @@ import { resolveDestImage } from '@/lib/utils/dest-image'
 import type { HomePageProps } from './types'
 
 const QUICK_ACTIONS = [
-  // 統一白底框格 + 灰色圖示底；圖示用品牌主色的不同深淺（iconShade = 疊在 C.primary 後的
-  // alpha 後綴，100%→70%）做出一點層次區分，整體仍乾淨一致。主色動態帶入、不寫死品牌色。
-  { key: 'orders',  label: '我的 eSIM', Icon: IconMyEsim,   iconShade: '' },
-  { key: 'guide',   label: '安裝教學',  Icon: IconGuide,    iconShade: 'E6' },
-  { key: 'data',    label: '流量指南',  Icon: IconDataPlan, iconShade: 'CC' },
-  { key: 'devices', label: '支援裝置',  Icon: IconDevices,  iconShade: 'B3' },
+  // 通透版：無卡框，duotone 圖示坐在品牌淡底圓角上；主色動態帶入、不寫死品牌色。
+  { key: 'orders',  label: '我的 eSIM', Icon: IconMyEsim },
+  { key: 'guide',   label: '安裝教學',  Icon: IconGuide },
+  { key: 'data',    label: '流量指南',  Icon: IconDataPlan },
+  { key: 'devices', label: '支援裝置',  Icon: IconDevices },
 ]
 
 const DAY_OPTIONS  = ['3天','5天','7天','10天','15天']
@@ -238,26 +237,24 @@ export default function ClassicHome({
       {/* ── 快速功能 ── */}
       <div style={{ padding: '22px 20px 0' }}>
         <p style={{ fontSize: 19, fontWeight: 900, color: '#1a1a1a', margin: '0 0 14px', letterSpacing: '-0.025em' }}>快速功能</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-          {QUICK_ACTIONS.map(({ key, label, Icon, iconShade }, i) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+          {QUICK_ACTIONS.map(({ key, label, Icon }, i) => (
             <button key={key} onClick={() => onNavigate(key)}
               className="liff-press"
               style={{
-                background: '#fff', borderRadius: 22,
-                border: '1px solid #ECEEF3',
-                padding: '17px 4px 14px', display: 'flex', flexDirection: 'column',
-                alignItems: 'center', gap: 10, cursor: 'pointer',
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '6px 0', display: 'flex', flexDirection: 'column',
+                alignItems: 'center', gap: 11,
                 animation: `fadeUp 0.4s ${i * 0.05}s ease both`,
-                boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 5px 14px rgba(16,24,40,0.05)',
               }}>
               <div style={{
-                width: 46, height: 46, borderRadius: 16,
-                background: '#F1F3F6',
+                width: 60, height: 60, borderRadius: 20,
+                background: C.light,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Icon color={`${C.primary}${iconShade}`} size={23} />
+                <Icon color={C.primary} size={27} />
               </div>
-              <span style={{ fontSize: 11.5, color: '#475467', fontWeight: 700, textAlign: 'center', lineHeight: 1.3 }}>{label}</span>
+              <span style={{ fontSize: 12, color: '#1a1a2e', fontWeight: 600, textAlign: 'center', letterSpacing: '0.01em' }}>{label}</span>
             </button>
           ))}
         </div>
