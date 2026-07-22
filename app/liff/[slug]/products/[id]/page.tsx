@@ -62,9 +62,20 @@ export default function ProductDetailPage() {
   }, [id])
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-      <div style={{ width: 28, height: 28, border: `2.5px solid ${C.light}`, borderTopColor: C.primary, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    <div style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 'calc(160px + env(safe-area-inset-bottom))' }}>
+      {/* 骨架：鏡射 nav + hero 卡 + specs，取代白屏轉圈 */}
+      <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="liff-shimmer" style={{ width: 24, height: 24, borderRadius: 8 }} />
+        <div className="liff-shimmer" style={{ width: 80, height: 14, borderRadius: 6 }} />
+      </div>
+      <div style={{ margin: '0 16px' }}>
+        <div className="liff-shimmer" style={{ borderRadius: 20, height: 208 }} />
+      </div>
+      <div style={{ margin: '18px 16px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {[1, 1, 1, 0.6].map((w, i) => (
+          <div key={i} className="liff-shimmer" style={{ height: 16, borderRadius: 6, width: `${w * 100}%` }} />
+        ))}
+      </div>
     </div>
   )
 
