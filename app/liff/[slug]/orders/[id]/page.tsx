@@ -54,12 +54,25 @@ function CopyBtn({ color, onClick }: { color: string; onClick: () => void }) {
   )
 }
 
-function UsageBar({ used, total }: { used: number; total: number }) {
+// 流量圓環：中心顯示剩餘百分比，弧色隨用量分級（綠→橘→紅）。
+function UsageDonut({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0
+  const remainPct = Math.round(100 - pct)
   const color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
+  const r = 32
+  const circ = 2 * Math.PI * r
+  const dash = ((100 - pct) / 100) * circ
   return (
-    <div style={{ background: '#f1f5f9', borderRadius: 100, height: 8, overflow: 'hidden' }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 100, transition: 'width 0.6s ease' }} />
+    <div style={{ position: 'relative', width: 84, height: 84, flexShrink: 0 }}>
+      <svg width={84} height={84} viewBox="0 0 84 84">
+        <circle cx="42" cy="42" r={r} fill="none" stroke="#f1f5f9" strokeWidth="8" />
+        <circle cx="42" cy="42" r={r} fill="none" stroke={color} strokeWidth="8" strokeLinecap="round"
+          strokeDasharray={`${dash} ${circ}`} transform="rotate(-90 42 42)" style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: 18, fontWeight: 900, color: S.ink, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{remainPct}<span style={{ fontSize: 10, fontWeight: 700 }}>%</span></span>
+        <span style={{ fontSize: 9, color: S.faint, marginTop: 1 }}>剩餘</span>
+      </div>
     </div>
   )
 }
@@ -512,16 +525,25 @@ export default function OrderDetailPage() {
               {usageError && <p style={{ fontSize: 12, color: '#ef4444', margin: '0 0 8px' }}>{usageError}</p>}
 
               {usage ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <UsageBar used={usage.usedData} total={usage.totalData} />
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
-                    <span style={{ color: S.muted }}>已用 <strong style={{ color: S.ink }}>{formatData(usage.usedData, usage.unit)}</strong></span>
-                    <span style={{ color: S.muted }}>剩餘 <strong style={{ color: '#16a34a' }}>{formatData(usage.remainingData, usage.unit)}</strong></span>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                    <UsageDonut used={usage.usedData} total={usage.totalData} />
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 12, color: S.muted }}>剩餘</span>
+                        <strong style={{ fontSize: 15, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.remainingData, usage.unit)}</strong>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 12, color: S.muted }}>已用</span>
+                        <span style={{ fontSize: 12, color: S.ink, fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.usedData, usage.unit)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontSize: 12, color: S.muted }}>總量</span>
+                        <span style={{ fontSize: 12, color: S.ink, fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.totalData, usage.unit)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: S.faint }}>總流量 {formatData(usage.totalData, usage.unit)}</span>
-                    <span style={{ fontSize: 11, color: S.faint }}>ICCID: {usage.iccid.slice(-8)}</span>
-                  </div>
+                  <p style={{ fontSize: 10, color: S.faint, margin: '10px 0 0', textAlign: 'right' }}>ICCID: {usage.iccid.slice(-8)}</p>
                 </div>
               ) : !usageError && (
                 <p style={{ fontSize: 12, color: S.faint, margin: 0 }}>點擊「查詢流量」取得即時用量資料</p>
