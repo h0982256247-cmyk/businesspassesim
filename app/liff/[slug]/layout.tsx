@@ -35,7 +35,7 @@ export default async function TenantLiffLayout({ children, params }: Props) {
             {/* 全站按壓回饋的單一來源：任何點下去該有反應的按鈕/列加上 className="liff-press"
                 即得輕微縮放＋降透明。補上 next/router 切換前那 100~300ms 的「按了沒反應」感，
                 touch-action 順帶砍掉 iOS 300ms tap delay。 */}
-            <style>{`.liff-press{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms ease,opacity 120ms ease}.liff-press:active{transform:scale(0.97);opacity:0.9}`}</style>
+            <style>{`.liff-press{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms ease,opacity 120ms ease}.liff-press:active{transform:scale(0.97);opacity:0.9}.liff-shimmer{background:linear-gradient(100deg,#eef1f4 30%,#f6f8fa 50%,#eef1f4 70%);background-size:200% 100%;animation:liffShimmer 1.2s ease-in-out infinite}@keyframes liffShimmer{from{background-position:200% 0}to{background-position:-200% 0}}`}</style>
             {children}
           </div>
           <FloatingCart />

@@ -8,7 +8,7 @@ import { pickInitialDay, PRODUCTS_DEFAULT_DAYS } from '@/lib/utils/products-day-
 import { peekCache, setCache, productsCacheKey } from '@/hooks/useCachedData'
 
 type ProductsApiResponse = { countries?: Country[]; products?: Product[] }
-import { GlobeIllustration } from '@/components/liff/LiffIllustrations'
+import { S } from '@/lib/liff/tokens'
 import ClassicShop from '@/components/liff/templates/products/ClassicShop'
 import SetupModal from '@/components/liff/SetupModal'
 import { useCart } from '@/components/liff/CartProvider'
@@ -28,18 +28,29 @@ function capKindOf(dc: string | null): '總量' | '每日型' | '吃到飽' | ''
   return '總量'
 }
 
-function Spinner() {
+// 商品列表載入骨架：鏡射 ClassicShop 版型（hero + 2 欄目的地卡格），
+// 取代白屏轉圈，讓使用者立刻看到頁面結構、感知更快。
+function ProductsSkeleton() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '70vh', gap: 16 }}>
-      <GlobeIllustration size={80} />
-      <p style={{ fontSize: 13, color: '#94a3b8', letterSpacing: '0.04em' }}>載入中</p>
+    <div style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 96, background: S.bg, minHeight: '100vh' }}>
+      <div style={{ padding: '20px 16px 0' }}>
+        <div className="liff-shimmer" style={{ borderRadius: 24, height: 148 }} />
+      </div>
+      <div style={{ padding: '24px 20px 12px' }}>
+        <div className="liff-shimmer" style={{ width: 120, height: 18, borderRadius: 6 }} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="liff-shimmer" style={{ borderRadius: 20, minHeight: 168 }} />
+        ))}
+      </div>
     </div>
   )
 }
 
 export default function ProductsPage() {
   return (
-    <Suspense fallback={<Spinner />}>
+    <Suspense fallback={<ProductsSkeleton />}>
       <ProductsContent />
     </Suspense>
   )
@@ -203,7 +214,7 @@ function ProductsContent() {
     },
   }), [cart, countries])
 
-  if (loading) return <Spinner />
+  if (loading) return <ProductsSkeleton />
 
   return (
     <>
