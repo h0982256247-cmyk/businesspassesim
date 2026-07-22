@@ -241,6 +241,7 @@ export default function ClassicHome({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
           {QUICK_ACTIONS.map(({ key, label, Icon, iconShade }, i) => (
             <button key={key} onClick={() => onNavigate(key)}
+              className="liff-press"
               style={{
                 background: '#fff', borderRadius: 22,
                 border: '1px solid #ECEEF3',

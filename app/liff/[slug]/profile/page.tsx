@@ -115,6 +115,7 @@ export default function ProfilePage() {
       {!user.profileComplete && (
         <button
           onClick={() => router.push(`${base}/profile/setup`)}
+          className="liff-press"
           style={{
             width: '100%', marginBottom: 14,
             background: '#fff7ed', border: '1px solid #fed7aa',
@@ -140,6 +141,7 @@ export default function ProfilePage() {
         {menuItems.map((item, i) => (
           <button
             key={item.label}
+            className="liff-press"
             onClick={() => router.push(item.href)}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 14,
