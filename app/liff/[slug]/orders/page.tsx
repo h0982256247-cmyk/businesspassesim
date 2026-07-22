@@ -420,14 +420,14 @@ export default function OrdersPage() {
                 {buckets.install.map(o => {
                   const phase = deriveEsimStatus(o).phase
                   if (phase === 'readyToInstall') return (
-                    <PendingCard key={o.id} order={o} primary={C.primary} onPrimary={C.onPrimary}
+                    <PendingCard key={o.id} order={o} primary={C.primary} primaryText={C.primaryText} onPrimary={C.onPrimary}
                       actioning={actioning === o.id}
                       canShare={!!tenant?.transferEnabled}
                       onRedeem={() => handleRedeem(o)} onShare={() => handleShare(o)}
                       onClick={() => router.push(`${base}/orders/${o.id}`)} />
                   )
                   if (phase === 'installable') return (
-                    <InstallableCard key={o.id} order={o} primary={C.primary}
+                    <InstallableCard key={o.id} order={o} primary={C.primary} primaryText={C.primaryText}
                       onClick={() => router.push(`${base}/orders/${o.id}`)} />
                   )
                   return (
@@ -556,15 +556,15 @@ function ActiveCard({ order, usage, primary, onClick }: {
   )
 }
 
-function InstallableCard({ order, primary, onClick }: { order: Order; primary: string; onClick: () => void }) {
+function InstallableCard({ order, primary, primaryText, onClick }: { order: Order; primary: string; primaryText: string; onClick: () => void }) {
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
   return (
     <button onClick={onClick}
-      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: '#eff6ff', border: '1px solid #93c5fd', borderRadius: 16, padding: '14px 16px', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
+      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: S.white, border: `1px solid ${S.line}`, borderRadius: 16, padding: '14px 16px', boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 6px 16px rgba(16,24,40,0.05)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8', padding: '3px 8px', borderRadius: 100 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: `${primary}14`, color: primaryText, padding: '3px 8px', borderRadius: 100 }}>
             <IconQr size={11} /> QR 已就緒
           </span>
           <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: '8px 0 2px' }}>
@@ -579,8 +579,8 @@ function InstallableCard({ order, primary, onClick }: { order: Order; primary: s
   )
 }
 
-function PendingCard({ order, primary, onPrimary, actioning, canShare, onRedeem, onShare, onClick }: {
-  order: Order; primary: string; onPrimary: string; actioning: boolean; canShare: boolean;
+function PendingCard({ order, primary, primaryText, onPrimary, actioning, canShare, onRedeem, onShare, onClick }: {
+  order: Order; primary: string; primaryText: string; onPrimary: string; actioning: boolean; canShare: boolean;
   onRedeem: () => void; onShare: () => void; onClick: () => void
 }) {
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
@@ -589,10 +589,10 @@ function PendingCard({ order, primary, onPrimary, actioning, canShare, onRedeem,
   const isReceived = order.receivedGift   // 收到的轉贈 → 不可再轉贈出去
 
   return (
-    <div style={{ background: S.white, border: `1.5px solid ${primary}`, borderRadius: 16, padding: '16px', boxShadow: `0 2px 10px ${primary}22` }}>
+    <div style={{ background: S.white, border: `1px solid ${S.line}`, borderRadius: 16, padding: '16px', boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 6px 16px rgba(16,24,40,0.05)' }}>
       <button onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: primary, color: onPrimary, padding: '3px 10px', borderRadius: 100 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: `${primary}14`, color: primaryText, padding: '3px 10px', borderRadius: 100 }}>
             <IconSim size={11} /> 可以安裝
           </span>
           {gift && (
