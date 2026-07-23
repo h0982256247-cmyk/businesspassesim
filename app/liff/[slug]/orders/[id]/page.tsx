@@ -5,7 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { deriveEsimStatus, TONE_STYLE } from '@/lib/esimStatus'
-import { IconSim, IconInstall, IconCheck, IconClock, IconAlert } from '@/components/liff/EsimIcons'
+import { IconSim, IconInstall, IconCheck, IconClock, IconAlert, IconShare } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
 import { S } from '@/lib/liff/tokens'
@@ -33,6 +33,9 @@ type OrderDetail = {
   redeemedAt: string | null
   activatedAt: string | null
   orderItems: { productName: string; qty: number; unitPrice: number; product?: { dataCapacity: string | null } | null }[]
+  isCurrentOwner: boolean         // 只有目前擁有者可安裝/操作（轉贈後為 false）
+  transferredAway: boolean        // 我買的、已轉贈出去 → 只能看歷史
+  gift?: { toName: string | null } | null
 }
 
 type EsimUsage = {
@@ -307,8 +310,20 @@ export default function OrderDetailPage() {
         <p style={{ fontSize: 12, color: S.faint, marginTop: 4 }}>{order.orderNumber ?? `#${order.id.slice(-8).toUpperCase()}`}</p>
       </div>
 
+      {/* 已轉贈出去：擁有權已移轉，轉贈者只能看歷史、不能安裝/操作（後端亦 fail-closed 擋 redeem） */}
+      {order.transferredAway && (
+        <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 16, padding: '18px 20px', marginBottom: 12 }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#6d28d9', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <IconShare size={15} /> 已轉贈{order.gift?.toName ? `給 ${order.gift.toName}` : '出去'}
+          </p>
+          <p style={{ fontSize: 13, color: '#7c3aed', margin: 0, lineHeight: 1.6 }}>
+            這張 eSIM 的擁有權已移轉，無法在此安裝或操作。
+          </p>
+        </div>
+      )}
+
       {/* === eSIM 階段一：未使用（已收到 rcode、未按我要安裝） === */}
-      {order.status === 'COMPLETED' && order.esimRcode && !order.redeemedAt && !order.activatedAt && (
+      {order.isCurrentOwner && order.status === 'COMPLETED' && order.esimRcode && !order.redeemedAt && !order.activatedAt && (
         <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px', marginBottom: 12 }}>
           <div style={{ textAlign: 'center', marginBottom: 16 }}>
             <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fff', border: `1px solid ${C.border}`, color: C.primaryText, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
@@ -343,7 +358,7 @@ export default function OrderDetailPage() {
       )}
 
       {/* === eSIM 階段二：兌換中（已按我要安裝、QR 還沒到） === */}
-      {order.redeemedAt && !order.esimQrcode && !order.activatedAt && (
+      {order.isCurrentOwner && order.redeemedAt && !order.esimQrcode && !order.activatedAt && (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 16, padding: '20px', marginBottom: 12, textAlign: 'center' }}>
           <div style={{ width: 28, height: 28, border: '3px solid #fed7aa', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 10px' }} />
           <p style={{ fontSize: 14, fontWeight: 700, color: '#c2410c', margin: '0 0 4px' }}>正在準備 QR 碼…</p>
@@ -359,7 +374,7 @@ export default function OrderDetailPage() {
       )}
 
       {/* === eSIM 階段三/四：QR 已生成（含已激活） === */}
-      {order.status === 'COMPLETED' && order.esimRcode && order.esimQrcode && (
+      {order.isCurrentOwner && order.status === 'COMPLETED' && order.esimRcode && order.esimQrcode && (
         <div style={{ marginBottom: 12 }}>
           {/* 登機證式交付票券：品牌色頭部 + 票根虛線 + QR */}
           <div style={{ borderRadius: 16, overflow: 'hidden', background: S.white, border: `1px solid ${S.line}`, boxShadow: '0 10px 26px rgba(15,23,42,0.12)', marginBottom: 16 }}>
