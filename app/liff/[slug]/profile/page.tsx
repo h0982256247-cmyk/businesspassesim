@@ -1,8 +1,9 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { useLiffBase } from '@/hooks/useLiffBase'
-import { useTenantColors } from '@/components/liff/TenantContext'
+import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
 import { useCachedData } from '@/hooks/useCachedData'
 import PageSkeleton from '@/components/liff/PageSkeleton'
 import { S } from '@/lib/liff/tokens'
@@ -51,10 +52,20 @@ function IconSupport() {
   )
 }
 
+function IconHeadset() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={S.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+    </svg>
+  )
+}
+
 export default function ProfilePage() {
   const router = useRouter()
   const base = useLiffBase()
   const C = useTenantColors()
+  const tenant = useTenant()
 
   const { data, loading } = useCachedData('profile', async () => {
     const d = await fetch('/api/auth/me').then(r => r.ok ? r.json() : null)
@@ -76,10 +87,14 @@ export default function ProfilePage() {
     ? '加入申請未通過'
     : `企業會員 · ${m.group.name}`
 
-  const menuItems = [
+  const menuItems: { label: string; sub: string; icon: React.ReactNode; href: string; external?: boolean }[] = [
     { label: '個人資料', sub: '姓名、電話、電郵', icon: <IconEdit />, href: `${base}/profile/setup` },
     { label: '我的企業', sub: groupLabel,           icon: <IconGroup />, href: `${base}/company` },
     { label: '客服中心', sub: '問題回報與聯絡',    icon: <IconSupport />, href: `${base}/support` },
+    // 聯繫客服：直開後台「系統設定 → 客服 / LINE OA 連結」；未設定則不顯示（與 support 頁同防呆）
+    ...(tenant?.lineOaUrl
+      ? [{ label: '聯繫客服', sub: 'LINE 官方帳號線上諮詢', icon: <IconHeadset />, href: tenant.lineOaUrl, external: true }]
+      : []),
   ]
 
   return (
@@ -88,7 +103,8 @@ export default function ProfilePage() {
       {/* Identity block */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
         {user.avatarUrl
-          ? <img src={user.avatarUrl} alt="" style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${S.line}` }} />
+          // unoptimized：LINE 頭像是遠端 URL（host 不固定，無法列 remotePatterns），68px 小圖不走優化器
+          ? <Image src={user.avatarUrl} alt="" width={68} height={68} unoptimized style={{ width: 68, height: 68, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${S.line}` }} />
           : (
             <div style={{ width: 68, height: 68, borderRadius: '50%', background: C.soft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.primaryText} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -142,7 +158,7 @@ export default function ProfilePage() {
           <button
             key={item.label}
             className="liff-press"
-            onClick={() => router.push(item.href)}
+            onClick={() => item.external ? window.open(item.href, '_blank', 'noopener,noreferrer') : router.push(item.href)}
             style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 14,
               padding: '15px 16px', background: 'transparent', border: 'none',
