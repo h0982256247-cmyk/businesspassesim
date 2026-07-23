@@ -589,7 +589,7 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
   const isReceived = order.receivedGift   // 收到的轉贈 → 不可再轉贈出去
 
   return (
-    <div style={{ background: S.white, border: `1px solid ${S.line}`, borderRadius: 16, padding: '16px', boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 6px 16px rgba(16,24,40,0.05)' }}>
+    <div style={{ background: S.white, border: `1px solid ${S.line}`, borderRadius: 16, padding: '14px', boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 6px 16px rgba(16,24,40,0.05)' }}>
       <button onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: `${primary}14`, color: primaryText, padding: '3px 10px', borderRadius: 100 }}>
@@ -601,25 +601,27 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
             </span>
           )}
         </div>
-        <p style={{ fontSize: 16, fontWeight: 700, color: S.ink, margin: '0 0 4px' }}>
+        <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: '0 0 3px' }}>
           {productName}
           {dataCapacity && !productName.includes(dataCapacity) && <span style={{ fontSize: 13, fontWeight: 600, color: S.muted, marginLeft: 6 }}>· {dataCapacity}</span>}
         </p>
-        <p style={{ fontSize: 11, color: S.faint, margin: '0 0 12px' }}>
+        <p style={{ fontSize: 11, color: S.faint, margin: '0 0 11px' }}>
           {new Date(order.createdAt).toLocaleDateString('zh-TW')}
         </p>
       </button>
 
-      <button onClick={onRedeem} disabled={actioning}
-        style={{ width: '100%', background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '12px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-        {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
-      </button>
-      {canShare && !isReceived && (
-        <button onClick={onShare} disabled={actioning}
-          style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: S.muted, fontSize: 12.5, fontWeight: 600, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-          <IconShare size={13} /> 轉贈給朋友
+      <div style={{ display: 'grid', gridTemplateColumns: (canShare && !isReceived) ? '1fr 1fr' : '1fr', gap: 8 }}>
+        <button onClick={onRedeem} disabled={actioning} className="liff-press"
+          style={{ background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '11px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
         </button>
-      )}
+        {canShare && !isReceived && (
+          <button onClick={onShare} disabled={actioning} className="liff-press"
+            style={{ background: S.white, color: primaryText, border: `1.5px solid ${primary}33`, borderRadius: 100, padding: '11px', fontSize: 13, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+            <IconShare size={14} /> 轉贈
+          </button>
+        )}
+      </div>
     </div>
   )
 }
