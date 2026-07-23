@@ -223,6 +223,7 @@ function ProductsContent() {
         slug={slug}
         countries={countries}
         products={filteredProducts}
+        allProducts={allProducts}
         coverageCountries={coverageCountries}
         selectedCountry={selectedCountry}
         showSetup={showSetup}

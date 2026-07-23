@@ -66,7 +66,7 @@ function CrownIcon({ size = 12 }: { size?: number }) {
 }
 
 export default function ClassicShop({
-  countries, products, coverageCountries, selectedCountry,
+  countries, products, allProducts, coverageCountries, selectedCountry,
   colors: C, onSelectCountry, onSelectProduct, onBack,
   filter, cart,
 }: ProductsTemplateProps) {
@@ -76,22 +76,25 @@ export default function ClassicShop({
   const [showCoverage, setShowCoverage] = useState(false)
   const coverageList = useMemo(() => getCoverageList(coverageCountries), [coverageCountries])
 
-  // 底部浮動搜尋列（國家清單畫面）：打字即篩選上方的國家卡格，不跳頁；
-  // 國名（中/英）沒中時退一步掃方案「適用國家」字串（如打「香港」找到中港澳）。
+  // 底部浮動搜尋列（國家清單畫面）：打字即篩選上方的國家卡格，不跳頁。
+  // 「國名（中/英）命中」與「方案適用國家字串命中」取聯集——
+  // 打「香港」時，香港本身與涵蓋香港的中港澳等目的地都要出現。
   const [searchQ, setSearchQ] = useState('')
   const shownCountries = useMemo(() => {
     // 去掉注音符號與聲調（IME 組字中的「ㄖ」「ㄖˋ」等 marked text），
     // 避免選字前整格被誤判成「找不到」；選完字（如「日」）立即比對。
     const q = searchQ.replace(/[ㄅ-ㄯㆠ-ㆿˊˇˋ˙]/g, '').trim().toLowerCase()
     if (!q) return countries
-    const byName = countries.filter(c =>
+    // 掃全量方案（allProducts）：products 已被預設天數篩過，會漏掉沒有該天數方案的目的地
+    const byCoverage = new Set<string>()
+    ;(allProducts ?? products).forEach(p => {
+      if (p.coverageCountries?.toLowerCase().includes(q)) byCoverage.add(p.countryCode)
+    })
+    return countries.filter(c =>
       c.countryNameZh.toLowerCase().includes(q) ||
-      c.countryNameEn.toLowerCase().includes(q))
-    if (byName.length > 0) return byName
-    const codes = new Set<string>()
-    products.forEach(p => { if (p.coverageCountries?.toLowerCase().includes(q)) codes.add(p.countryCode) })
-    return countries.filter(c => codes.has(c.countryCode))
-  }, [searchQ, countries, products])
+      c.countryNameEn.toLowerCase().includes(q) ||
+      byCoverage.has(c.countryCode))
+  }, [searchQ, countries, products, allProducts])
 
   // Country selection screen — 機票/登機證主視覺
   if (!selectedCountry) {
