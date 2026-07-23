@@ -360,7 +360,7 @@ export default function OrderDetailPage() {
 
       {/* === eSIM 階段三/四：QR 已生成（含已激活） === */}
       {order.status === 'COMPLETED' && order.esimRcode && order.esimQrcode && (
-        <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px', marginBottom: 12 }}>
+        <div style={{ marginBottom: 12 }}>
           {/* 登機證式交付票券：品牌色頭部 + 票根虛線 + QR */}
           <div style={{ borderRadius: 16, overflow: 'hidden', background: S.white, border: `1px solid ${S.line}`, boxShadow: '0 10px 26px rgba(15,23,42,0.12)', marginBottom: 16 }}>
             <div style={{ background: `linear-gradient(135deg, ${C.primaryText} 0%, ${C.primary} 100%)`, padding: '13px 18px', color: C.onPrimary }}>
@@ -393,11 +393,13 @@ export default function OrderDetailPage() {
           {canOneClick && order.esimLpa && !order.activatedAt && (
             <a
               href={buildAppleOneClickUrl(order.esimLpa)}
+              className="liff-press"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 textDecoration: 'none',
-                background: C.primary, color: C.onPrimary,
-                borderRadius: 100, padding: '13px',
+                background: S.white, color: C.primaryText,
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 100, padding: '12px',
                 fontSize: 14, fontWeight: 800, marginBottom: 8, letterSpacing: '0.02em',
               }}
             >
