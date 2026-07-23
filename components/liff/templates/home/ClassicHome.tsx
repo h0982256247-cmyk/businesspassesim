@@ -362,12 +362,36 @@ export default function ClassicHome({
             })}
           </div>
         )}
+
+        {/* 底部全寬「查看全部」：滑完 6 張卡剛好是想看更多的時刻，右上角那顆此時已捲出畫面 */}
+        {hot.length > 0 && (
+          <button onClick={() => onNavigate('products')}
+            className="ch-viewall"
+            style={{
+              width: '100%', marginTop: 14,
+              background: '#fff', border: `1.5px solid ${C.primary}40`,
+              borderRadius: 16, padding: '13px 0', cursor: 'pointer',
+              fontSize: 14, fontWeight: 800, color: C.primary,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              boxShadow: '0 1px 2px rgba(15,23,42,0.05)',
+              animation: 'fadeUp 0.4s 0.35s ease both',
+              WebkitTapHighlightColor: 'transparent',
+              touchAction: 'manipulation',
+              transition: 'transform 0.12s ease',
+            }}>
+            查看全部目的地{countries.length > hot.length ? `（${countries.length}）` : ''}
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+        )}
       </div>
 
       <style>{`
         @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         @keyframes dropIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
         .ch-dest-card:active { transform: scale(0.97); box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
+        .ch-viewall:active { transform: scale(0.98); }
       `}</style>
     </div>
   )
