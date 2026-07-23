@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
-import { deriveEsimStatus, daysLeftOf, TONE_STYLE } from '@/lib/esimStatus'
+import { deriveEsimStatus, TONE_STYLE } from '@/lib/esimStatus'
 import { IconSim, IconInstall, IconCheck, IconClock, IconAlert } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
@@ -361,27 +361,32 @@ export default function OrderDetailPage() {
       {/* === eSIM 階段三/四：QR 已生成（含已激活） === */}
       {order.status === 'COMPLETED' && order.esimRcode && order.esimQrcode && (
         <div style={{ background: C.light, border: `1px solid ${C.border}`, borderRadius: 16, padding: '20px', marginBottom: 12 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: S.ink, margin: '0 0 14px' }}>安裝你的 eSIM</h2>
-
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ position: 'relative', padding: 12, background: '#fff', borderRadius: 18, border: `1px solid ${S.line}`, boxShadow: `0 8px 24px ${C.light}, 0 2px 8px rgba(15,23,42,0.06)` }}>
-              {/* 品牌色四角掃描框，增加交付儀式感 */}
-              <span style={{ position: 'absolute', width: 15, height: 15, top: 5, left: 5, borderTop: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderTopLeftRadius: 5 }} />
-              <span style={{ position: 'absolute', width: 15, height: 15, top: 5, right: 5, borderTop: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderTopRightRadius: 5 }} />
-              <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, left: 5, borderBottom: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderBottomLeftRadius: 5 }} />
-              <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, right: 5, borderBottom: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderBottomRightRadius: 5 }} />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={order.esimQrcode} alt="eSIM QR Code" style={{ width: 200, height: 200, display: 'block', borderRadius: 6 }} />
+          {/* 登機證式交付票券：品牌色頭部 + 票根虛線 + QR */}
+          <div style={{ borderRadius: 16, overflow: 'hidden', background: S.white, border: `1px solid ${S.line}`, boxShadow: '0 10px 26px rgba(15,23,42,0.12)', marginBottom: 16 }}>
+            <div style={{ background: `linear-gradient(135deg, ${C.primaryText} 0%, ${C.primary} 100%)`, padding: '13px 18px', color: C.onPrimary }}>
+              <p style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', margin: 0, opacity: 0.82 }}>eSIM 安裝憑證</p>
+              <p style={{ fontSize: 15, fontWeight: 800, margin: '3px 0 0', letterSpacing: '-0.01em' }}>{order.orderItems[0]?.productName ?? 'eSIM'}</p>
             </div>
-            <p style={{ fontSize: 11, color: S.faint, margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
-              掃碼前建議調高螢幕亮度
-            </p>
-            <a href={order.esimQrcode} download="esim-qrcode.png" className="liff-press"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '7px 16px', borderRadius: 100, background: C.light, color: C.primaryText, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-              儲存 QR 到相簿
-            </a>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 18px', borderTop: `1.5px dashed ${C.border}` }}>
+              <div style={{ position: 'relative', padding: 12, background: '#fff', borderRadius: 14, border: `1px solid ${S.line}` }}>
+                {/* 品牌色四角掃描框 */}
+                <span style={{ position: 'absolute', width: 15, height: 15, top: 5, left: 5, borderTop: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderTopLeftRadius: 5 }} />
+                <span style={{ position: 'absolute', width: 15, height: 15, top: 5, right: 5, borderTop: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderTopRightRadius: 5 }} />
+                <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, left: 5, borderBottom: `2.5px solid ${C.primary}`, borderLeft: `2.5px solid ${C.primary}`, borderBottomLeftRadius: 5 }} />
+                <span style={{ position: 'absolute', width: 15, height: 15, bottom: 5, right: 5, borderBottom: `2.5px solid ${C.primary}`, borderRight: `2.5px solid ${C.primary}`, borderBottomRightRadius: 5 }} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={order.esimQrcode} alt="eSIM QR Code" style={{ width: 200, height: 200, display: 'block', borderRadius: 6 }} />
+              </div>
+              <p style={{ fontSize: 11, color: S.faint, margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
+                掃碼前建議調高螢幕亮度
+              </p>
+              <a href={order.esimQrcode} download="esim-qrcode.png" className="liff-press"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '7px 16px', borderRadius: 100, background: C.light, color: C.primaryText, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                儲存 QR 到相簿
+              </a>
+            </div>
           </div>
 
           {/* iOS 17.4+ 一鍵安裝 */}
@@ -470,24 +475,26 @@ export default function OrderDetailPage() {
           {order.activatedAt && (
             <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
               {(() => {
-                const dl = daysLeftOf(order.activationEnd)
-                const expiring = dl !== null && dl >= 0 && dl <= 3
-                const expired = dl !== null && dl < 0
-                const box = expired
-                  ? { bg: '#f8fafc', border: '#e2e8f0', fg: '#64748b', sub: '#94a3b8', title: '已結束', Icon: IconClock }
-                  : expiring
-                    ? { bg: '#fff7ed', border: '#fed7aa', fg: '#c2410c', sub: '#9a3412', title: '即將到期', Icon: IconAlert }
-                    : { bg: '#f0fdf4', border: '#86efac', fg: '#15803d', sub: '#166534', title: '已激活使用中', Icon: IconCheck }
+                // 配色走 esimStatus 的 TONE_STYLE 單一來源（active/warn/ended）；
+                // icon/標題/次文字色是詳情頁本地語意。
+                const sv = deriveEsimStatus(order)
+                const ts = TONE_STYLE[sv.tone]
+                const meta = sv.tone === 'ended'
+                  ? { sub: '#94a3b8', title: '已結束', Icon: IconClock }
+                  : sv.tone === 'warn'
+                    ? { sub: '#9a3412', title: '即將到期', Icon: IconAlert }
+                    : { sub: '#166534', title: '已激活使用中', Icon: IconCheck }
+                const dl = sv.daysLeft
                 const remain = dl === null ? null : dl < 0 ? '使用期間已過' : dl === 0 ? '今天到期' : `剩 ${dl} 天`
                 return (
-                  <div style={{ background: box.bg, border: `1px solid ${box.border}`, borderRadius: 12, padding: '12px 14px' }}>
+                  <div style={{ background: ts.bg, border: `1px solid ${ts.border}`, borderRadius: 12, padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: box.fg, margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}><box.Icon size={14} /> {box.title}</p>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: ts.fg, margin: 0, display: 'flex', alignItems: 'center', gap: 5 }}><meta.Icon size={14} /> {meta.title}</p>
                       {remain && (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: box.fg }}>{remain}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: ts.fg }}>{remain}</span>
                       )}
                     </div>
-                    <p style={{ fontSize: 11, color: box.sub, margin: '4px 0 0', lineHeight: 1.5 }}>
+                    <p style={{ fontSize: 11, color: meta.sub, margin: '4px 0 0', lineHeight: 1.5 }}>
                       已於 {new Date(order.activatedAt).toLocaleDateString('zh-TW')} 激活
                       {order.activationEnd ? ` · ${new Date(order.activationEnd).toLocaleDateString('zh-TW')} 到期` : ''}
                     </p>
