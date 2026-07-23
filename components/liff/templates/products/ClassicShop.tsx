@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getCoverageList, CoveragePopup } from '@/components/liff/CoverageCountries'
 import DayPicker from '@/components/liff/DayPicker'
@@ -76,12 +76,12 @@ export default function ClassicShop({
   const [showCoverage, setShowCoverage] = useState(false)
   const coverageList = useMemo(() => getCoverageList(coverageCountries), [coverageCountries])
 
-  // 底部浮動搜尋列（國家清單畫面）：打國名（中/英）即比對；
-  // 國名沒中時退一步掃方案「適用國家」字串（如打「香港」找到中港澳）。
+  // 底部浮動搜尋列（國家清單畫面）：打字即篩選上方的國家卡格，不跳頁；
+  // 國名（中/英）沒中時退一步掃方案「適用國家」字串（如打「香港」找到中港澳）。
   const [searchQ, setSearchQ] = useState('')
-  const searchMatches = useMemo(() => {
+  const shownCountries = useMemo(() => {
     const q = searchQ.trim().toLowerCase()
-    if (!q) return []
+    if (!q) return countries
     const byName = countries.filter(c =>
       c.countryNameZh.toLowerCase().includes(q) ||
       c.countryNameEn.toLowerCase().includes(q))
@@ -90,13 +90,6 @@ export default function ClassicShop({
     products.forEach(p => { if (p.coverageCountries?.toLowerCase().includes(q)) codes.add(p.countryCode) })
     return countries.filter(c => codes.has(c.countryCode))
   }, [searchQ, countries, products])
-  // 打中唯一國家 → 直接進該國方案（多個比對改浮出 chip 讓使用者點選）
-  useEffect(() => {
-    if (selectedCountry || !searchQ.trim()) return
-    if (searchMatches.length === 1) onSelectCountry(searchMatches[0].countryCode)
-    // onSelectCountry 是 page 傳入的穩定導頁 callback，不列依賴避免每 render 重跑
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchMatches, searchQ, selectedCountry])
 
   // Country selection screen — 機票/登機證主視覺
   if (!selectedCountry) {
@@ -154,16 +147,20 @@ export default function ClassicShop({
           <p style={{ fontSize: 16, fontWeight: 900, color: S.ink, margin: 0, letterSpacing: '-0.02em' }}>所有目的地</p>
           {countries.length > 0 && (
             <span style={{ fontSize: 11, color: S.faint, fontWeight: 600, marginLeft: 'auto' }}>
-              共 {countries.length} 國
+              {searchQ.trim() ? `符合 ${shownCountries.length} 國` : `共 ${countries.length} 國`}
             </span>
           )}
         </div>
 
         {countries.length === 0 ? (
           <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>目前沒有可購買的商品</p>
+        ) : shownCountries.length === 0 ? (
+          <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>
+            找不到「{searchQ.trim()}」的目的地，換個關鍵字試試
+          </p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
-            {countries.map((c) => {
+            {shownCountries.map((c) => {
               const { accent } = getAccent(c.countryCode)
               const img = resolveDestImage(c.countryCode, c.countryNameZh)
               return (
@@ -231,30 +228,6 @@ export default function ClassicShop({
           pointerEvents: 'none',
         }}>
           <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 16px' }}>
-            {/* 比對到多國 → 浮出 chip 讓使用者點選 */}
-            {searchMatches.length > 1 && (
-              <div style={{
-                display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 10,
-                pointerEvents: 'auto', WebkitOverflowScrolling: 'touch',
-              }}>
-                {searchMatches.map(c => (
-                  <button key={c.countryCode} onClick={() => onSelectCountry(c.countryCode)}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                      background: 'rgba(255,255,255,0.72)',
-                      backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
-                      border: '1px solid rgba(255,255,255,0.7)', borderRadius: 100,
-                      padding: '7px 13px', cursor: 'pointer',
-                      fontSize: 13, fontWeight: 800, color: S.ink,
-                      boxShadow: '0 4px 14px rgba(15,23,42,0.14)',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}>
-                    <CountryFlag code={c.countryCode} fallbackEmoji={c.countryFlag} size={16} />
-                    {c.countryNameZh}
-                  </button>
-                ))}
-              </div>
-            )}
             <div style={{
               pointerEvents: 'auto',
               display: 'flex', alignItems: 'center', gap: 10,
@@ -270,7 +243,6 @@ export default function ClassicShop({
                 onChange={e => setSearchQ(e.target.value)}
                 placeholder="搜尋目的地，如：日本、韓國"
                 enterKeyHint="search"
-                onKeyDown={e => { if (e.key === 'Enter' && searchMatches[0]) onSelectCountry(searchMatches[0].countryCode) }}
                 style={{
                   flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent',
                   fontSize: 15, fontWeight: 600, color: S.ink,
