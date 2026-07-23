@@ -610,18 +610,16 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
         </p>
       </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: (canShare && !isReceived) ? '2fr 1fr' : '1fr', gap: 8 }}>
-        <button onClick={onRedeem} disabled={actioning}
-          style={{ background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '11px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
+      <button onClick={onRedeem} disabled={actioning}
+        style={{ width: '100%', background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '12px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+        {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
+      </button>
+      {canShare && !isReceived && (
+        <button onClick={onShare} disabled={actioning}
+          style={{ width: '100%', marginTop: 8, background: 'none', border: 'none', color: S.muted, fontSize: 12.5, fontWeight: 600, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+          <IconShare size={13} /> 轉贈給朋友
         </button>
-        {canShare && !isReceived && (
-          <button onClick={onShare} disabled={actioning}
-            style={{ background: S.white, color: primary, border: `1.5px solid ${primary}`, borderRadius: 100, padding: '11px', fontSize: 13, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-            <IconShare size={14} /> 轉贈
-          </button>
-        )}
-      </div>
+      )}
     </div>
   )
 }
