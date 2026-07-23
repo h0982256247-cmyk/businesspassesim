@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { BeeLogoSVG } from '@/components/liff/LiffIllustrations'
 import { IconMyEsim, IconGuide, IconDataPlan, IconDevices } from './HomeIcons'
 import FilterDropdown from './FilterDropdown'
@@ -88,7 +89,8 @@ export default function ClassicHome({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {tenant?.logoUrl
-              ? <img src={tenant.logoUrl} alt={brandName} style={{ width: 46, height: 46, objectFit: 'cover' }} />
+              // unoptimized：logo 是後台上傳的遠端 URL（host 不固定，無法列 remotePatterns），46px 小圖不走優化器
+              ? <Image src={tenant.logoUrl} alt={brandName} width={46} height={46} unoptimized style={{ width: 46, height: 46, objectFit: 'cover' }} />
               : <BeeLogoSVG size={26} />}
           </div>
           <div>
