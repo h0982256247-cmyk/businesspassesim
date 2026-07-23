@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getCoverageList, CoveragePopup } from '@/components/liff/CoverageCountries'
 import DayPicker from '@/components/liff/DayPicker'
@@ -76,10 +76,33 @@ export default function ClassicShop({
   const [showCoverage, setShowCoverage] = useState(false)
   const coverageList = useMemo(() => getCoverageList(coverageCountries), [coverageCountries])
 
+  // 底部浮動搜尋列（國家清單畫面）：打國名（中/英）即比對；
+  // 國名沒中時退一步掃方案「適用國家」字串（如打「香港」找到中港澳）。
+  const [searchQ, setSearchQ] = useState('')
+  const searchMatches = useMemo(() => {
+    const q = searchQ.trim().toLowerCase()
+    if (!q) return []
+    const byName = countries.filter(c =>
+      c.countryNameZh.toLowerCase().includes(q) ||
+      c.countryNameEn.toLowerCase().includes(q))
+    if (byName.length > 0) return byName
+    const codes = new Set<string>()
+    products.forEach(p => { if (p.coverageCountries?.toLowerCase().includes(q)) codes.add(p.countryCode) })
+    return countries.filter(c => codes.has(c.countryCode))
+  }, [searchQ, countries, products])
+  // 打中唯一國家 → 直接進該國方案（多個比對改浮出 chip 讓使用者點選）
+  useEffect(() => {
+    if (selectedCountry || !searchQ.trim()) return
+    if (searchMatches.length === 1) onSelectCountry(searchMatches[0].countryCode)
+    // onSelectCountry 是 page 傳入的穩定導頁 callback，不列依賴避免每 render 重跑
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchMatches, searchQ, selectedCountry])
+
   // Country selection screen — 機票/登機證主視覺
   if (!selectedCountry) {
     return (
-      <div style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 96, background: S.bg, minHeight: '100vh' }}>
+      // paddingBottom 預留底部導覽 + 浮動搜尋列的高度，避免最後一排卡片被蓋住
+      <div style={{ maxWidth: 520, margin: '0 auto', paddingBottom: 172, background: S.bg, minHeight: '100vh' }}>
         {/* Hero：登機證式紫色漸層 banner，呼應主頁 hero 風格 */}
         <div style={{ padding: '20px 16px 0' }}>
           <div style={{
@@ -200,6 +223,73 @@ export default function ClassicShop({
             })}
           </div>
         )}
+
+        {/* ── 底部浮動玻璃搜尋列（懸在底部導覽上方）── */}
+        <div style={{
+          position: 'fixed', left: 0, right: 0, zIndex: 40,
+          bottom: 'calc(78px + env(safe-area-inset-bottom))',
+          pointerEvents: 'none',
+        }}>
+          <div style={{ maxWidth: 520, margin: '0 auto', padding: '0 16px' }}>
+            {/* 比對到多國 → 浮出 chip 讓使用者點選 */}
+            {searchMatches.length > 1 && (
+              <div style={{
+                display: 'flex', gap: 8, overflowX: 'auto', marginBottom: 10,
+                pointerEvents: 'auto', WebkitOverflowScrolling: 'touch',
+              }}>
+                {searchMatches.map(c => (
+                  <button key={c.countryCode} onClick={() => onSelectCountry(c.countryCode)}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                      background: 'rgba(255,255,255,0.72)',
+                      backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)',
+                      border: '1px solid rgba(255,255,255,0.7)', borderRadius: 100,
+                      padding: '7px 13px', cursor: 'pointer',
+                      fontSize: 13, fontWeight: 800, color: S.ink,
+                      boxShadow: '0 4px 14px rgba(15,23,42,0.14)',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}>
+                    <CountryFlag code={c.countryCode} fallbackEmoji={c.countryFlag} size={16} />
+                    {c.countryNameZh}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{
+              pointerEvents: 'auto',
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: 'rgba(255,255,255,0.55)',
+              backdropFilter: 'blur(18px) saturate(180%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(180%)',
+              border: '1px solid rgba(255,255,255,0.65)',
+              borderRadius: 100, padding: '9px 9px 9px 20px',
+              boxShadow: '0 8px 28px rgba(15,23,42,0.18)',
+            }}>
+              <input
+                value={searchQ}
+                onChange={e => setSearchQ(e.target.value)}
+                placeholder="搜尋目的地，如：日本、韓國"
+                enterKeyHint="search"
+                onKeyDown={e => { if (e.key === 'Enter' && searchMatches[0]) onSelectCountry(searchMatches[0].countryCode) }}
+                style={{
+                  flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent',
+                  fontSize: 15, fontWeight: 600, color: S.ink,
+                }}
+              />
+              {/* 放大鏡：純裝飾，不可點 */}
+              <div aria-hidden style={{
+                width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                background: C.primary, color: C.onPrimary,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 4px 12px ${C.primary}4d`,
+              }}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+                  <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <style>{`
           .cs-country-card:active { transform: scale(0.97); box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
