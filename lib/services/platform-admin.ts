@@ -5,8 +5,10 @@ import { Prisma, AdminRole, MemberStatus } from '@prisma/client'
 // ─── 登入驗證 ─────────────────────────────────────────────────────
 
 export async function verifyAdminCredentials(email: string, password: string) {
-  const admin = await prisma.adminUser.findUnique({
-    where: { email },
+  const admin = await prisma.adminUser.findFirst({
+    // email 大小寫不敏感 + 去前後空白：避免自動填入帶了大寫／空白時，
+    // 第一次登入被誤判成「帳號或密碼錯誤」。密碼不 trim（可能含有意義的空白）。
+    where: { email: { equals: email.trim(), mode: 'insensitive' } },
     select: { id: true, email: true, passwordHash: true, name: true, role: true, isActive: true },
   })
 

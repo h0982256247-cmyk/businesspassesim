@@ -13,7 +13,10 @@ export async function POST(req: NextRequest) {
   let admin
   try {
     admin = await verifyAdminCredentials(email, password)
-  } catch {
+  } catch (err) {
+    // 不可靜默吞錯（CLAUDE.md F）：把真實原因記到 Vercel function log，
+    // 方便排查（例如 serverless 冷啟動時的 DB 連線失敗）。
+    console.error('[platform/auth/login] verifyAdminCredentials failed:', err)
     return NextResponse.json({ error: '伺服器錯誤，請稍後再試' }, { status: 500 })
   }
   if (!admin) {
