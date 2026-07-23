@@ -80,7 +80,9 @@ export default function ClassicShop({
   // 國名（中/英）沒中時退一步掃方案「適用國家」字串（如打「香港」找到中港澳）。
   const [searchQ, setSearchQ] = useState('')
   const shownCountries = useMemo(() => {
-    const q = searchQ.trim().toLowerCase()
+    // 去掉注音符號與聲調（IME 組字中的「ㄖ」「ㄖˋ」等 marked text），
+    // 避免選字前整格被誤判成「找不到」；選完字（如「日」）立即比對。
+    const q = searchQ.replace(/[ㄅ-ㄯㆠ-ㆿˊˇˋ˙]/g, '').trim().toLowerCase()
     if (!q) return countries
     const byName = countries.filter(c =>
       c.countryNameZh.toLowerCase().includes(q) ||
@@ -231,10 +233,10 @@ export default function ClassicShop({
             <div style={{
               pointerEvents: 'auto',
               display: 'flex', alignItems: 'center', gap: 10,
-              background: 'rgba(255,255,255,0.55)',
+              background: 'rgba(255,255,255,0.32)',
               backdropFilter: 'blur(18px) saturate(180%)',
               WebkitBackdropFilter: 'blur(18px) saturate(180%)',
-              border: '1px solid rgba(255,255,255,0.65)',
+              border: '1px solid rgba(255,255,255,0.5)',
               borderRadius: 100, padding: '9px 9px 9px 20px',
               boxShadow: '0 8px 28px rgba(15,23,42,0.18)',
             }}>
@@ -245,7 +247,8 @@ export default function ClassicShop({
                 enterKeyHint="search"
                 style={{
                   flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent',
-                  fontSize: 15, fontWeight: 600, color: S.ink,
+                  // 16px 起跳：iOS 對 <16px 的輸入框聚焦時會自動放大整頁，維持畫面一致
+                  fontSize: 16, fontWeight: 600, color: S.ink,
                 }}
               />
               {/* 放大鏡：純裝飾，不可點 */}
