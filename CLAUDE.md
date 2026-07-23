@@ -22,11 +22,14 @@
 
 **commit**：一個邏輯一包、訊息 `type(scope): 中文說明`、結尾帶 Co-Authored-By；未經要求不擅自 push。
 
-## B. 架構與多租戶
-- 多租戶 = `PlatformAdmin`（白標品牌），**不是** Group（Group 是租戶底下的社群）。slug → tenant 用 `lib/services/tenant.ts`。
-- 每個 tenant 各有 `liffId`、`tenantPaymentConfig`(TapPay)、`tenantEsimConfig`(世界移動)。設定一律 by `tenantAdminId` 解析，env 只能當 fallback，別把全域 env 當預設值。
-- 世界移動「測試/正式」是兩台獨立主機，各有不同 merchantId/deptId/token 與 **wmproductId**。
-- **無 DB RLS**，全靠 app 層 auth：每個 query 都要自己帶 `tenantAdminId` / `userId` / `ownerId` 過濾，別假設拿得到的資料已被隔離。
+## B. 架構（單一品牌 + 企業 Group；已非多租戶白牌）
+- **單一品牌**：舊的白牌多租戶（per-tenant `PlatformAdmin` / `tenantEsimConfig` / `tenantPaymentConfig`）已被 `refactor/b2b2c-esim` 移除。品牌與設定改為**全域單列**；別再找 `PlatformAdmin` / `tenantAdminId` 這些已不存在的符號（僅殘留在少數註解／test）。
+- 全域設定來源都在 `lib/services/tenant-config.ts`：品牌／網域／LIFF／功能開關 → `getPlatformSettings()`（`PlatformSetting`，id 固定 `"singleton"`）；世界移動 → `getEsimConfig()`（`EsimConfig` 單列）；TapPay → `getPaymentConfig(gateway)`（`PaymentConfig` 每 gateway 一列：`tappay_credit` / `tappay_linepay`）。三者皆 env 只當 fallback，DB 有值以 DB 為準。
+- `/liff/[slug]` 路由與 `lib/services/tenant.ts` 是**相容空殼**：`getTenantBySlug/ById/…` 一律忽略參數、回傳同一個品牌（讀 `getPlatformSettings()`）。不要在 slug 上再長出 per-tenant 邏輯；slug 是常數（`NEXT_PUBLIC_BRAND_SLUG`）。
+- **企業 = `Group`**（一家公司＝一個企業社群，沿用 Group model）：使用者用邀請碼加入、需企業管理員（`GroupMember.role = ADMIN`）審核；核准後享福利價。`Group.isActive` 由 Super Admin 控停權。`Order.companyId` 記錄下單當下所屬企業（**null＝一般會員**），`Order.priceTier` 為 `GENERAL` / `BENEFIT`。
+- 後台管理者只有單一 `AdminUser`（role 僅 `SUPER_ADMIN`＝商務通平台管理者）；認證入口見 D 節。
+- 世界移動「測試/正式」是兩台獨立主機，各有不同 merchantId/deptId/token 與 **wmproductId**；連哪台由 `EsimConfig`（`apiUrl` + `env`）決定。
+- **無 DB RLS**，全靠 app 層 auth：LIFF 使用者資料一律自己帶 `userId` / `Order.currentOwnerId` 過濾，企業範圍資料帶 `groupId` / `companyId`；別假設拿到的資料已被隔離。
 
 ## C. LIFF 前端
 - 純 inline CSS-in-JS（**無 Tailwind、無全域 CSS**）；顏色用 `useTenantColors()` 的 `C.*`，禁止寫死品牌色；動畫用 `<style>` 內 `@keyframes`。

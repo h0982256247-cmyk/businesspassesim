@@ -24,16 +24,19 @@ function HomeLoginInner() {
   // proxy redirect 後會帶 ?from=<舊路徑>，方便我們顯示「您剛被導離 /xxx」
   const from = searchParams.get('from')
 
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
   const [rememberMe, setRemember] = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [loading, setLoading]     = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
+
+    // 直接讀表單當下的值，確保自動填入的內容一定被抓到（不依賴可能還沒同步的 state）。
+    const fd = new FormData(e.currentTarget)
+    const email = String(fd.get('email') ?? '').trim()
+    const password = String(fd.get('password') ?? '')
 
     let r: { admin?: { role?: string }; error?: string } = {}
     try {
@@ -76,8 +79,7 @@ function HomeLoginInner() {
               <label className="text-sm text-gray-600 block mb-1">電子郵件</label>
               <input
                 type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                name="email"
                 required
                 autoComplete="username"
                 className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -88,8 +90,7 @@ function HomeLoginInner() {
               <label className="text-sm text-gray-600 block mb-1">密碼</label>
               <input
                 type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                name="password"
                 required
                 autoComplete="current-password"
                 className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
