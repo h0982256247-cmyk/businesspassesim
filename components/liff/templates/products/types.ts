@@ -60,6 +60,8 @@ export interface ProductsTemplateProps {
   countries: Country[]
   /** Products to render — already filtered by `filter.dayFilter` when active. */
   products: Product[]
+  /** 全量方案（未經天數/流量篩選）：國家清單搜尋掃「適用國家」用，避免漏掉被日篩濾掉的目的地。 */
+  allProducts?: Product[]
   /** 該目的地「適用國家」原字串（取自未經天數篩選的整組方案，避免被日篩濾掉）。 */
   coverageCountries: string | null
   selectedCountry: string | null
