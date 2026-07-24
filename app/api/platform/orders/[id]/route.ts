@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
 import { prisma } from '@/lib/db/prisma'
 import { safeDecrypt } from '@/lib/utils/crypto'
+import { decryptEsimFields } from '@/lib/utils/esim-crypto'
 import { retryEsimActivation } from '@/lib/services/esim'
 import { tapPayRefund } from '@/lib/services/tappay'
 import { OrderStatus } from '@prisma/client'
@@ -59,7 +60,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       createdAt: order.createdAt,
       tapPayRecTradeId: order.tapPayRecTradeId,
     },
-    esims,
+    // eSIM 憑證欄位在 DB 加密；後台客服需要看明文（補發、對帳），解密後回傳。
+    esims: esims.map(decryptEsimFields),
   })
 }
 

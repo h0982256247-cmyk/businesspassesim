@@ -89,10 +89,17 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // 兩個職責：API auth gate + 舊 LIFF URL redirect。
-  // 排除 _next 內部、靜態資源、liff、platform 路徑；其餘讓 proxy 跑、
-  // function 內部依 pathname.startsWith('/api/') 分流。
+  // 兩個職責：API auth gate + 舊 LIFF URL redirect，各用一條 matcher。
+  //
+  // ⚠ /api/* 必須獨立列一條，不能只靠下面那條萬用規則：萬用規則排除靜態資源用的
+  //   `.*\.(?:svg|png|…|js)`，會讓「路徑帶副檔名」的 API 也一起被排除 —— 例如
+  //   /api/orders/<id>.js 會整個跳過認證閘門（該路徑仍會命中 [id] 動態路由）。
+  //   目前每支 route 都有自帶守門（requireLiffAuth / requirePlatformAuth），所以
+  //   沒有實際被繞過，但少一層防護、且日後新增 route 忘記守門就會直接公開。
   matcher: [
-    '/((?!_next/|liff/|platform/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)).*)',
+    '/api/:path*',
+    // 其餘路徑只為了舊 LIFF deep link 的 redirect。副檔名以 $ 錨定在結尾，
+    // 否則路徑「中間」出現 .js 也會被誤排除（如 /a.js/b）。
+    '/((?!_next/|liff/|platform/|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
   ],
 }

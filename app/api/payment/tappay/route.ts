@@ -13,7 +13,7 @@ import {
   isOrderExpired,
 } from '@/lib/services/order'
 import { tapPayCharge, tapPayChargeByToken, tapPayChargeLinePay } from '@/lib/services/tappay'
-import { buildLiffOrderUrl } from '@/lib/utils/liff-url'
+import { buildLiffOrderUrl, isAllowedReturnUrl } from '@/lib/utils/liff-url'
 import { getTenantById } from '@/lib/services/tenant'
 import { triggerEsimActivation } from '@/lib/services/esim'
 import { getUserById } from '@/lib/services/user'
@@ -156,6 +156,12 @@ export async function POST(req: NextRequest) {
   // 端依該訂單 owner 的 tenantSlug 重新組路徑，避免落到已刪除的 (liff) 群組
   // 舊 URL 變成 404。
   let frontendRedirectUrl = returnUrl
+  // 白名單守門：returnUrl 會原樣交給 TapPay 當付款後的回跳網址，不設限即 open
+  // redirect（見 isAllowedReturnUrl）。不在白名單就當作沒送、走下面的 server 端組裝。
+  if (frontendRedirectUrl && !isAllowedReturnUrl(frontendRedirectUrl, origin)) {
+    console.warn('[pay] returnUrl 不在白名單，改用 server 端組的回跳網址')
+    frontendRedirectUrl = undefined
+  }
   if (!frontendRedirectUrl) {
     const tenant = await getTenantById('default')
     frontendRedirectUrl = buildLiffOrderUrl({

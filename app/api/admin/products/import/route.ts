@@ -10,6 +10,12 @@ import { parseCapacityFromName, normalizeCapacity } from '@/lib/utils/capacity'
 // （Hobby 上限）。
 export const maxDuration = 60
 
+// 上傳檔案大小上限。xlsx 0.18.5 有已知的 ReDoS（GHSA-5pgg-2g8v-p4x9），而 npm 上
+// 沒有修補版（SheetJS 已停止發佈到 npm registry；為何不改用官方 CDN 版，見
+// ROADMAP「已知並接受的風險」）。此上限讓惡意壓縮檔無法餵進大量內容放大解析
+// 成本；正常商品表（數千列）遠低於 5MB。
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024
+
 // ── 欄位別名對應表（中文欄位名 → 內部英文名）──────────────────────
 const HEADER_ALIAS: Record<string, string> = {
   // 中文欄位名（使用者試算表）
@@ -262,6 +268,12 @@ export async function POST(req: NextRequest) {
   }
 
   const f = file as File
+  if (f.size > MAX_IMPORT_BYTES) {
+    return NextResponse.json(
+      { error: `檔案過大（${(f.size / 1024 / 1024).toFixed(1)}MB），上限 ${MAX_IMPORT_BYTES / 1024 / 1024}MB` },
+      { status: 413 },
+    )
+  }
   const isExcel = /\.(xlsx|xls)$/i.test(f.name)
 
   // Excel：讀入「所有分頁」；CSV：單一分頁。每個分頁各自有表頭，獨立解析後合併。

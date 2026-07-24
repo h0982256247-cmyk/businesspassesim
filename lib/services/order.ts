@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db/prisma'
+import { encryptEsimFields, decryptEsimFields } from '@/lib/utils/esim-crypto'
 import { OrderStatus, PaymentMethod, PriceTier, Prisma } from '@prisma/client'
 import { getProductById } from './product'
 import { isApprovedMember } from './group'
@@ -389,7 +390,8 @@ export async function markOrderCompleted(orderId: string, esimData: {
     where: { id: orderId },
     data: {
       status: OrderStatus.COMPLETED,
-      ...esimData,
+      // 憑證欄位加密後才落地（單一來源見 lib/utils/esim-crypto）
+      ...encryptEsimFields(esimData),
     },
   })
 }
@@ -438,7 +440,8 @@ export async function getUserOrders(userId: string) {
     },
   })
   return orders.map(({ currentOwnerId, transfer, ...o }) => ({
-    ...o,
+    // 憑證欄位在 DB 為密文，回前端前解密（safeDecrypt 相容舊明文）
+    ...decryptEsimFields(o),
     transferredAway: o.userId === userId && currentOwnerId !== userId,   // 我買的、已轉贈出去
     receivedGift: currentOwnerId === userId && o.userId !== userId,      // 我收到的轉贈
     gift: transfer ? {
@@ -508,7 +511,8 @@ export async function getOrderByIdForUser(orderId: string, userId: string) {
   if (!o) return null
   const { currentOwnerId, transfer, ...rest } = o
   return {
-    ...rest,
+    // 憑證欄位在 DB 為密文，回前端前解密（safeDecrypt 相容舊明文）
+    ...decryptEsimFields(rest),
     isCurrentOwner: currentOwnerId === userId,                           // 只有目前擁有者可安裝/轉贈
     transferredAway: rest.userId === userId && currentOwnerId !== userId,
     receivedGift: currentOwnerId === userId && rest.userId !== userId,
