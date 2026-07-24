@@ -1,10 +1,19 @@
 import { prisma } from '@/lib/db/prisma'
 
 // DB-backed 固定視窗限流（serverless 跨實例有效；不需 Redis）。
-// fail-open：限流器自身出錯一律放行，絕不可因限流 bug 擋住正常付款/下單。
+// 預設 fail-open：限流器自身出錯一律放行，絕不可因限流 bug 擋住正常付款/下單。
 // 視窗起點併入 bucket key，舊 bucket 由 cleanupRateLimits()（每日 cron）清掉，
 // 避免 rate_limits 無上限增長。
-export async function checkRateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
+//
+// opts.failClosed：限流本身就是安全機制的端點（後台登入防爆破）才開。這類端點
+// fail-open 等於「DB 一掛就沒有防護」；而 DB 不可用時登入驗證本來就無法成功，
+// 擋下請求不會造成額外損失，故改為擋。
+export async function checkRateLimit(
+  key: string,
+  limit: number,
+  windowSec: number,
+  opts: { failClosed?: boolean } = {},
+): Promise<boolean> {
   try {
     const windowStart = Math.floor(Date.now() / (windowSec * 1000)) * windowSec
     const bucket = `${key}:${windowStart}`
@@ -15,7 +24,7 @@ export async function checkRateLimit(key: string, limit: number, windowSec: numb
       RETURNING count`
     return (rows[0]?.count ?? 0) <= limit
   } catch {
-    return true // fail-open
+    return !opts.failClosed // 預設 fail-open；failClosed 端點改為擋下
   }
 }
 

@@ -88,10 +88,13 @@ interface WmEsimResult {
 // 端點 /Api/SOrder/querybuyesim；encStr = SHA1(merchantId + orderId + token)（不含 deptId、不含 body）。
 // 回應與 2.2 callback 同結構：itemList[0].redemptionCode → esimRcode、iccid → esimIccid；
 // 此階段尚無 QR/LPA/PIN/PUK（要兌換後 3.2 callback 才有）。
-async function fetchEsimCodes(wmOrderId: string): Promise<WmEsimResult | null> {
-  const { apiUrl, merchantId, token } = await getWmConfig()
-  const encStr = crypto.createHash('sha1').update(merchantId + wmOrderId + token).digest('hex')
+// 對外亦供 2.2 webhook 做「回查驗真」：該 callback 無簽章，落地資料一律以本查詢為準。
+export async function fetchEsimCodes(wmOrderId: string): Promise<WmEsimResult | null> {
   try {
+    // getWmConfig 併入 try：設定缺漏時本函式應回 null（見簽章），不可往外丟例外——
+    // 呼叫端（2.2 webhook、重試 cron）都以 null 當「查不到」處理。
+    const { apiUrl, merchantId, token } = await getWmConfig()
+    const encStr = crypto.createHash('sha1').update(merchantId + wmOrderId + token).digest('hex')
     const res = await fetch(`${apiUrl}/Api/SOrder/querybuyesim`, wmFetchInit(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

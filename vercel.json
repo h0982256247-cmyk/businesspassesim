@@ -4,14 +4,6 @@
     {
       "path": "/api/cron/cancel-pending-orders",
       "schedule": "0 18 * * *"
-    },
-    {
-      "path": "/api/cron/settle-monthly",
-      "schedule": "0 18 1 * *"
-    },
-    {
-      "path": "/api/cron/cancel-expired-gifts",
-      "schedule": "0 18 * * *"
     }
   ]
 }

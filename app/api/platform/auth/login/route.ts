@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminCredentials } from '@/lib/services/platform-admin'
 import { createPlatformSession, PLATFORM_COOKIE } from '@/lib/auth/platform'
+import { checkRateLimit } from '@/lib/utils/rate-limit'
+
+// 後台登入是對外開放的最高權限入口，必須擋暴力破解。兩層 bucket：
+//   per-IP   10 次 / 5 分鐘  —— 擋單一來源狂試
+//   per-帳號 20 次 / 15 分鐘 —— 擋分散式來源鎖定單一帳號。門檻刻意放寬，
+//                              避免被惡意打滿而把管理員自己鎖在門外。
+// 兩者皆 fail-closed（見 checkRateLimit 註解）。
+const RATE = {
+  ip:      { limit: 10, windowSec: 5 * 60 },
+  account: { limit: 20, windowSec: 15 * 60 },
+}
+
+// Vercel 邊緣會設 x-real-ip；x-forwarded-for 首段可被用戶端偽造，僅作為後備。
+function clientIp(req: NextRequest): string {
+  return req.headers.get('x-real-ip')
+    ?? req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    ?? 'unknown'
+}
 
 // POST /api/platform/auth/login
 export async function POST(req: NextRequest) {
@@ -8,6 +26,20 @@ export async function POST(req: NextRequest) {
 
   if (!email || !password) {
     return NextResponse.json({ error: '帳號與密碼必填' }, { status: 400 })
+  }
+
+  // 帳號 bucket 的 key 與 verifyAdminCredentials 的查詢一樣做 trim + 小寫，
+  // 否則大小寫變形就能各自拿到一份額度。
+  const ip = clientIp(req)
+  const account = String(email).trim().toLowerCase()
+  const [ipOk, accountOk] = await Promise.all([
+    checkRateLimit(`admin-login:ip:${ip}`, RATE.ip.limit, RATE.ip.windowSec, { failClosed: true }),
+    checkRateLimit(`admin-login:acct:${account}`, RATE.account.limit, RATE.account.windowSec, { failClosed: true }),
+  ])
+  if (!ipOk || !accountOk) {
+    // 記到 Vercel log 供事後追查；不寫 system_alerts，避免持續攻擊灌爆告警表。
+    console.warn('[platform/auth/login] rate limited', { ip, scope: ipOk ? 'account' : 'ip' })
+    return NextResponse.json({ error: '嘗試次數過多，請稍後再試' }, { status: 429 })
   }
 
   let admin
