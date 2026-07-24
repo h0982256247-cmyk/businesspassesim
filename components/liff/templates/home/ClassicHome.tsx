@@ -365,24 +365,39 @@ export default function ClassicHome({
           </div>
         )}
 
-        {/* 底部全寬「查看全部」：滑完 6 張卡剛好是想看更多的時刻，右上角那顆此時已捲出畫面 */}
+        {/* 底部全寬「查看全部」：滑完 6 張卡剛好是想看更多的時刻，右上角那顆此時已捲出畫面。
+            刻意無底框無邊框——直接浮在頁面底色上，讓上方的目的地卡是唯一的「卡片」；
+            紙飛機沿虛線航線起飛 + 文字輕輕浮動，整塊都可點。動效慢而小幅度
+            （列表頁不該有搶戲的動畫），並尊重 prefers-reduced-motion。
+            padding 保留 16px 上下，觸控區才有 48px 高（無框時更需要靠 padding 撐）。 */}
         {hot.length > 0 && (
           <button onClick={() => onNavigate('products')}
             className="ch-viewall"
             style={{
-              width: '100%', marginTop: 14,
-              background: '#fff', border: `1.5px solid ${C.primary}40`,
-              borderRadius: 16, padding: '13px 0', cursor: 'pointer',
+              width: '100%', marginTop: 10,
+              background: 'transparent', border: 'none',
+              padding: '16px 0', cursor: 'pointer',
               fontSize: 14, fontWeight: 800, color: C.primary,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              boxShadow: '0 1px 2px rgba(15,23,42,0.05)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
               animation: 'fadeUp 0.4s 0.35s ease both',
               WebkitTapHighlightColor: 'transparent',
               touchAction: 'manipulation',
-              transition: 'transform 0.12s ease',
+              transition: 'transform 0.12s ease, opacity 0.12s ease',
             }}>
-            查看全部目的地{countries.length > hot.length ? `（${countries.length}）` : ''}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            {/* 航線 + 紙飛機（純裝飾，不進無障礙樹） */}
+            <span className="ch-va-scene" aria-hidden="true">
+              <svg className="ch-va-trail" width="34" height="18" viewBox="0 0 34 18" fill="none">
+                <path d="M1 15 Q10 15 17 9.5 T31 4" stroke={C.primary} strokeOpacity="0.35"
+                  strokeWidth="1.6" strokeLinecap="round" strokeDasharray="2.5 3.5" />
+              </svg>
+              <span className="ch-va-plane">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill={C.primary}>
+                  <path d="M21.4 2.6a1 1 0 0 0-1.1-.2L3.2 9.9c-.9.4-.8 1.7.1 2l5.6 1.9 2 5.8c.3.9 1.6.9 2-.1l7.7-16.8a1 1 0 0 0-.2-1.1zM10.6 13.9l7.2-7.5-4.4 8.9-1 2.9-1-2.9z"/>
+                </svg>
+              </span>
+            </span>
+            <span className="ch-va-text">查看全部目的地</span>
+            <svg className="ch-va-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <polyline points="9 18 15 12 9 6"/>
             </svg>
           </button>
@@ -393,7 +408,37 @@ export default function ClassicHome({
         @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         @keyframes dropIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
         .ch-dest-card:active { transform: scale(0.97); box-shadow: 0 1px 2px rgba(15,23,42,0.04); }
-        .ch-viewall:active { transform: scale(0.98); }
+        /* 無底框時少了「表面被壓下」的線索，按壓回饋改用縮放＋淡出雙重提示 */
+        .ch-viewall:active { transform: scale(0.97); opacity: 0.6; }
+
+        /* 「查看全部目的地」的小動畫。紙飛機沿航線起飛後回到原點循環，
+           文字與箭頭各自以不同節奏浮動，看起來像整塊在輕輕呼吸。 */
+        .ch-va-scene { position: relative; display: inline-block; width: 34px; height: 18px; flex-shrink: 0; }
+        .ch-va-trail { position: absolute; inset: 0; animation: vaTrail 2.4s linear infinite; }
+        .ch-va-plane {
+          position: absolute; left: 3px; bottom: 1px; display: inline-flex;
+          animation: vaFly 2.4s cubic-bezier(0.45,0,0.55,1) infinite;
+        }
+        .ch-va-text { animation: vaFloat 2.4s ease-in-out infinite; }
+        .ch-va-chevron { animation: vaNudge 2.4s ease-in-out infinite; flex-shrink: 0; }
+
+        /* 虛線往前流動，製造「航線延伸」感 */
+        @keyframes vaTrail { from { stroke-dashoffset: 0 } to { stroke-dashoffset: -12 } }
+        /* 沿著 Q 曲線的方向起飛：右上前進、機頭微抬，末段淡出回到起點 */
+        @keyframes vaFly {
+          0%   { transform: translate(0,0) rotate(0deg);        opacity: 1 }
+          55%  { transform: translate(17px,-9px) rotate(-10deg); opacity: 1 }
+          70%  { transform: translate(22px,-12px) rotate(-10deg); opacity: 0 }
+          71%  { transform: translate(0,0) rotate(0deg);        opacity: 0 }
+          100% { transform: translate(0,0) rotate(0deg);        opacity: 1 }
+        }
+        @keyframes vaFloat { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-2px) } }
+        @keyframes vaNudge { 0%,100% { transform: translateX(0) } 50% { transform: translateX(3px) } }
+
+        /* 使用者關閉動效時一律靜止（含入場的 fadeUp），只留可點擊的按壓回饋 */
+        @media (prefers-reduced-motion: reduce) {
+          .ch-va-trail, .ch-va-plane, .ch-va-text, .ch-va-chevron, .ch-viewall { animation: none !important; }
+        }
       `}</style>
     </div>
   )
