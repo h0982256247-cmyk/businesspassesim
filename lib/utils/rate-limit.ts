@@ -1,19 +1,18 @@
 import { prisma } from '@/lib/db/prisma'
 
 // DB-backed 固定視窗限流（serverless 跨實例有效；不需 Redis）。
-// 預設 fail-open：限流器自身出錯一律放行，絕不可因限流 bug 擋住正常付款/下單。
 // 視窗起點併入 bucket key，舊 bucket 由 cleanupRateLimits()（每日 cron）清掉，
 // 避免 rate_limits 無上限增長。
 //
-// opts.failClosed：限流本身就是安全機制的端點（後台登入防爆破）才開。這類端點
-// fail-open 等於「DB 一掛就沒有防護」；而 DB 不可用時登入驗證本來就無法成功，
-// 擋下請求不會造成額外損失，故改為擋。
-export async function checkRateLimit(
-  key: string,
-  limit: number,
-  windowSec: number,
-  opts: { failClosed?: boolean } = {},
-): Promise<boolean> {
+// ⚠ 一律 fail-open，且失敗必須留下 log —— 這條規則是踩過才寫下的：
+//   曾為了讓後台登入「DB 掛掉時也要有防護」而加 failClosed 選項，但當時 rate_limits
+//   表根本不存在（schema 從未定義），INSERT 每次都丟例外 → fail-closed 一律回擋
+//   → 後台永遠 429，管理員被自己的限流鎖在門外，且因為 catch 是空的、log 也沒有，
+//   完全查不出原因。
+//   結論：限流器壞掉時「擋下全部人」的自我 DoS，比「暫時失去防爆破」更嚴重——
+//   密碼仍需正確（bcrypt 12 rounds + 12 碼英數政策）。所以壞掉時放行，但要吵，
+//   讓它可被發現、可修，而不是安靜地把人鎖在外面。
+export async function checkRateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
   try {
     const windowStart = Math.floor(Date.now() / (windowSec * 1000)) * windowSec
     const bucket = `${key}:${windowStart}`
@@ -23,8 +22,14 @@ export async function checkRateLimit(
       ON CONFLICT (bucket) DO UPDATE SET count = rate_limits.count + 1
       RETURNING count`
     return (rows[0]?.count ?? 0) <= limit
-  } catch {
-    return !opts.failClosed // 預設 fail-open；failClosed 端點改為擋下
+  } catch (e) {
+    // 不可靜默吞錯（CLAUDE.md F）：限流器壞掉＝防護消失，必須看得到。
+    // key 只印前綴（admin-login:ip / pay 等），不印 IP／帳號等識別資料。
+    console.error('[rate-limit] 限流器失效，本次放行', {
+      scope: key.split(':')[0],
+      error: e instanceof Error ? e.message : String(e),
+    })
+    return true
   }
 }
 

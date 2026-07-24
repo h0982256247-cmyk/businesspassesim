@@ -7,7 +7,8 @@ import { checkRateLimit } from '@/lib/utils/rate-limit'
 //   per-IP   10 次 / 5 分鐘  —— 擋單一來源狂試
 //   per-帳號 20 次 / 15 分鐘 —— 擋分散式來源鎖定單一帳號。門檻刻意放寬，
 //                              避免被惡意打滿而把管理員自己鎖在門外。
-// 兩者皆 fail-closed（見 checkRateLimit 註解）。
+// 限流器自身失效時一律放行並記 log（見 checkRateLimit 註解：曾因 fail-closed
+// 加上 rate_limits 表不存在，導致後台永遠 429、管理員被鎖在門外）。
 const RATE = {
   ip:      { limit: 10, windowSec: 5 * 60 },
   account: { limit: 20, windowSec: 15 * 60 },
@@ -33,8 +34,8 @@ export async function POST(req: NextRequest) {
   const ip = clientIp(req)
   const account = String(email).trim().toLowerCase()
   const [ipOk, accountOk] = await Promise.all([
-    checkRateLimit(`admin-login:ip:${ip}`, RATE.ip.limit, RATE.ip.windowSec, { failClosed: true }),
-    checkRateLimit(`admin-login:acct:${account}`, RATE.account.limit, RATE.account.windowSec, { failClosed: true }),
+    checkRateLimit(`admin-login:ip:${ip}`, RATE.ip.limit, RATE.ip.windowSec),
+    checkRateLimit(`admin-login:acct:${account}`, RATE.account.limit, RATE.account.windowSec),
   ])
   if (!ipOk || !accountOk) {
     // 記到 Vercel log 供事後追查；不寫 system_alerts，避免持續攻擊灌爆告警表。

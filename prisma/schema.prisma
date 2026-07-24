@@ -463,3 +463,27 @@ model SystemAlert {
   @@index([resolvedAt, createdAt])
   @@map("system_alerts")
 }
+
+// ============================================================
+// 限流（lib/utils/rate-limit.ts）
+// ============================================================
+
+// DB-backed 固定視窗限流的計數表。
+//
+// ⚠ 這張表原本「只存在於 checkRateLimit 的 raw SQL 裡」，schema 從未定義過，
+//   線上實際上沒有這張表 → INSERT 一律丟例外。因為付款／下單的呼叫端是
+//   fail-open，例外被吞掉後靜默放行，所以限流其實從來沒有生效過、也沒人發現；
+//   直到後台登入改用 fail-closed 才爆出「永遠 429、管理員被鎖在門外」。
+//   補上 model 後才會真正被建立並運作。
+//
+// bucket 需為 unique：checkRateLimit 用 `ON CONFLICT (bucket) DO UPDATE`
+// 做原子累加，沒有 unique 約束時 Postgres 會直接報錯。
+// windowStart 供 cleanupRateLimits() 每日清理過期視窗用。
+model RateLimit {
+  bucket      String   @id
+  count       Int      @default(0)
+  windowStart DateTime @map("window_start")
+
+  @@index([windowStart])
+  @@map("rate_limits")
+}
