@@ -7,7 +7,7 @@ import { useLiff } from '@/components/liff/LiffProvider'
 import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
 import { useCachedData } from '@/hooks/useCachedData'
 import PageSkeleton from '@/components/liff/PageSkeleton'
-import { S } from '@/lib/liff/tokens'
+import { S, CARD } from '@/lib/liff/tokens'
 import { EmptyOrdersIllustration } from '@/components/liff/LiffIllustrations'
 import {
   deriveEsimStatus, groupOf,
@@ -556,12 +556,23 @@ function ActiveCard({ order, usage, primary, onClick }: {
   )
 }
 
+// 「待安裝」主要動作卡的表面：大圓角 + 品牌色淡邊 + 柔和浮起（讓卡片從 S.bg
+// 上浮起來，原本 7% 黑細邊幾乎看不見）。品牌色一律由呼叫端的 primary 帶入
+// （CLAUDE.md C：禁止寫死品牌色），故不放進只收中性值的 lib/liff/tokens.ts。
+// 歷史列刻意維持中性的 CARD.border，不跟主要動作卡搶視覺。
+const actionCardSurface = (primary: string) => ({
+  background: S.white,
+  border: `1.5px solid ${primary}28`,
+  borderRadius: 22,
+  boxShadow: `0 2px 8px ${primary}12, 0 10px 22px rgba(16,24,40,0.06)`,
+})
+
 function InstallableCard({ order, primary, primaryText, onClick }: { order: Order; primary: string; primaryText: string; onClick: () => void }) {
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
   return (
     <button onClick={onClick}
-      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: S.white, border: `1px solid ${S.line}`, borderRadius: 16, padding: '14px 16px', boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 6px 16px rgba(16,24,40,0.05)' }}>
+      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', ...actionCardSurface(primary), padding: '16px 18px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: `${primary}14`, color: primaryText, padding: '3px 8px', borderRadius: 100 }}>
@@ -589,7 +600,7 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
   const isReceived = order.receivedGift   // 收到的轉贈 → 不可再轉贈出去
 
   return (
-    <div style={{ background: S.white, border: `1px solid ${S.line}`, borderRadius: 16, padding: '14px', boxShadow: '0 1px 2px rgba(16,24,40,0.04), 0 6px 16px rgba(16,24,40,0.05)' }}>
+    <div style={{ ...actionCardSurface(primary), padding: '15px 16px' }}>
       <button onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: `${primary}14`, color: primaryText, padding: '3px 10px', borderRadius: 100 }}>
@@ -662,7 +673,7 @@ function CompactRow({ order, onClick }: { order: Order; onClick: () => void }) {
   const color = gifted ? '#6d28d9' : view.phase === 'failed' ? '#b91c1c' : view.phase === 'ended' ? '#15803d' : S.faint
   return (
     <button onClick={onClick}
-      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: S.white, border: `1px solid ${S.line}`, borderRadius: 12, padding: '12px 14px', opacity: 0.85 }}>
+      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: S.white, border: CARD.border, borderRadius: 16, padding: '12px 14px', opacity: 0.85 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <span style={{ fontSize: 11, fontWeight: 600, color }}>{label}</span>

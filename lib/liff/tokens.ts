@@ -19,5 +19,18 @@ export const S = {
   bg:    '#f9f9f9',            // 內頁畫布底色（首頁 hero 的 #EEEEF8 為刻意特色，不納入）
 } as const
 
+/** 中性卡片邊框：次要／已完成的列表卡用。
+ *
+ * S.line（7% 黑）當卡片外框在 S.bg 上幾乎看不見——白卡與底色只差 3% 亮度，
+ * 使用者回報「框格太不明顯」。故卡片另用這組較實的邊框，不動 S.line
+ * （它仍是分隔線／表單框的正確值，全站多處在用）。
+ *
+ * 需要吸睛的「主要動作卡」不用這個，改用品牌色淡邊（見 orders 頁的
+ * actionCardSurface）；品牌色不進本檔，本檔只收與租戶無關的中性值。
+ * 目前由「我的 eSIM」歷史列使用，其餘頁面逐頁遷移。 */
+export const CARD = {
+  border: '1px solid rgba(15,23,42,0.12)',
+} as const
+
 /** 全站字體堆疊。LINE webview：iOS 走 SF Pro、Android fallback 系統 sans-serif。 */
 export const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif'
