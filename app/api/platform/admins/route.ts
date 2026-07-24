@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
-import { getAllAdmins, createAdmin } from '@/lib/services/platform-admin'
+import { getAllAdmins, createAdmin, validateAdminPassword } from '@/lib/services/platform-admin'
 import { AdminRole } from '@prisma/client'
 
 // GET /api/platform/admins — 帳號列表（僅 SUPER_ADMIN）
@@ -30,6 +30,9 @@ export async function POST(req: NextRequest) {
   if (!email || !password || !name) {
     return NextResponse.json({ error: '必填欄位缺漏' }, { status: 400 })
   }
+
+  const pwError = validateAdminPassword(password)
+  if (pwError) return NextResponse.json({ error: pwError }, { status: 400 })
 
   try {
     const admin = await createAdmin({ email, password, name, createdById: auth.adminId })

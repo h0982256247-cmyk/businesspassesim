@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
-import { toggleAdminActive, updateAdminPassword } from '@/lib/services/platform-admin'
+import { toggleAdminActive, updateAdminPassword, validateAdminPassword } from '@/lib/services/platform-admin'
 import { AdminRole } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
 
@@ -43,6 +43,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   if (body.newPassword) {
+    const pwError = validateAdminPassword(body.newPassword)
+    if (pwError) return NextResponse.json({ error: pwError }, { status: 400 })
     await updateAdminPassword(id, body.newPassword)
     return NextResponse.json({ ok: true })
   }

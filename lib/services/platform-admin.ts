@@ -20,6 +20,23 @@ export async function verifyAdminCredentials(email: string, password: string) {
   return { id: admin.id, email: admin.email, name: admin.name, role: admin.role }
 }
 
+// ─── 密碼政策 ─────────────────────────────────────────────────────
+// 後台帳號即最高權限（只有 SUPER_ADMIN 一種角色），且 /platform/login 對外開放，
+// 故門檻高於一般會員。建立／修改密碼共用這支，避免兩處規則走鐘。
+export const ADMIN_PASSWORD_MIN_LENGTH = 12
+
+// 通過回 null，否則回可直接顯示給使用者的錯誤訊息。
+export function validateAdminPassword(password: unknown): string | null {
+  if (typeof password !== 'string') return '密碼格式不正確'
+  if (password.length < ADMIN_PASSWORD_MIN_LENGTH) {
+    return `密碼至少需 ${ADMIN_PASSWORD_MIN_LENGTH} 碼`
+  }
+  if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) {
+    return '密碼需同時包含英文字母與數字'
+  }
+  return null
+}
+
 // ─── 建立後台帳號（Super Admin）──────────────────────────────────
 // 企業管理員不是後台帳號，改由 Super Admin 指派 LINE User（Group.adminUserId），在 LIFF 操作。
 
