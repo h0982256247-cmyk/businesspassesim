@@ -114,3 +114,15 @@
 - 核心冪等守門 ✅
 - cron fail-closed ✅
 - 退款回沖單一來源 ✅
+
+## 已知並接受的風險（評估過，刻意不修）
+- **`npm audit` 對 `xlsx` 的 2 條 high 是雜訊，不必再評估一次**：SheetJS 已停止
+  發佈到 npm registry，npm 上的最新版就是有漏洞的 `0.18.5`（`fixAvailable: false`）。
+  官方修補版只在 `cdn.sheetjs.com` 提供，改裝它會讓 CI 與每次 Vercel build 都
+  依賴該站可用性，且非 registry 來源 npm audit / Dependabot 盯不到 —— 用趨近於零
+  的風險換真實的營運風險，不划算。
+  可達性評估：唯一使用處 `/api/admin/products/import` 需 SUPER_ADMIN 已登入，
+  該角色本來就能改金流設定、匯入任意商品；且該處用 `sheet_to_json({ header: 1 })`
+  取回陣列（非以表頭當 key 的物件），原型污染的主要路徑走不到。ReDoS 由
+  `maxDuration = 60` 與 5MB 上傳上限收斂。
+  **若哪天 SheetJS 回到 npm registry，就直接升版、刪掉本條。**
