@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
+import { encryptEsimFields } from '@/lib/utils/esim-crypto'
 import { notifyEsimReady } from '@/lib/services/notification'
 import { OrderStatus } from '@prisma/client'
 
@@ -66,7 +67,9 @@ export async function POST(req: NextRequest) {
 
   await prisma.order.update({
     where: { id: order.id },
-    data: {
+    // 憑證欄位加密後才落地（單一來源見 lib/utils/esim-crypto）；
+    // esimCfCode / esimApnExplain 非憑證，維持明文。
+    data: encryptEsimFields({
       esimQrcode:     body.qrcode        as string | undefined,
       esimLpa:        body.qrcodeContent as string | undefined,
       esimIccid:      body.iccid         as string | undefined,
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
       esimPuk2:       body.puk2          as string | undefined,
       esimCfCode:     body.cfCode        as string | undefined,
       esimApnExplain: body.apnExplain    as string | undefined,
-    },
+    }),
   })
 
   // 推 LINE 通知：QR 可以用了

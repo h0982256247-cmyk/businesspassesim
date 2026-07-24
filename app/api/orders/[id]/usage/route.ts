@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireLiffAuth } from '@/lib/auth/liff'
 import { queryEsimUsage } from '@/lib/services/esim'
 import { getOrderForOwner } from '@/lib/services/order'
+import { safeDecrypt } from '@/lib/utils/crypto'
 
 // GET /api/orders/:id/usage — 查詢 eSIM 剩餘流量（即時向世界移動查詢）
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (order.status !== 'COMPLETED') return NextResponse.json({ error: 'eSIM 尚未啟動' }, { status: 400 })
   if (!order.esimIccid) return NextResponse.json({ error: '無 ICCID 資料' }, { status: 400 })
 
-  const usage = await queryEsimUsage(order.esimIccid)
+  // ICCID 在 DB 為密文，要送去世界移動查詢前需解密（safeDecrypt 相容舊明文）
+  const usage = await queryEsimUsage(safeDecrypt(order.esimIccid))
 
   if (!usage) return NextResponse.json({ error: '無法取得用量資料' }, { status: 502 })
 
