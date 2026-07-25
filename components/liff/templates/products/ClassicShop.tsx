@@ -69,7 +69,7 @@ function CrownIcon({ size = 12 }: { size?: number }) {
 export default function ClassicShop({
   countries, products, allProducts, coverageCountries, selectedCountry,
   colors: C, onSelectCountry, onSelectProduct, onBack,
-  filter, cart,
+  filter, cart, shopHeroUrl,
 }: ProductsTemplateProps) {
   // Hooks 一律在任何 early return 之前呼叫（react-hooks/rules-of-hooks）
   const displays = useMemo(() => sortByValue(annotatePlans(products)), [products])
@@ -96,7 +96,10 @@ export default function ClassicShop({
           <div style={{
             position: 'relative', overflow: 'hidden',
             borderRadius: 24, padding: '24px 22px 26px',
-            background: `linear-gradient(135deg, ${C.primaryText} 0%, ${C.primary} 100%)`,
+            // 有後台上傳頂圖：品牌色漸層(帶透明)疊在照片上，白字仍可讀；沒有則沿用純品牌漸層。
+            background: shopHeroUrl
+              ? `linear-gradient(135deg, ${C.primaryText}e6 0%, ${C.primary}b3 100%), url(${shopHeroUrl}) center/cover`
+              : `linear-gradient(135deg, ${C.primaryText} 0%, ${C.primary} 100%)`,
             boxShadow: `0 12px 28px ${C.border}`,
             border: `1px solid ${C.border}`,
           }}>
@@ -157,7 +160,7 @@ export default function ClassicShop({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
             {shownCountries.map((c) => {
               const { accent } = getAccent(c.countryCode)
-              const img = resolveDestImage(c.countryCode, c.countryNameZh)
+              const img = c.imageUrl ?? resolveDestImage(c.countryCode, c.countryNameZh)
               return (
                 <button
                   key={c.countryCode}

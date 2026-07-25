@@ -6,6 +6,7 @@ export interface HomeCountry {
   countryNameEn: string
   countryFlag: string | null
   minPrice: number | null
+  imageUrl?: string | null // 後台上傳的國家圖（覆寫內建預設）；空＝退回 dest-image.ts
 }
 
 // 主頁搜尋的「適用國家」聯集用：每個方案的所屬國 + 適用國家字串。

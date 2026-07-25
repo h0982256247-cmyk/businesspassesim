@@ -16,6 +16,8 @@ async function brand(): Promise<TenantConfig> {
     primaryColor: s.primaryColor || process.env.NEXT_PUBLIC_BRAND_COLOR || null,
     lineOaUrl: s.lineOaUrl || process.env.NEXT_PUBLIC_LINE_OA_URL || null,
     transferEnabled: s.transferEnabled,
+    homeHeroUrl: s.homeHeroUrl,
+    shopHeroUrl: s.shopHeroUrl,
   }
 }
 

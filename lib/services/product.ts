@@ -60,22 +60,32 @@ export async function getProductById(id: string) {
   })
 }
 
+// 國家圖片後台覆寫：code（＝Product.countryCode 原樣）→ Storage 公開網址。
+// 前台熱門目的地卡與商城國家卡共用；沒覆寫的國家在前端退回 dest-image.ts 內建預設。
+export async function getDestinationImageMap(): Promise<Map<string, string>> {
+  const rows = await prisma.destinationImage.findMany({ select: { code: true, imageUrl: true } })
+  return new Map(rows.map(r => [r.code, r.imageUrl]))
+}
+
 export async function getAvailableCountries() {
-  const products = await prisma.product.findMany({
-    where: {
-      status: ProductStatus.ACTIVE,
-      supplierProduct: { status: SupplierProductStatus.ACTIVE },
-    },
-    select: {
-      countryCode: true,
-      countryNameZh: true,
-      countryNameEn: true,
-      countryFlag: true,
-    },
-    distinct: ['countryCode'],
-    orderBy: { sortOrder: 'asc' },
-  })
-  return products
+  const [products, imgMap] = await Promise.all([
+    prisma.product.findMany({
+      where: {
+        status: ProductStatus.ACTIVE,
+        supplierProduct: { status: SupplierProductStatus.ACTIVE },
+      },
+      select: {
+        countryCode: true,
+        countryNameZh: true,
+        countryNameEn: true,
+        countryFlag: true,
+      },
+      distinct: ['countryCode'],
+      orderBy: { sortOrder: 'asc' },
+    }),
+    getDestinationImageMap(),
+  ])
+  return products.map(p => ({ ...p, imageUrl: imgMap.get(p.countryCode) ?? null }))
 }
 
 // 主頁「熱門目的地」專用：只回國家清單 + 各國最低售價（約數十筆），不撈全部商品。
@@ -85,7 +95,7 @@ export async function getCountriesWithMinPrice() {
     status: ProductStatus.ACTIVE,
     supplierProduct: { status: SupplierProductStatus.ACTIVE },
   }
-  const [countries, mins] = await Promise.all([
+  const [countries, mins, imgMap] = await Promise.all([
     prisma.product.findMany({
       where,
       select: { countryCode: true, countryNameZh: true, countryNameEn: true, countryFlag: true },
@@ -97,9 +107,10 @@ export async function getCountriesWithMinPrice() {
       where,
       _min: { sellPrice: true },
     }),
+    getDestinationImageMap(),
   ])
   const minMap = new Map(mins.map(m => [m.countryCode, m._min.sellPrice]))
-  return countries.map(c => ({ ...c, minPrice: minMap.get(c.countryCode) ?? null }))
+  return countries.map(c => ({ ...c, minPrice: minMap.get(c.countryCode) ?? null, imageUrl: imgMap.get(c.countryCode) ?? null }))
 }
 
 // ─── Admin operations ────────────────────────────────────────────

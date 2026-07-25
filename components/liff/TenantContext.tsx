@@ -11,6 +11,8 @@ export interface TenantConfig {
   primaryColor: string | null
   lineOaUrl: string | null   // LINE 官方帳號／客服連結（後台設定；前台客服按鈕導向）
   transferEnabled: boolean   // 是否開放 eSIM 轉贈（後台開關）
+  homeHeroUrl: string | null // 主頁首圖（後台上傳；空＝內建預設圖）
+  shopHeroUrl: string | null // 商城頂端圖（後台上傳；空＝預設漸層）
 }
 
 const TenantContext = createContext<TenantConfig | null>(null)
