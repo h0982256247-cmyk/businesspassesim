@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminCredentials } from '@/lib/services/platform-admin'
-import { createPlatformSession, PLATFORM_COOKIE } from '@/lib/auth/platform'
+import { createPlatformSession, PLATFORM_COOKIE, PLATFORM_SESSION_TTL } from '@/lib/auth/platform'
 import { checkRateLimit } from '@/lib/utils/rate-limit'
 
 // 後台登入是對外開放的最高權限入口，必須擋暴力破解。兩層 bucket：
@@ -23,7 +23,10 @@ function clientIp(req: NextRequest): string {
 
 // POST /api/platform/auth/login
 export async function POST(req: NextRequest) {
-  const { email, password, rememberMe } = await req.json()
+  // req.json() 對空 body／壞 JSON 會丟例外——兜住回 400，不讓它變成難看的 500
+  // （其他登入路由同作法）。
+  const body = await req.json().catch(() => null)
+  const { email, password, rememberMe } = body ?? {}
 
   if (!email || !password) {
     return NextResponse.json({ error: '帳號與密碼必填' }, { status: 400 })
@@ -56,10 +59,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: '帳號或密碼錯誤' }, { status: 401 })
   }
 
+  // 單一 ttl 同時決定 JWT 到期與 cookie maxAge，兩者不再各自寫死（見先前「記住我」bug）。
+  const ttlSec = rememberMe ? PLATFORM_SESSION_TTL.remember : PLATFORM_SESSION_TTL.default
   const token = await createPlatformSession({
     adminId: admin.id,
     role: admin.role,
-  })
+  }, ttlSec)
 
   const res = NextResponse.json({
     admin: { id: admin.id, name: admin.name, email: admin.email, role: admin.role },
@@ -69,7 +74,7 @@ export async function POST(req: NextRequest) {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: rememberMe ? 30 * 24 * 60 * 60 : 8 * 60 * 60,  // 30天 或 8小時
+    maxAge: ttlSec,   // 勾記住我 7 天、否則 8 小時（與 JWT 同一來源）
     path: '/',
   })
 

@@ -14,11 +14,20 @@ function getSecret() {
   return new TextEncoder().encode(secret)
 }
 
-export async function createPlatformSession(payload: PlatformSessionPayload): Promise<string> {
+// 後台 session 效期（秒）。呼叫端用同一個值同時設 JWT 與 cookie，兩者不可各自寫死——
+// 曾發生 cookie 30 天但 JWT 寫死 8h，「記住我 30 天」實際 8h 就登出。
+export const PLATFORM_SESSION_TTL = {
+  default:  8 * 60 * 60,          // 未勾記住我：8 小時
+  remember: 7 * 24 * 60 * 60,     // 勾記住我：7 天
+} as const
+
+// ttlSec 同時決定 JWT 到期與（由呼叫端）cookie maxAge，避免兩者漂移。
+export async function createPlatformSession(payload: PlatformSessionPayload, ttlSec: number): Promise<string> {
+  const nowSec = Math.floor(Date.now() / 1000)
   return new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime('8h')
+    .setIssuedAt(nowSec)
+    .setExpirationTime(nowSec + ttlSec)
     .sign(getSecret())
 }
 
