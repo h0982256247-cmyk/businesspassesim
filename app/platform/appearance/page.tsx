@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/platform/Toast'
+import { APPEARANCE } from '@/lib/utils/appearance'
 
 // 前端把圖縮到最長邊 maxEdge、輸出 JPEG Blob 再上傳（避開 Vercel body 上限、上傳更快）。
 function resizeToBlob(file: File, maxEdge: number, quality = 0.82): Promise<Blob> {
@@ -124,24 +125,24 @@ export default function AppearancePage() {
           <div className="grid md:grid-cols-2 gap-5">
             <HeroCard
               title="主頁首圖"
-              sizeLabel="1600 × 900"
+              sizeLabel={APPEARANCE.home.label}
               note="文字疊在左側，主體請靠右"
-              ratio={16 / 9}
+              ratio={APPEARANCE.home.ratio}
               currentUrl={homeHeroUrl ?? defaultHomeHeroUrl}
               isCustom={!!homeHeroUrl}
               busy={!!busy.home}
-              onPick={f => doUpload('home', f, 1600)}
+              onPick={f => doUpload('home', f, APPEARANCE.home.maxEdge)}
               onRemove={homeHeroUrl ? () => doRemove('home') : undefined}
             />
             <HeroCard
               title="商城頂端圖"
-              sizeLabel="1600 × 900"
-              note="未設圖時顯示品牌漸層底"
-              ratio={16 / 9}
+              sizeLabel={APPEARANCE.shop.label}
+              note="未設圖時顯示品牌漸層底；主體請置中"
+              ratio={APPEARANCE.shop.ratio}
               currentUrl={shopHeroUrl}
               isCustom={!!shopHeroUrl}
               busy={!!busy.shop}
-              onPick={f => doUpload('shop', f, 1600)}
+              onPick={f => doUpload('shop', f, APPEARANCE.shop.maxEdge)}
               onRemove={shopHeroUrl ? () => doRemove('shop') : undefined}
             />
           </div>
@@ -150,7 +151,7 @@ export default function AppearancePage() {
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="font-semibold text-gray-800">國家圖片</h2>
-                <SizePill label="800 × 600" />
+                <SizePill label={APPEARANCE.dest.label} />
                 <span className="text-xs text-gray-400">{countries.length} 國 · 已自訂 {customCount}</span>
               </div>
               <input
@@ -170,7 +171,7 @@ export default function AppearancePage() {
                     key={c.code}
                     c={c}
                     busy={!!busy[`dest:${c.code}`]}
-                    onPick={f => doUpload('dest', f, 1000, c.code)}
+                    onPick={f => doUpload('dest', f, APPEARANCE.dest.maxEdge, c.code)}
                     onRemove={c.imageUrl ? () => doRemove('dest', c.code) : undefined}
                   />
                 ))}
@@ -260,7 +261,7 @@ function CountryCell({
     : { t: '色塊', cls: 'bg-amber-50 text-amber-600' }
   return (
     <div className="border border-gray-100 rounded-xl p-3 flex gap-3">
-      <div className="w-16 h-12 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
+      <div className="w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
         {effective
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={effective} alt={c.nameZh} className="w-full h-full object-cover" />

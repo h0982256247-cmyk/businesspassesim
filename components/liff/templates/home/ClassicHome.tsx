@@ -7,6 +7,7 @@ import { IconMyEsim, IconGuide, IconDataPlan, IconDevices } from './HomeIcons'
 import FilterDropdown from './FilterDropdown'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { resolveDestImage, DEFAULT_HOME_HERO_URL } from '@/lib/utils/dest-image'
+import { APPEARANCE } from '@/lib/utils/appearance'
 import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { HomePageProps } from './types'
 
@@ -301,7 +302,7 @@ export default function ClassicHome({
                   style={{
                     position: 'relative', borderRadius: 20, overflow: 'hidden',
                     border: 'none', cursor: 'pointer',
-                    padding: 0, textAlign: 'left', minHeight: 172, display: 'block',
+                    padding: 0, textAlign: 'left', aspectRatio: String(APPEARANCE.dest.ratio), display: 'block',
                     animation: `fadeUp 0.4s ${0.1 + i * 0.04}s ease both`,
                     boxShadow: '0 1px 2px rgba(15,23,42,0.06), 0 12px 26px rgba(15,23,42,0.12)',
                     WebkitTapHighlightColor: 'transparent',

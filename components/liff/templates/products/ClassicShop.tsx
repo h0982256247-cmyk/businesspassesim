@@ -7,6 +7,7 @@ import DayPicker from '@/components/liff/DayPicker'
 import { annotatePlans, sortByValue, TIER_COLOR } from '@/lib/utils/product-display'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
 import { resolveDestImage } from '@/lib/utils/dest-image'
+import { APPEARANCE } from '@/lib/utils/appearance'
 import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { ProductsTemplateProps } from './types'
 
@@ -96,6 +97,9 @@ export default function ClassicShop({
           <div style={{
             position: 'relative', overflow: 'hidden',
             borderRadius: 24, padding: '24px 22px 26px',
+            // 頂圖固定 16:9（與後台建議一致）；文字短、垂直置中，照片好好顯示而非薄薄一條。
+            aspectRatio: String(APPEARANCE.shop.ratio), boxSizing: 'border-box',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
             // 有後台上傳頂圖：品牌色漸層(帶透明)疊在照片上，白字仍可讀；沒有則沿用純品牌漸層。
             background: shopHeroUrl
               ? `linear-gradient(135deg, ${C.primaryText}e6 0%, ${C.primary}b3 100%), url(${shopHeroUrl}) center/cover`
@@ -174,7 +178,7 @@ export default function ClassicShop({
                     WebkitTapHighlightColor: 'transparent',
                     touchAction: 'manipulation',
                     transition: 'transform 0.12s ease, box-shadow 0.18s ease',
-                    minHeight: 168,
+                    aspectRatio: String(APPEARANCE.dest.ratio),
                     display: 'block',
                   }}
                 >
