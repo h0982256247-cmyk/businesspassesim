@@ -6,7 +6,7 @@ import { BeeLogoSVG } from '@/components/liff/LiffIllustrations'
 import { IconMyEsim, IconGuide, IconDataPlan, IconDevices } from './HomeIcons'
 import FilterDropdown from './FilterDropdown'
 import { CountryFlag } from '@/components/common/CountryFlag'
-import { resolveDestImage } from '@/lib/utils/dest-image'
+import { resolveDestImage, DEFAULT_HOME_HERO_URL } from '@/lib/utils/dest-image'
 import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { HomePageProps } from './types'
 
@@ -203,7 +203,7 @@ export default function ClassicHome({
         <div style={{
           borderRadius: 28, padding: '28px 22px',
           position: 'relative', overflow: 'hidden', minHeight: 180,
-          backgroundImage: 'url(https://images.pexels.com/photos/3042418/pexels-photo-3042418.jpeg?auto=compress&cs=tinysrgb&w=1000)',
+          backgroundImage: `url(${tenant?.homeHeroUrl || DEFAULT_HOME_HERO_URL})`,
           backgroundSize: 'cover', backgroundPosition: 'center 40%',
           boxShadow: `0 14px 30px ${C.primary}30`,
           border: `2px solid ${C.primary}2e`,
@@ -293,7 +293,7 @@ export default function ClassicHome({
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {hot.map((c, i) => {
               const { accent } = getAccent(c.countryCode)
-              const img = resolveDestImage(c.countryCode, c.countryNameZh)
+              const img = c.imageUrl ?? resolveDestImage(c.countryCode, c.countryNameZh)
               const isHot = i < 2
               return (
                 <button key={c.countryCode} onClick={() => onSelectCountry(c.countryCode)}

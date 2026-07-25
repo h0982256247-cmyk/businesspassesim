@@ -5,6 +5,7 @@ export interface Country {
   countryNameZh: string
   countryNameEn: string
   countryFlag: string | null
+  imageUrl?: string | null // 後台上傳的國家圖（覆寫內建預設）；空＝退回 dest-image.ts
 }
 
 export interface Product {
@@ -68,6 +69,7 @@ export interface ProductsTemplateProps {
   showSetup: boolean
   colors: TenantColors
   logoUrl: string | null
+  shopHeroUrl?: string | null // 商城頂端圖（後台上傳；空＝品牌漸層底）
   onSelectCountry: (code: string) => void
   onSelectProduct: (id: string) => void
   onDismissSetup: () => void

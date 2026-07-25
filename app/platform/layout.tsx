@@ -53,6 +53,17 @@ const NAV_ALL = [
     ),
   },
   {
+    href: '/platform/appearance',
+    label: '前台外觀',
+    group: '商品與前台',    icon: (
+      <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 15l-5-5L5 21" />
+      </svg>
+    ),
+  },
+  {
     href: '/platform/orders',
     label: '訂單管理',
     group: '營運',    icon: (

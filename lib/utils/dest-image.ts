@@ -5,6 +5,10 @@
 export const pexels = (id: number) =>
   `https://images.pexels.com/photos/${id}/pexels-photo-${id}.jpeg?auto=compress&cs=tinysrgb&w=800`
 
+// 主頁首圖預設（後台未上傳 homeHeroUrl 時沿用；與 ClassicHome 原寫死值一致）。
+export const DEFAULT_HOME_HERO_URL =
+  'https://images.pexels.com/photos/3042418/pexels-photo-3042418.jpeg?auto=compress&cs=tinysrgb&w=1000'
+
 export const DEST_IMAGES: Record<string, string> = {
   // ── 亞洲 ──
   JP: pexels(4336279),  JPN: pexels(4336279),

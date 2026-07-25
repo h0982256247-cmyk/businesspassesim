@@ -359,9 +359,22 @@ model PlatformSetting {
   domain            String?  // 自訂網域（純 host，如 esim.example.com）
   // 功能開關
   transferEnabled   Boolean  @default(false) @map("transfer_enabled") // 是否開放 eSIM 轉贈給好友
+  // 前台版面圖片（存 Supabase Storage 公開網址，非 base64；避免拖慢「每次開前台都讀」的設定）
+  homeHeroUrl       String?  @map("home_hero_url") // 主頁首圖；空＝用內建預設圖
+  shopHeroUrl       String?  @map("shop_hero_url") // 商城頂端圖；空＝用預設漸層
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("platform_settings")
+}
+
+// 目的地圖片後台覆寫：key = 商品的 countryCode（與 Product.countryCode 完全一致，含自訂區域碼）。
+// 有值時取代 lib/utils/dest-image.ts 的內建預設圖；主頁熱門目的地卡與商城國家卡共用。
+model DestinationImage {
+  code      String   @id // 對應 Product.countryCode（大小寫原樣）
+  imageUrl  String   @map("image_url") // Supabase Storage 公開網址
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("destination_images")
 }
 
 // 世界移動 eSIM 設定（單列；token 加密儲存）
