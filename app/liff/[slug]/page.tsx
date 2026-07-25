@@ -9,7 +9,7 @@ import SetupModal from '@/components/liff/SetupModal'
 import { BeeLogoSVG } from '@/components/liff/LiffIllustrations'
 import { hasSeenSplash, markSplashSeen } from '@/lib/utils/splash'
 import { setCache, productsCacheKey } from '@/hooks/useCachedData'
-import type { HomeCountry } from '@/components/liff/templates/home/types'
+import type { HomeCountry, HomeCoverage } from '@/components/liff/templates/home/types'
 
 // 主頁熱門目的地的本機快取：一開就用上次存的清單瞬間顯示，再背景抓 /api/countries 更新。
 // 以 slug 分租戶（避免切品牌看到別家）；國家清單是公開資料、非個資，故不綁 LINE 使用者。
@@ -59,6 +59,8 @@ export default function LiffHomePage() {
   // ── 資料抓取 ──
   // lazy initializer 同步讀本機快取 → 回訪時熱門目的地「一開就顯示」，不必等網路
   const [countries, setCountries] = useState<HomeCountry[]>(() => readCachedHomeCountries(slug))
+  // 搜尋的「適用國家」聯集來源：從背景預抓的全量商品導出（只留搜尋要用的兩個欄位）。
+  const [coverage, setCoverage] = useState<HomeCoverage[]>([])
   const [showSetup, setShowSetup] = useState(false)
 
   useEffect(() => {
@@ -78,8 +80,13 @@ export default function LiffHomePage() {
       })
       .catch(() => {})
     // 背景預熱商品頁 cache（全量），不阻塞熱門目的地；products 頁掛載時可直接吃這份。
+    // 同一份資料順手導出搜尋用的「適用國家」聯集來源（只留 code + 適用國家字串）。
     fetch('/api/products').then(r => r.json())
-      .then(data => setCache(productsCacheKey(), data))
+      .then(data => {
+        setCache(productsCacheKey(), data)
+        const products: Array<{ countryCode: string; coverageCountries: string | null }> = data.products ?? []
+        setCoverage(products.map(p => ({ countryCode: p.countryCode, coverageCountries: p.coverageCountries ?? null })))
+      })
       .catch(() => {})
   }, [isReady])
 
@@ -161,6 +168,7 @@ export default function LiffHomePage() {
           tenant={tenant}
           slug={slug}
           countries={countries}
+          coverage={coverage}
           colors={C}
           showSetup={showSetup}
           onDismissSetup={() => setShowSetup(false)}

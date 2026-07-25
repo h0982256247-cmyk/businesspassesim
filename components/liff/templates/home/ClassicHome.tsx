@@ -7,6 +7,7 @@ import { IconMyEsim, IconGuide, IconDataPlan, IconDevices } from './HomeIcons'
 import FilterDropdown from './FilterDropdown'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { resolveDestImage } from '@/lib/utils/dest-image'
+import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { HomePageProps } from './types'
 
 const QUICK_ACTIONS = [
@@ -36,7 +37,7 @@ function getAccent(code: string) {
 }
 
 export default function ClassicHome({
-  tenant, countries, colors: C, onSelectCountry, onNavigate, onSearch,
+  tenant, countries, coverage, colors: C, onSelectCountry, onNavigate, onSearch,
 }: HomePageProps) {
   const [query, setQuery]       = useState('')
   const [selDays, setSelDays]   = useState<string | null>(null)
@@ -46,10 +47,10 @@ export default function ClassicHome({
   const [searchOpen, setSearchOpen] = useState(true)   // 預設展開搜尋面板
   const brandName = tenant?.brandName ?? 'eSIM'
 
+  // 與商城搜尋同一套規則（filterCountriesByQuery 單一來源）：國名（中/英）＋適用國家
+  // 聯集，「打日出日本」、打香港連中港澳一起出現。coverage 尚未回來時退化成純國名比對。
   const filtered = query.trim()
-    ? countries.filter(c =>
-        c.countryNameZh.includes(query) ||
-        c.countryNameEn.toLowerCase().includes(query.toLowerCase()))
+    ? filterCountriesByQuery(countries, query, coverage)
     : []
   // 熱門目的地：韓國、日本固定置頂兩格（HOT），其餘照原順序補滿 6 格。
   const HOT_PINNED = ['KR', 'JP']
