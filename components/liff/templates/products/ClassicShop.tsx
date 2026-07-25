@@ -7,6 +7,7 @@ import DayPicker from '@/components/liff/DayPicker'
 import { annotatePlans, sortByValue, TIER_COLOR } from '@/lib/utils/product-display'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
 import { resolveDestImage } from '@/lib/utils/dest-image'
+import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { ProductsTemplateProps } from './types'
 
 const S = {
@@ -77,24 +78,13 @@ export default function ClassicShop({
   const coverageList = useMemo(() => getCoverageList(coverageCountries), [coverageCountries])
 
   // 底部浮動搜尋列（國家清單畫面）：打字即篩選上方的國家卡格，不跳頁。
-  // 「國名（中/英）命中」與「方案適用國家字串命中」取聯集——
-  // 打「香港」時，香港本身與涵蓋香港的中港澳等目的地都要出現。
+  // 比對規則走共用單一來源 filterCountriesByQuery（主頁搜尋同一支）。
+  // 掃全量方案（allProducts）：products 已被預設天數篩過，會漏掉沒有該天數方案的目的地。
   const [searchQ, setSearchQ] = useState('')
-  const shownCountries = useMemo(() => {
-    // 去掉注音符號與聲調（IME 組字中的「ㄖ」「ㄖˋ」等 marked text），
-    // 避免選字前整格被誤判成「找不到」；選完字（如「日」）立即比對。
-    const q = searchQ.replace(/[ㄅ-ㄯㆠ-ㆿˊˇˋ˙]/g, '').trim().toLowerCase()
-    if (!q) return countries
-    // 掃全量方案（allProducts）：products 已被預設天數篩過，會漏掉沒有該天數方案的目的地
-    const byCoverage = new Set<string>()
-    ;(allProducts ?? products).forEach(p => {
-      if (p.coverageCountries?.toLowerCase().includes(q)) byCoverage.add(p.countryCode)
-    })
-    return countries.filter(c =>
-      c.countryNameZh.toLowerCase().includes(q) ||
-      c.countryNameEn.toLowerCase().includes(q) ||
-      byCoverage.has(c.countryCode))
-  }, [searchQ, countries, products, allProducts])
+  const shownCountries = useMemo(
+    () => filterCountriesByQuery(countries, searchQ, allProducts ?? products),
+    [searchQ, countries, products, allProducts],
+  )
 
   // Country selection screen — 機票/登機證主視覺
   if (!selectedCountry) {
