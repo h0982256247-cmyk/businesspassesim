@@ -73,7 +73,7 @@ export default function PlatformLoginPage() {
               className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
             />
             <label htmlFor="rememberMe" className="text-sm text-gray-600 cursor-pointer select-none">
-              記住我（30 天免登入）
+              記住我（7 天免登入）
             </label>
           </div>
 
