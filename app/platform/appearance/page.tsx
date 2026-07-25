@@ -135,9 +135,9 @@ export default function AppearancePage() {
             />
             <HeroCard
               title="商城頂端圖"
-              sizeLabel="1600 × 800"
+              sizeLabel="1600 × 900"
               note="未設圖時顯示品牌漸層底"
-              ratio={2}
+              ratio={16 / 9}
               currentUrl={shopHeroUrl}
               isCustom={!!shopHeroUrl}
               busy={!!busy.shop}
