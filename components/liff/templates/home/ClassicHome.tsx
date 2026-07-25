@@ -202,35 +202,40 @@ export default function ClassicHome({
       {/* ── Hero Banner ── */}
       <div style={{ padding: '18px 20px 0' }}>
         <div style={{
-          borderRadius: 28, padding: '28px 22px',
-          position: 'relative', overflow: 'hidden', minHeight: 180,
+          borderRadius: 28,
+          position: 'relative', overflow: 'hidden',
+          aspectRatio: String(APPEARANCE.home.ratio), boxSizing: 'border-box',
           backgroundImage: `url(${tenant?.homeHeroUrl || DEFAULT_HOME_HERO_URL})`,
           backgroundSize: 'cover', backgroundPosition: 'center 40%',
           boxShadow: `0 14px 30px ${C.primary}30`,
           border: `2px solid ${C.primary}2e`,
         }}>
-          {/* 中性深色 scrim：文字側壓暗保可讀、右側讓照片原色透出（不再用品牌色染滿整張圖） */}
+          {/* 左側壓暗 scrim：右側讓照片透出、左側保白字可讀 */}
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(105deg, rgba(17,20,30,0.60) 0%, rgba(17,20,30,0.30) 48%, rgba(17,20,30,0) 100%)',
-            borderRadius: 26,
+            background: 'linear-gradient(100deg, rgba(15,18,28,0.68) 0%, rgba(15,18,28,0.34) 52%, rgba(15,18,28,0) 100%)',
           }}/>
 
-          <div style={{ position: 'relative', zIndex: 1, maxWidth: '65%' }}>
+          {/* 內容絕對填滿、垂直置中；字級用 clamp 隨版位寬度縮放，確保 16:9 內不裁到、又清晰 */}
+          <div style={{
+            position: 'absolute', inset: 0, zIndex: 1,
+            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-start',
+            padding: 'clamp(16px, 5vw, 26px)', maxWidth: '72%',
+          }}>
             <div style={{
               display: 'inline-block', background: 'rgba(255,255,255,0.2)',
-              borderRadius: 8, padding: '3px 10px', marginBottom: 10,
+              borderRadius: 8, padding: '2px 9px', marginBottom: 'clamp(5px, 1.6vw, 10px)',
               border: '1px solid rgba(255,255,255,0.3)',
             }}>
-              <p style={{ fontSize: 10, fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '0.14em', textTransform: 'uppercase' }}>出發前必備</p>
+              <p style={{ fontSize: 'clamp(8px, 2.5vw, 11px)', fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '0.14em', textTransform: 'uppercase' }}>出發前必備</p>
             </div>
-            <h2 style={{ fontSize: 27, fontWeight: 900, color: '#fff', margin: '0 0 8px', lineHeight: 1.1, letterSpacing: '-0.025em', textShadow: '0 2px 8px rgba(0,0,0,0.25)' }}>探索世界，<br/>隨時在線</h2>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)', margin: '0 0 18px', lineHeight: 1.4, textShadow: '0 1px 4px rgba(0,0,0,0.2)' }}>最便宜的旅遊 eSIM 方案</p>
+            <h2 style={{ fontSize: 'clamp(19px, 6vw, 28px)', fontWeight: 900, color: '#fff', margin: '0 0 clamp(4px, 1.4vw, 8px)', lineHeight: 1.12, letterSpacing: '-0.025em', textShadow: '0 2px 10px rgba(0,0,0,0.35)' }}>探索世界，<br/>隨時在線</h2>
+            <p style={{ fontSize: 'clamp(11px, 3vw, 14px)', color: 'rgba(255,255,255,0.9)', margin: '0 0 clamp(8px, 2.6vw, 16px)', lineHeight: 1.35, textShadow: '0 1px 5px rgba(0,0,0,0.3)' }}>最便宜的旅遊 eSIM 方案</p>
             <button onClick={() => onNavigate('products')} style={{
-              background: '#fff', border: '2px solid rgba(255,255,255,0.8)', borderRadius: 22,
-              padding: '9px 20px', cursor: 'pointer',
-              fontSize: 13, fontWeight: 800, color: C.primary,
-              boxShadow: '0 6px 16px rgba(0,0,0,0.14)',
+              background: '#fff', border: '2px solid rgba(255,255,255,0.85)', borderRadius: 22,
+              padding: 'clamp(7px, 2vw, 10px) clamp(16px, 4.5vw, 22px)', cursor: 'pointer',
+              fontSize: 'clamp(12px, 3.3vw, 14px)', fontWeight: 800, color: C.primary,
+              boxShadow: '0 6px 16px rgba(0,0,0,0.16)', whiteSpace: 'nowrap',
             }}>
               立即選購 →
             </button>
