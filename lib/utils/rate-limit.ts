@@ -10,7 +10,7 @@ import { prisma } from '@/lib/db/prisma'
 //   → 後台永遠 429，管理員被自己的限流鎖在門外，且因為 catch 是空的、log 也沒有，
 //   完全查不出原因。
 //   結論：限流器壞掉時「擋下全部人」的自我 DoS，比「暫時失去防爆破」更嚴重——
-//   密碼仍需正確（bcrypt 12 rounds + 12 碼英數政策）。所以壞掉時放行，但要吵，
+//   密碼仍需正確（bcrypt 12 rounds + 8 碼英數政策）。所以壞掉時放行，但要吵，
 //   讓它可被發現、可修，而不是安靜地把人鎖在外面。
 export async function checkRateLimit(key: string, limit: number, windowSec: number): Promise<boolean> {
   try {
