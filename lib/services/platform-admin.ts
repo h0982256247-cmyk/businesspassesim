@@ -23,7 +23,7 @@ export async function verifyAdminCredentials(email: string, password: string) {
 // ─── 密碼政策 ─────────────────────────────────────────────────────
 // 後台帳號即最高權限（只有 SUPER_ADMIN 一種角色），且 /platform/login 對外開放，
 // 故門檻高於一般會員。建立／修改密碼共用這支，避免兩處規則走鐘。
-export const ADMIN_PASSWORD_MIN_LENGTH = 12
+export const ADMIN_PASSWORD_MIN_LENGTH = 8
 
 // 通過回 null，否則回可直接顯示給使用者的錯誤訊息。
 export function validateAdminPassword(password: unknown): string | null {
