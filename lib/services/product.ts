@@ -91,7 +91,7 @@ export async function getAvailableCountries() {
 
 // 主頁「熱門目的地」專用：只回國家清單 + 各國最低售價（約數十筆），不撈全部商品。
 // 原本主頁打 /api/products（上萬筆）只為了算每國最低價，載入很慢；改用此聚合查詢。
-export async function getCountriesWithMinPrice() {
+export async function getCountriesWithMinPrice(isMember = false) {
   const where: Prisma.ProductWhereInput = {
     status: ProductStatus.ACTIVE,
     supplierProduct: { status: SupplierProductStatus.ACTIVE },
@@ -106,11 +106,12 @@ export async function getCountriesWithMinPrice() {
     prisma.product.groupBy({
       by: ['countryCode'],
       where,
-      _min: { sellPrice: true },
+      _min: { sellPrice: true, benefitPrice: true },
     }),
     getDestinationImageMap(),
   ])
-  const minMap = new Map(mins.map(m => [m.countryCode, m._min.sellPrice]))
+  // 會員看福利價最低值、非會員看一般售價最低值（與方案卡實際顯示的價一致）
+  const minMap = new Map(mins.map(m => [m.countryCode, isMember ? m._min.benefitPrice : m._min.sellPrice]))
   return sortByCountryOrder(countries.map(c => ({ ...c, minPrice: minMap.get(c.countryCode) ?? null, imageUrl: imgMap.get(c.countryCode) ?? null })))
 }
 

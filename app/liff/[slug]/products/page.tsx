@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { useLiff } from '@/components/liff/LiffProvider'
 import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
-import { pickInitialDay, PRODUCTS_DEFAULT_DAYS } from '@/lib/utils/products-day-default'
 import { peekCache, setCache, productsCacheKey } from '@/hooks/useCachedData'
 
 type ProductsApiResponse = { countries?: Country[]; products?: Product[] }
@@ -14,9 +13,7 @@ import SetupModal from '@/components/liff/SetupModal'
 import { useCart } from '@/components/liff/CartProvider'
 import type { Country, Product, DayFilterControls, CartControls } from '@/components/liff/templates/products/types'
 
-const COMMON_PRESETS = [1, 3, 5, 7, 14, 30]
-
-// 商城頁的流量類型篩選按鈕（與主頁搜尋一致）；置中、可切換、null=全部。
+// 商城頁的方案類型（與主頁搜尋一致）：總量 / 每日型 / 吃到飽。
 const DATA_TYPE_OPTIONS = ['總量', '每日型', '吃到飽']
 
 // 把 dataCapacity 歸類成主頁搜尋的三種流量類型：吃到飽 / 每日型 / 總量。
@@ -77,21 +74,18 @@ function ProductsContent() {
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Day filter state — 有從搜尋帶 ?days 就用它，否則預設 5（避免「340 → 17」閃爍）
-  const initialDay = (() => {
+  // 天數篩選：0 = 全部天數。初始吃主頁搜尋帶的 ?days（無/無效則全部）。
+  const [dayFilter, setDayFilter] = useState<number>(() => {
     const n = searchDays ? parseInt(searchDays) : NaN
-    return Number.isFinite(n) && n > 0 ? n : PRODUCTS_DEFAULT_DAYS
-  })()
-  const [dayFilter, setDayFilter] = useState<number>(initialDay)
-  const [pickerDays, setPickerDays] = useState<number>(initialDay)
+    return Number.isFinite(n) && n > 0 ? n : 0
+  })
 
-  // 切國家時重設回 5（不重置成 0，避免又出現一次閃爍）。
-  // 首次掛載略過：保留從主頁搜尋帶進來的 ?days，不被重設覆蓋。
-  const dayResetSkipRef = useRef(true)
+  // 切國家時把天數/方案重設為「全部」；首次掛載略過以保留主頁搜尋帶入的 ?days/?data。
+  const filterResetSkipRef = useRef(true)
   useEffect(() => {
-    if (dayResetSkipRef.current) { dayResetSkipRef.current = false; return }
-    setDayFilter(PRODUCTS_DEFAULT_DAYS)
-    setPickerDays(PRODUCTS_DEFAULT_DAYS)
+    if (filterResetSkipRef.current) { filterResetSkipRef.current = false; return }
+    setDayFilter(0)
+    setDataType(null)
   }, [selectedCountry])
 
   function dismissSetup() {
@@ -139,57 +133,37 @@ function ProductsContent() {
     [products],
   )
 
+  // 交叉過濾：天數選項依已選方案類型；方案選項依已選天數。
   const availableDays = useMemo(() => {
     const set = new Set<number>()
-    products.forEach(p => set.add(p.displayDays))
+    for (const p of products) if (!dataType || capKindOf(p.dataCapacity) === dataType) set.add(p.displayDays)
     return Array.from(set).sort((a, b) => a - b)
-  }, [products])
+  }, [products, dataType])
 
-  // Fallback：該國家沒有 5 天方案時，改抓最接近 5 的可用天數
-  useEffect(() => {
-    if (availableDays.length === 0) return
-    if (availableDays.includes(pickerDays)) return
-    const chosen = pickInitialDay(availableDays)
-    if (chosen !== null) {
-      setPickerDays(chosen)
-      setDayFilter(chosen)
-    }
-  }, [availableDays, pickerDays])
+  const availableDataTypes = useMemo(
+    () => DATA_TYPE_OPTIONS.filter(t => products.some(p => capKindOf(p.dataCapacity) === t && (!dayFilter || p.displayDays === dayFilter))),
+    [products, dayFilter],
+  )
 
-  const filteredProducts = useMemo(() => {
-    let list = dayFilter ? products.filter(p => p.displayDays === dayFilter) : products
-    if (dataType) list = list.filter(p => capKindOf(p.dataCapacity) === dataType)
-    return list
-  }, [products, dayFilter, dataType])
+  // eff：狀態若不在可選範圍（例如搜尋帶入此國沒有的天數）→ 視為全部，避免顯示 0 筆。
+  const effDay = dayFilter && availableDays.includes(dayFilter) ? dayFilter : 0
+  const effType = dataType && availableDataTypes.includes(dataType) ? dataType : null
 
-  const nearestDays = useMemo(() => {
-    if (!dayFilter || filteredProducts.length > 0) return []
-    return [...availableDays]
-      .sort((a, b) => Math.abs(a - dayFilter) - Math.abs(b - dayFilter))
-      .slice(0, 3)
-  }, [dayFilter, filteredProducts.length, availableDays])
-
-  const presets = useMemo(() => {
-    const fromData = COMMON_PRESETS.filter(n => availableDays.includes(n))
-    return fromData.length >= 3 ? fromData : availableDays.slice(0, 6)
-  }, [availableDays])
+  const filteredProducts = useMemo(
+    () => products.filter(p => (!effDay || p.displayDays === effDay) && (!effType || capKindOf(p.dataCapacity) === effType)),
+    [products, effDay, effType],
+  )
 
   const filter: DayFilterControls = useMemo(() => ({
-    pickerDays: pickerDays || (availableDays[0] ?? 1),
-    dayFilter,
+    dayFilter: effDay,
     availableDays,
-    presets,
-    minDay: availableDays[0] ?? 1,
-    maxDay: availableDays[availableDays.length - 1] ?? 30,
-    onChange: (n: number) => { setPickerDays(n); setDayFilter(n) },
-    onClear: () => setDayFilter(0),
+    onDay: (n: number) => setDayFilter(n),
+    dataType: effType,
+    availableDataTypes,
+    onDataType: (t: string | null) => setDataType(t),
     filteredCount: filteredProducts.length,
     totalCount: products.length,
-    nearestDays,
-    dataType,
-    dataOptions: DATA_TYPE_OPTIONS,
-    onDataType: (t: string | null) => setDataType(t),
-  }), [pickerDays, dayFilter, availableDays, presets, filteredProducts.length, products.length, nearestDays, dataType])
+  }), [effDay, availableDays, effType, availableDataTypes, filteredProducts.length, products.length])
 
   const cartControls: CartControls = useMemo(() => ({
     has: (id: string) => cart.has(id),
