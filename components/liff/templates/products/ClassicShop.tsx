@@ -440,11 +440,8 @@ export default function ClassicShop({
                   primary={C.primary}
                 />
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12 }}>
-                <span style={{ fontSize: 12.5, color: S.muted, fontWeight: 600 }}>
-                  找到 <span style={{ color: C.primary, fontWeight: 800 }}>{filter.filteredCount}</span> 個方案
-                </span>
-                {isFiltered && (
+              {isFiltered && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                   <button
                     onClick={filter.onClear}
                     style={{
@@ -459,8 +456,8 @@ export default function ClassicShop({
                     </svg>
                     清除篩選
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         )
