@@ -110,9 +110,13 @@ export async function POST(req: NextRequest) {
     ? ((await prisma.order.aggregate({ where: { bundleId }, _sum: { totalPaid: true } }))._sum.totalPaid ?? order.totalPaid)
     : order.totalPaid
   const verify = await tapPayQueryTrade(recTradeId, gateway)
-  // record_status 0 = 已授權（即使尚未請款 is_captured=false 也算付款成立，TapPay
-  // 會在 cap_millis 自動請款）。金額需與訂單相符。
-  if (!verify.ok || verify.amount !== expectedAmount || verify.recordStatus !== 0) {
+  // record_status（TapPay Record API）：
+  //   0 = 已授權未請款（信用卡；TapPay 會在 cap_millis 自動請款）
+  //   1 = 交易完成／已請款（LINE Pay 即時請款）
+  // 兩者都代表「款項已成立」，皆放行；其餘（-1 錯誤／2,3 退款／4 待付款／5 取消）一律不放行。
+  // （先前只放行 0 → LINE Pay 回 1 被擋，付款成功卻卡在 PROCESSING、沒發卡。）金額需與訂單相符。
+  const paidRecordStatus = verify.ok && (verify.recordStatus === 0 || verify.recordStatus === 1)
+  if (!verify.ok || verify.amount !== expectedAmount || !paidRecordStatus) {
     // 只印純量：verify 內含 raw（TapPay 原始交易紀錄，帶持卡人 PII / 卡片資訊），不可落地 log
     console.warn('[tappay-notify] Record API 驗真失敗，不標記 PAID', { order_number: tapPayOrderId, expectedAmount, ok: verify.ok, gotAmount: verify.ok ? verify.amount : null, recordStatus: verify.ok ? verify.recordStatus : null })
     await recordAlert('payment_verify_failed', {
