@@ -53,16 +53,8 @@ export default function ClassicHome({
   const filtered = query.trim()
     ? filterCountriesByQuery(countries, query, coverage)
     : []
-  // 熱門目的地：韓國、日本固定置頂兩格（HOT），其餘照原順序補滿 6 格。
-  const HOT_PINNED = ['KR', 'JP']
-  const hotPinned = HOT_PINNED.flatMap(code => {
-    const f = countries.find(c => c.countryCode === code)
-    return f ? [f] : []
-  })
-  const hot = [
-    ...hotPinned,
-    ...countries.filter(c => !HOT_PINNED.includes(c.countryCode)),
-  ].slice(0, 6)
+  // 熱門目的地：取商城排序（業主指定順序，見 lib/utils/country-order）的前 6 個。
+  const hot = countries.slice(0, 6)
 
   function handleSearch() {
     // 國家：優先用下拉點選的；沒點則用輸入字串比對到的第一個
