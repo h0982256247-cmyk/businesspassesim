@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  resolveCountry,
   resolveCountryByPlanCode,
   matchCountryInText,
   COUNTRY_NAME_TO_CODE,
@@ -61,5 +62,29 @@ describe('country resolution — 南美 / SAM region', () => {
   it('不會把 南美 誤抓成 南非 / 美國', () => {
     expect(matchCountryInText('南美')?.code).toBe('SAM')
     expect(matchCountryInText('南非')?.code).toBe('ZA')
+  })
+})
+
+describe('resolveCountry — 前台國家取 D 欄「適用地區」（業主 2026-07 定案）', () => {
+  const R = (name: string, region: string) => resolveCountry(name, '', region, '', '')
+
+  it('單一國家 D → ISO 碼 + D 當卡標題（不受商品名稱「｜」雜訊影響）', () => {
+    expect(R('中國大陸 eSIM｜1天 每日1GB 降速128kbps', '中國大陸'))
+      .toMatchObject({ countryCode: 'CN', countryNameZh: '中國大陸' })
+    expect(R('日本 eSIM｜Softbank｜90天 總量15GB', '日本'))
+      .toMatchObject({ countryCode: 'JP', countryNameZh: '日本' })
+  })
+
+  it('組合地區 D → 區域碼，且同地區一律聚成一張卡', () => {
+    expect(R('中港澳 eSIM｜1天 每日1GB', '中港澳'))
+      .toMatchObject({ countryCode: 'CNT', countryNameZh: '中港澳' })
+    expect(R('南美 eSIM｜10天 總量5GB', '南美'))
+      .toMatchObject({ countryCode: 'SAM', countryNameZh: '南美' })
+    // 同一 D、不同方案名 → countryCode 一致（避免爆成多張卡）
+    expect(R('中港澳 eSIM｜3天 高速吃到飽', '中港澳').countryCode).toBe('CNT')
+  })
+
+  it('D 欄為空 → 退回舊行為（取商品名稱逗號前段）', () => {
+    expect(R('美國, 10天, 3GB/天', '')).toMatchObject({ countryCode: 'US', countryNameZh: '美國' })
   })
 })
