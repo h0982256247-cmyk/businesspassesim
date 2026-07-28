@@ -283,6 +283,15 @@ function CheckoutContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sdkLoaded, paymentMethod, tapPayConfig])
 
+  // 切到 LINE Pay／改用已存卡片前先重置信用卡欄位狀態：切回信用卡時上面的 setup effect
+  // （有 `if (sdkReady) return`）才會重新跑 card.setup 綁定「新的」#card-number 等 DOM 欄位。
+  // 否則 sdkReady 仍為 true → 不再 setup → 卡號輸入框失效（切 LINE Pay 再切回信用卡打不了字）。
+  const resetCardFields = () => {
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    setSdkReady(false)
+    setCanPay(false)
+  }
+
   // 付款結果處理（3DS 導轉 / 成功 / 失敗共用）
   // 只有在扣款被受理（導轉 3DS）或同步成功時才清空購物車；
   // 第一階段失敗時保留購物車，讓使用者可直接重試。
@@ -793,7 +802,7 @@ function CheckoutContent() {
                         <>
                           {savedCard && useNewCard && (
                             <button
-                              onClick={() => setUseNewCard(false)}
+                              onClick={() => { resetCardFields(); setUseNewCard(false) }}
                               style={{
                                 display: 'flex', alignItems: 'center', gap: 4,
                                 background: 'none', border: 'none', padding: '0 0 12px',
@@ -873,7 +882,7 @@ function CheckoutContent() {
             {methods.linePay && (
             <div>
               <label
-                onClick={() => setPaymentMethod('LINE_PAY')}
+                onClick={() => { resetCardFields(); setPaymentMethod('LINE_PAY') }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 14,
                   background: lp ? C.light : '#fff',
