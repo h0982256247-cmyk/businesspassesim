@@ -3,6 +3,7 @@ import { Prisma, ProductStatus, SupplierProductStatus, SupplierProductType } fro
 import type { SupplierProductMap } from './esim'
 import { sellPriceForCostChange, benefitPriceFromCost, DEFAULT_MARGIN_GUARD, DEFAULT_BENEFIT_MARKUP, type MarginGuard } from '@/lib/utils/pricing'
 import { getPlatformSettings } from './tenant-config'
+import { sortByCountryOrder } from '@/lib/utils/country-order'
 
 export async function getActiveProducts(countryCode?: string) {
   return prisma.product.findMany({
@@ -85,7 +86,7 @@ export async function getAvailableCountries() {
     }),
     getDestinationImageMap(),
   ])
-  return products.map(p => ({ ...p, imageUrl: imgMap.get(p.countryCode) ?? null }))
+  return sortByCountryOrder(products.map(p => ({ ...p, imageUrl: imgMap.get(p.countryCode) ?? null })))
 }
 
 // 主頁「熱門目的地」專用：只回國家清單 + 各國最低售價（約數十筆），不撈全部商品。
@@ -110,7 +111,7 @@ export async function getCountriesWithMinPrice() {
     getDestinationImageMap(),
   ])
   const minMap = new Map(mins.map(m => [m.countryCode, m._min.sellPrice]))
-  return countries.map(c => ({ ...c, minPrice: minMap.get(c.countryCode) ?? null, imageUrl: imgMap.get(c.countryCode) ?? null }))
+  return sortByCountryOrder(countries.map(c => ({ ...c, minPrice: minMap.get(c.countryCode) ?? null, imageUrl: imgMap.get(c.countryCode) ?? null })))
 }
 
 // ─── Admin operations ────────────────────────────────────────────
