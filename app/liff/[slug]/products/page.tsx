@@ -161,6 +161,7 @@ function ProductsContent() {
     dataType: effType,
     availableDataTypes,
     onDataType: (t: string | null) => setDataType(t),
+    onClear: () => { setDayFilter(0); setDataType(null) },
     filteredCount: filteredProducts.length,
     totalCount: products.length,
   }), [effDay, availableDays, effType, availableDataTypes, filteredProducts.length, products.length])

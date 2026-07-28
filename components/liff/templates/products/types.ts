@@ -38,6 +38,8 @@ export interface DayFilterControls {
   availableDataTypes: string[]
   /** 切換方案類型；傳 null 表示全部。 */
   onDataType: (t: string | null) => void
+  /** 一鍵清除：天數與方案都回到「全部」。 */
+  onClear: () => void
   /** 符合目前兩個篩選的方案數。 */
   filteredCount: number
   /** 此目的地全部方案數。 */

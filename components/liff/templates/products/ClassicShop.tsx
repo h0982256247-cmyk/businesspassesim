@@ -415,30 +415,56 @@ export default function ClassicShop({
         </div>
       )}
 
-      {/* 篩選：方案（左）＋ 天數（右）——兩個下拉互相交叉過濾，只列出實際有的選項 */}
-      {filter.totalCount > 0 && (
-        <div style={{ padding: '16px 16px 4px' }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <FilterSelect
-              label="方案"
-              value={filter.dataType ?? ''}
-              onChange={v => filter.onDataType(v || null)}
-              options={[{ value: '', label: '全部方案' }, ...filter.availableDataTypes.map(t => ({ value: t, label: t }))]}
-              primary={C.primary}
-            />
-            <FilterSelect
-              label="天數"
-              value={filter.dayFilter ? String(filter.dayFilter) : ''}
-              onChange={v => filter.onDay(v ? Number(v) : 0)}
-              options={[{ value: '', label: '全部天數' }, ...filter.availableDays.map(d => ({ value: String(d), label: `${d} 天` }))]}
-              primary={C.primary}
-            />
+      {/* 篩選卡：方案（左）＋ 天數（右），兩個下拉互相交叉過濾；有篩選時可一鍵清除回全部 */}
+      {filter.totalCount > 0 && (() => {
+        const isFiltered = filter.dayFilter !== 0 || filter.dataType !== null
+        return (
+          <div style={{ padding: '16px 16px 4px' }}>
+            <div style={{
+              background: '#fff', borderRadius: 18, padding: 14,
+              border: '1px solid rgba(15,23,42,0.06)', boxShadow: '0 4px 14px rgba(15,23,42,0.05)',
+            }}>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <FilterSelect
+                  label="方案"
+                  value={filter.dataType ?? ''}
+                  onChange={v => filter.onDataType(v || null)}
+                  options={[{ value: '', label: '全部方案' }, ...filter.availableDataTypes.map(t => ({ value: t, label: t }))]}
+                  primary={C.primary}
+                />
+                <FilterSelect
+                  label="天數"
+                  value={filter.dayFilter ? String(filter.dayFilter) : ''}
+                  onChange={v => filter.onDay(v ? Number(v) : 0)}
+                  options={[{ value: '', label: '全部天數' }, ...filter.availableDays.map(d => ({ value: String(d), label: `${d} 天` }))]}
+                  primary={C.primary}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 12 }}>
+                <span style={{ fontSize: 12.5, color: S.muted, fontWeight: 600 }}>
+                  找到 <span style={{ color: C.primary, fontWeight: 800 }}>{filter.filteredCount}</span> 個方案
+                </span>
+                {isFiltered && (
+                  <button
+                    onClick={filter.onClear}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '6px 12px', borderRadius: 100, cursor: 'pointer',
+                      border: `1.5px solid ${C.border}`, background: C.light, color: C.primary,
+                      fontSize: 12.5, fontWeight: 700, WebkitTapHighlightColor: 'transparent',
+                    }}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                    清除篩選
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-          <p style={{ fontSize: 12.5, color: S.muted, margin: '10px 2px 0', fontWeight: 600 }}>
-            找到 {filter.filteredCount} 個方案
-          </p>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Plans */}
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
