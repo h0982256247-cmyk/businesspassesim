@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { getCoverageList, CoveragePopup } from '@/components/liff/CoverageCountries'
-import DayPicker from '@/components/liff/DayPicker'
 import { annotatePlans, sortByValue, TIER_COLOR } from '@/lib/utils/product-display'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
 import { resolveDestImage } from '@/lib/utils/dest-image'
@@ -64,6 +63,40 @@ function CrownIcon({ size = 12 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
       <path d="M3 18l-2-11 6 4 5-8 5 8 6-4-2 11H3zm0 2h18v2H3v-2z" />
     </svg>
+  )
+}
+
+// 篩選下拉（方案 / 天數共用）：原生 select + 自繪箭頭，選中時邊框帶品牌色。
+function FilterSelect({ label, value, onChange, options, primary }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  primary: string
+}) {
+  return (
+    <label style={{ flex: 1, minWidth: 0, display: 'block' }}>
+      <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: S.muted, margin: '0 0 5px 2px' }}>{label}</span>
+      <div style={{ position: 'relative' }}>
+        <select
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          style={{
+            appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+            width: '100%', padding: '11px 34px 11px 14px',
+            borderRadius: 14, border: `1.5px solid ${value ? primary : 'rgba(15,23,42,0.12)'}`,
+            background: '#fff', color: '#1a1a1a', fontSize: 14, fontWeight: 700,
+            cursor: 'pointer', outline: 'none',
+          }}
+        >
+          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+    </label>
   )
 }
 
@@ -274,7 +307,6 @@ export default function ClassicShop({
   }
 
   const country = countries.find(c => c.countryCode === selectedCountry)
-  const showNoMatch = filter.dayFilter > 0 && filter.filteredCount === 0
   const countryAccent = country ? getAccent(country.countryCode) : DEST_PALETTE[0]
 
   return (
@@ -383,44 +415,28 @@ export default function ClassicShop({
         </div>
       )}
 
-      {/* Day picker */}
-      {filter.availableDays.length > 0 && (
+      {/* 篩選：方案（左）＋ 天數（右）——兩個下拉互相交叉過濾，只列出實際有的選項 */}
+      {filter.totalCount > 0 && (
         <div style={{ padding: '16px 16px 4px' }}>
-          <DayPicker
-            value={filter.pickerDays}
-            onChange={filter.onChange}
-            min={filter.minDay}
-            max={filter.maxDay}
-            presets={filter.presets}
-            label="想用幾天？"
-            caption={filter.dayFilter
-              ? (filter.filteredCount > 0 ? `找到 ${filter.filteredCount} 個 ${filter.dayFilter} 天方案` : `沒有 ${filter.dayFilter} 天的方案`)
-              : '點 +/− 或輸入即可篩選'}
-          />
-        </div>
-      )}
-
-      {/* 流量類型：總量 / 每日型 / 吃到飽（置中，對應主頁搜尋；不選＝全部，再點一下取消）*/}
-      {filter.availableDays.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, padding: '6px 16px 0', flexWrap: 'wrap' }}>
-          {filter.dataOptions.map(opt => {
-            const active = filter.dataType === opt
-            return (
-              <button
-                key={opt}
-                onClick={() => filter.onDataType(active ? null : opt)}
-                style={{
-                  padding: '7px 16px', borderRadius: 100, cursor: 'pointer',
-                  border: active ? `1.5px solid ${C.primary}` : '1.5px solid rgba(15,23,42,0.10)',
-                  background: active ? C.primary : '#fff',
-                  color: active ? C.onPrimary : S.muted,
-                  fontSize: 13, fontWeight: 700,
-                  WebkitTapHighlightColor: 'transparent',
-                  transition: 'background 0.15s, border 0.15s, color 0.15s',
-                }}
-              >{opt}</button>
-            )
-          })}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <FilterSelect
+              label="方案"
+              value={filter.dataType ?? ''}
+              onChange={v => filter.onDataType(v || null)}
+              options={[{ value: '', label: '全部方案' }, ...filter.availableDataTypes.map(t => ({ value: t, label: t }))]}
+              primary={C.primary}
+            />
+            <FilterSelect
+              label="天數"
+              value={filter.dayFilter ? String(filter.dayFilter) : ''}
+              onChange={v => filter.onDay(v ? Number(v) : 0)}
+              options={[{ value: '', label: '全部天數' }, ...filter.availableDays.map(d => ({ value: String(d), label: `${d} 天` }))]}
+              primary={C.primary}
+            />
+          </div>
+          <p style={{ fontSize: 12.5, color: S.muted, margin: '10px 2px 0', fontWeight: 600 }}>
+            找到 {filter.filteredCount} 個方案
+          </p>
         </div>
       )}
 
@@ -428,25 +444,6 @@ export default function ClassicShop({
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filter.totalCount === 0 && (
           <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>此目的地暫無可購買方案</p>
-        )}
-
-        {showNoMatch && filter.nearestDays.length > 0 && (
-          <div style={{ padding: '8px 4px' }}>
-            <p style={{ fontSize: 13, color: S.muted, margin: '0 0 8px' }}>您也可以選擇相近天數：</p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {filter.nearestDays.map(n => (
-                <button
-                  key={n}
-                  onClick={() => filter.onChange(n)}
-                  style={{
-                    padding: '7px 14px', borderRadius: 100,
-                    border: `1px solid ${C.border}`, background: C.light, color: C.primary,
-                    fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  }}
-                >{n} 天</button>
-              ))}
-            </div>
-          </div>
         )}
 
         {displays.map(d => {

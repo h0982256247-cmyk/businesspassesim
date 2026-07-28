@@ -24,30 +24,24 @@ export interface Product {
   benefitPrice?: number
 }
 
+// 方案/天數雙下拉（互相交叉過濾）：選項本身就排除不相容組合。
 export interface DayFilterControls {
-  /** Current value shown in the picker (1 when no filter is active). */
-  pickerDays: number
-  /** Active filter value; 0 means no filter is applied. */
+  /** 目前選的天數；0 = 全部天數。 */
   dayFilter: number
-  /** Sorted list of `displayDays` values available across all products. */
+  /** 可選天數（依已選方案類型交叉過濾，升冪）；0(全部) 由 UI 自行加。 */
   availableDays: number[]
-  /** Preset chip values to surface in the picker. */
-  presets: number[]
-  minDay: number
-  maxDay: number
-  onChange: (n: number) => void
-  onClear: () => void
-  /** Plans matching the active filter (the value the template should render). */
-  filteredCount: number
-  totalCount: number
-  /** Up to 3 nearest available day counts to suggest when no exact match. */
-  nearestDays: number[]
-  /** 流量類型篩選（對應主頁搜尋）：'總量' | '每日型' | '吃到飽'；null = 全部。 */
+  /** 選天數；傳 0 表示全部。 */
+  onDay: (n: number) => void
+  /** 目前選的方案類型（總量 / 每日型 / 吃到飽）；null = 全部。 */
   dataType: string | null
-  /** 可選的流量類型按鈕。 */
-  dataOptions: string[]
-  /** 切換流量類型；傳 null 表示「全部」。 */
+  /** 可選方案類型（依已選天數交叉過濾）。 */
+  availableDataTypes: string[]
+  /** 切換方案類型；傳 null 表示全部。 */
   onDataType: (t: string | null) => void
+  /** 符合目前兩個篩選的方案數。 */
+  filteredCount: number
+  /** 此目的地全部方案數。 */
+  totalCount: number
 }
 
 export interface CartControls {
