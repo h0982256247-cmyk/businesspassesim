@@ -125,7 +125,8 @@ function parseMatrix(matrix: unknown[][]): { rows: CsvProductRow[]; errors: stri
     const coverageCountries = get('coverageCountries') || undefined   // L 欄：適用國家清單原字串
     const networkType   = get('networkType') || undefined
     const isNativeRaw   = get('isNativeSim').toLowerCase()
-    const isNativeSim   = isNativeRaw === '是' || isNativeRaw === 'true' || isNativeRaw === '1'
+    // 認：是/true/1/y/yes（新報價單 F 欄用 Y/N）
+    const isNativeSim   = ['是', 'true', '1', 'y', 'yes'].includes(isNativeRaw)
 
     // 商品名稱通常為「菲律賓, 1天, 2GB/天」「日本Softbank, 3天, 5GB」格式：先拆段
     const nameSegs = parseProductNameSegments(productName)

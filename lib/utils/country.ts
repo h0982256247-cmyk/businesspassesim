@@ -169,12 +169,14 @@ export function resolveCountryByPlanCode(
   return null
 }
 
-// 從商品名稱（C 欄）+ CSV 各欄位解析出「顯示國家/區域」。業主定案 2026-06：
-//   - 顯示名一律取 **C 欄商品名稱的前段**（逗號前第 1 段），如「西歐」「日本」「中歐/東歐/巴爾幹」。
-//   - 前段是「單一國家」（抓到的關鍵字對應 2 碼 ISO）→ countryCode 用 ISO，前台顯示該國國旗。
-//   - 前段是「區域/多國/無法辨識」（如 西歐、南美、歐洲C、紐澳）→ countryCode 直接用「顯示名」，
-//     使每個區域各自成為獨立目的地（前台依 countryCode 分組），且 CountryFlag 因 code 非 ISO 顯示地球。
-//   - 前段為空才退回 CSV 國碼/適用地區欄兜底。
+// 從 CSV 各欄位解析出「前台顯示國家/區域」。業主定案 2026-07：
+//   - 前台國家一律取 **D 欄「適用地區」**（csvCountryNameZh），如「中國大陸」「歐洲」「中港澳」。
+//     （原 2026-06 定案是取 C 欄商品名稱前段；但新報價單名稱用「｜」分隔、逗號切不開，
+//      前段會變成整串名稱、組合地區還會爆成多張卡，故改以乾淨的 D 欄為準。）
+//   - matchCountryInText 認得單一國家(2 碼 ISO)與區域(AFR/SAM/CNT/EU/NMY/ANZ…)：
+//     單一國家→ISO 碼＋國旗；區域→區域碼；抓不到碼的區域（如「波斯灣」）用地區名當分組鍵。
+//     同一 D 一律聚成一張卡（分組鍵只來自 D，不受商品名稱雜訊影響）。
+//   - D 欄為空才退回舊行為（取 C 欄商品名稱逗號前段），維持舊格式檔相容。
 export function resolveCountry(
   productName: string,
   csvCountryCode: string,
@@ -188,39 +190,45 @@ export function resolveCountry(
   countryFlag: string
   matchedByName: boolean
 } {
-  const nameSegs = parseProductNameSegments(productName)
-  const front = (nameSegs.country ?? '').trim()      // C 欄前段
   const explicitCode = csvCountryCode.trim().toUpperCase()
   const explicitIsIso = /^[A-Z]{2}$/.test(explicitCode)
 
-  // 是否為單一國家：抓到的關鍵字對應 2 碼 ISO（自訂多國代碼 EU/SAM/SEA/AFR… 不算）
+  // ── D 欄「適用地區」優先（前台國家單一來源）──
+  const region = csvCountryNameZh.trim()
+  if (region) {
+    const hit = matchCountryInText(region)
+    const countryCode = hit ? hit.code : (explicitIsIso ? explicitCode : region)
+    const isIso = /^[A-Z]{2}$/.test(countryCode)
+    return {
+      countryCode,
+      countryNameZh: region,
+      countryNameEn: csvCountryNameEn,
+      // 2 碼 ISO 用 emoji 備援；區域（3+ 碼/中文名）留空 → 前端 CountryFlag 顯示地球
+      countryFlag: isIso ? (csvCountryFlag || countryCodeToFlag(countryCode) || '') : '',
+      matchedByName: true,
+    }
+  }
+
+  // ── D 欄為空 → 退回舊行為：取 C 欄商品名稱逗號前段（相容舊格式檔）──
+  const front = (parseProductNameSegments(productName).country ?? '').trim()
   const hit = matchCountryInText(front) ?? matchCountryInText(productName)
   const isSingleCountry = !!hit && /^[A-Z]{2}$/.test(hit.code)
-
-  // 顯示名：優先 C 欄前段；前段空才退回 explicit ISO 的標準中文名 / CSV 適用地區
   const countryNameZh =
     front
     || (explicitIsIso ? (CODE_TO_NAME_ZH[explicitCode] ?? '') : '')
-    || csvCountryNameZh.trim()
     || ''
-
-  // 分組鍵 countryCode：單一國家→ISO；CSV 明確 ISO→該 ISO；其餘區域→顯示名（各自成組 + 地球）
   let countryCode: string
   if (isSingleCountry) countryCode = hit!.code
   else if (explicitIsIso) countryCode = explicitCode
   else countryCode = countryNameZh
-
-  // 旗標：單一國家用 ISO emoji 備援；區域一律留空 → 前端 CountryFlag 顯示地球
   const countryFlag = isSingleCountry
     ? (csvCountryFlag || countryCodeToFlag(countryCode) || '')
     : ''
-
   return {
     countryCode,
     countryNameZh,
     countryNameEn: csvCountryNameEn,
     countryFlag,
-    // 有抓到前段就視為「已決定國家/區域」，匯入 POST 階段不再用供應商名覆蓋
     matchedByName: !!front,
   }
 }
