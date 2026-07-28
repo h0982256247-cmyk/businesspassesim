@@ -20,6 +20,7 @@ type Product = {
   networkType: string | null
   isNativeSim: boolean
   sellPrice: number
+  benefitPrice: number
   costPrice: number
   sortOrder: number
   status: string
@@ -501,7 +502,7 @@ export default function PlatformProductsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b">
               <tr>
-                {['國家', '天數', '流量', '售價', '成本', '毛利率', '供應商 SKU', '狀態', '操作'].map(h => (
+                {['國家', '天數', '流量', '售價', '福利價', '成本', '毛利率', '供應商 SKU', '狀態', '操作'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500">{h}</th>
                 ))}
               </tr>
@@ -536,6 +537,7 @@ export default function PlatformProductsPage() {
                       <span className="ml-1 text-xs font-normal" title="售價未高於成本，將虧損">⚠</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 font-medium text-indigo-600" title="企業福利價（成本 × 後台倍率，預設 1.5）">NT${p.benefitPrice}</td>
                   <td className="px-4 py-3 text-gray-400">NT${p.costPrice}</td>
                   <td className="px-4 py-3">
                     <span
