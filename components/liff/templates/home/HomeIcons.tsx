@@ -44,3 +44,16 @@ export function IconDevices({ color = '#374151', size = 24 }: { color?: string; 
     </svg>
   )
 }
+
+// 客服中心：耳機麥克風。左耳罩 duotone 淡底、右耳罩實色重點，與其餘快速功能同風格。
+export function IconSupport({ color = '#374151', size = 24 }: { color?: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4.5 13.5v-1.5a7.5 7.5 0 0 1 15 0v1.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="3" y="12.5" width="4" height="6.8" rx="1.6" fill={color} fillOpacity={0.16} />
+      <rect x="3" y="12.5" width="4" height="6.8" rx="1.6" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      <rect x="17" y="12.5" width="4" height="6.8" rx="1.6" fill={color} />
+      <path d="M19 19.3v0.7a2.3 2.3 0 0 1-2.3 2.3H14" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}

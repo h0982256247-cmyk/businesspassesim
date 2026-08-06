@@ -91,12 +91,17 @@ export default function LiffHomePage() {
   }, [isReady])
 
   function handleNavigate(path: string) {
+    // 客服中心：直開後台「系統設定 → 客服 / LINE OA 連結」；未設定則退回 /support 頁（其自身有防呆）
+    if (path === 'support') {
+      if (tenant?.lineOaUrl) window.open(tenant.lineOaUrl, '_blank', 'noopener,noreferrer')
+      else router.push(`/liff/${slug}/support`)
+      return
+    }
     const routes: Record<string, string> = {
       orders:  `/liff/${slug}/orders`,
       products:`/liff/${slug}/products`,
       profile: `/liff/${slug}/profile`,
       guide:   `/liff/${slug}/guide`,
-      data:    `/liff/${slug}/support`,
       devices: `/liff/${slug}/devices`,
     }
     router.push(routes[path] ?? `/liff/${slug}/${path}`)
