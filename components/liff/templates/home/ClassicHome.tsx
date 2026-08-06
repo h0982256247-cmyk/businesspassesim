@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Image from 'next/image'
 import { BeeLogoSVG } from '@/components/liff/LiffIllustrations'
-import { IconMyEsim, IconGuide, IconDataPlan, IconDevices } from './HomeIcons'
+import { IconMyEsim, IconGuide, IconSupport, IconDevices } from './HomeIcons'
 import FilterDropdown from './FilterDropdown'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { resolveDestImage, DEFAULT_HOME_HERO_URL } from '@/lib/utils/dest-image'
@@ -15,7 +15,7 @@ const QUICK_ACTIONS = [
   // 通透版：無卡框，duotone 圖示坐在品牌淡底圓角上；主色動態帶入、不寫死品牌色。
   { key: 'orders',  label: '我的 eSIM', Icon: IconMyEsim },
   { key: 'guide',   label: '安裝教學',  Icon: IconGuide },
-  { key: 'data',    label: '流量指南',  Icon: IconDataPlan },
+  { key: 'support', label: '客服中心',  Icon: IconSupport },
   { key: 'devices', label: '支援裝置',  Icon: IconDevices },
 ]
 
