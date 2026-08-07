@@ -159,7 +159,8 @@ export default function PlatformProductsPage() {
       .finally(() => setLoading(false))
   }
 
-  // page 或 q 改變時重新抓資料
+  // page 或 q 改變時重新抓資料。換頁/搜尋時需重設 loading（刻意的一次性抓取，非渲染同步）
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(load, [router, page, q])
 
   const handleStatusToggle = async (id: string, currentStatus: string) => {

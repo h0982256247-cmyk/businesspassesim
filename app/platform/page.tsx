@@ -148,8 +148,8 @@ export default function PlatformDashboard() {
   }, [])
 
   useEffect(() => {
+    // loading 初始即 true、此 effect 僅掛載時執行一次（deps=[router] 穩定），毋須再 setLoading(true)
     let cancelled = false
-    setLoading(true)
     fetch('/api/platform/dashboard')
       .then(async r => {
         if (r.status === 401) { router.replace('/platform/login'); return }
