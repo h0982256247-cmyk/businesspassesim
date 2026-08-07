@@ -230,7 +230,7 @@ export default function OrdersPage() {
   const handleRedeem = (o: Order) => {
     setDialog({
       title: '確定要安裝這張 eSIM 嗎？',
-      lines: ['按下後會立即兌換、產生這張 eSIM 的安裝 QR 碼。', '兌換後就無法再轉贈，請裝在要長期使用的手機上。'],
+      lines: ['按下後會立即兌換、產生 QR 碼', '兌換後就無法再轉贈'],
       confirmLabel: '確定安裝',
       tone: 'primary',
       icon: <IconInstall size={24} />,
