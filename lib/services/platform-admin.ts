@@ -87,9 +87,6 @@ export async function getAllAdmins() {
 
 // ─── Dashboard 統計 ───────────────────────────────────────────────
 
-// 毛利定義 = (售價 − 成本) / 售價。低於 40% → 成本 > 售價 × 0.6 即示警。
-const LOW_MARGIN_THRESHOLD = 0.40
-
 // system_alerts.label → 後台可讀標題
 const ALERT_LABEL: Record<string, string> = {
   esim_activation_failed:        '開卡失敗',
@@ -123,11 +120,9 @@ async function aggregateMargin(where: Prisma.OrderWhereInput) {
   return { eligibleRevenue, cost, grossProfit, marginRate, ordersIncluded, ordersExcluded }
 }
 
-// ─── 風險警示：虧損訂單 + 低毛利商品 + 系統異常（儀表板紅色警示區）────────
+// ─── 風險警示：虧損訂單 + 福利價高於售價 + 系統異常（儀表板紅色警示區）────────
 export async function getRiskAlerts() {
-  const costFactor = 1 - LOW_MARGIN_THRESHOLD  // 成本 / 售價 的上限（0.6）
-
-  const [lossRows, lossCount, lowMarginExamples, lowMarginCount, alertRows, alertCount] = await Promise.all([
+  const [lossRows, lossCount, alertRows, alertCount, benefitOverExamples, benefitOverCount] = await Promise.all([
     // 虧損訂單：已付款、所有品項皆有成本快照，且實付 < 成本。取虧最多的前 8 筆。
     prisma.$queryRaw<Array<{ id: string; orderNumber: string | null; totalPaid: number; cost: number }>>`
       SELECT o.id, o.order_number AS "orderNumber", o.total_paid AS "totalPaid",
@@ -148,16 +143,6 @@ export async function getRiskAlerts() {
         GROUP BY o.id, o.total_paid
         HAVING o.total_paid < SUM(oi.unit_cost * oi.qty)
       ) s`,
-    prisma.$queryRaw<Array<{ id: string; countryNameZh: string; dataCapacity: string | null; displayDays: number; sellPrice: number; costPrice: number }>>`
-      SELECT id, country_name_zh AS "countryNameZh", data_capacity AS "dataCapacity",
-             display_days AS "displayDays", sell_price AS "sellPrice", cost_price AS "costPrice"
-      FROM products
-      WHERE status = 'ACTIVE' AND sell_price > 0 AND cost_price > sell_price * ${costFactor}::numeric
-      ORDER BY (cost_price::float / sell_price) DESC
-      LIMIT 8`,
-    prisma.$queryRaw<Array<{ n: number }>>`
-      SELECT COUNT(*)::int AS n FROM products
-      WHERE status = 'ACTIVE' AND sell_price > 0 AND cost_price > sell_price * ${costFactor}::numeric`,
     // 系統異常（近 24h 未處理）：開卡/金流驗真/WM 等失敗
     prisma.$queryRaw<Array<{ label: string; orderId: string | null; createdAt: Date }>>`
       SELECT label, order_id AS "orderId", created_at AS "createdAt"
@@ -167,10 +152,20 @@ export async function getRiskAlerts() {
     prisma.$queryRaw<Array<{ n: number }>>`
       SELECT COUNT(*)::int AS n FROM system_alerts
       WHERE resolved_at IS NULL AND created_at > now() - interval '24 hours'`,
+    // 福利價 > 售價：企業會員反而付得比一般價貴（新定價政策防呆；售價手動、福利價=成本×倍率）
+    prisma.$queryRaw<Array<{ id: string; countryNameZh: string; dataCapacity: string | null; displayDays: number; sellPrice: number; benefitPrice: number }>>`
+      SELECT id, country_name_zh AS "countryNameZh", data_capacity AS "dataCapacity",
+             display_days AS "displayDays", sell_price AS "sellPrice", benefit_price AS "benefitPrice"
+      FROM products
+      WHERE status = 'ACTIVE' AND benefit_price > sell_price
+      ORDER BY (benefit_price - sell_price) DESC
+      LIMIT 8`,
+    prisma.$queryRaw<Array<{ n: number }>>`
+      SELECT COUNT(*)::int AS n FROM products
+      WHERE status = 'ACTIVE' AND benefit_price > sell_price`,
   ])
 
   return {
-    threshold: LOW_MARGIN_THRESHOLD,
     systemAlerts: {
       count: alertCount[0]?.n ?? 0,
       examples: alertRows.map(a => ({
@@ -189,14 +184,13 @@ export async function getRiskAlerts() {
         loss: r.cost - r.totalPaid,
       })),
     },
-    lowMarginProducts: {
-      count: lowMarginCount[0]?.n ?? 0,
-      examples: lowMarginExamples.map(p => ({
+    benefitOverSell: {
+      count: benefitOverCount[0]?.n ?? 0,
+      examples: benefitOverExamples.map(p => ({
         id: p.id,
         name: `${p.countryNameZh} ${p.displayDays}天${p.dataCapacity ? ` · ${p.dataCapacity}` : ''}`,
         sellPrice: p.sellPrice,
-        costPrice: p.costPrice,
-        marginRate: p.sellPrice > 0 ? (p.sellPrice - p.costPrice) / p.sellPrice : 0,
+        benefitPrice: p.benefitPrice,
       })),
     },
   }

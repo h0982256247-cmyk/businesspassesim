@@ -37,10 +37,9 @@ type Stats = {
   ordersIncluded: number
   ordersExcluded: number
   riskAlerts: {
-    threshold: number
     systemAlerts: { count: number; examples: { title: string; orderNo: string; at: string }[] }
     lossOrders: { count: number; examples: { id: string; orderNo: string; totalPaid: number; cost: number; loss: number }[] }
-    lowMarginProducts: { count: number; examples: { id: string; name: string; sellPrice: number; costPrice: number; marginRate: number }[] }
+    benefitOverSell: { count: number; examples: { id: string; name: string; sellPrice: number; benefitPrice: number }[] }
   }
 }
 
@@ -205,7 +204,7 @@ export default function PlatformDashboard() {
 
   const today = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
 
-  const hasRisk = stats.riskAlerts.systemAlerts.count > 0 || stats.riskAlerts.lossOrders.count > 0 || stats.riskAlerts.lowMarginProducts.count > 0
+  const hasRisk = stats.riskAlerts.systemAlerts.count > 0 || stats.riskAlerts.lossOrders.count > 0 || stats.riskAlerts.benefitOverSell.count > 0
 
   return (
     <div className="space-y-5">
@@ -313,21 +312,21 @@ export default function PlatformDashboard() {
                 </ul>
               </div>
             )}
-            {stats.riskAlerts.lowMarginProducts.count > 0 && (
-              <div className="bg-white rounded-xl border border-red-100 p-3">
+            {stats.riskAlerts.benefitOverSell.count > 0 && (
+              <div className="bg-white rounded-xl border border-amber-100 p-3">
                 <div className="flex items-baseline justify-between mb-2">
-                  <p className="text-sm font-semibold text-gray-700">毛利 &lt; {(stats.riskAlerts.threshold * 100).toFixed(0)}% 商品</p>
-                  <span className="text-lg font-bold text-red-600">{stats.riskAlerts.lowMarginProducts.count} 項</span>
+                  <p className="text-sm font-semibold text-gray-700">福利價 &gt; 售價（企業會員反而更貴）</p>
+                  <span className="text-lg font-bold text-amber-600">{stats.riskAlerts.benefitOverSell.count} 項</span>
                 </div>
                 <ul className="space-y-1">
-                  {stats.riskAlerts.lowMarginProducts.examples.map(p => (
+                  {stats.riskAlerts.benefitOverSell.examples.map(p => (
                     <li key={p.id} className="flex items-center justify-between text-xs text-gray-500 gap-2">
                       <span className="truncate">{p.name}</span>
-                      <span className="whitespace-nowrap">售 NT${p.sellPrice.toLocaleString()} / 成本 NT${p.costPrice.toLocaleString()} · <span className={p.marginRate < 0 ? 'text-red-600 font-semibold' : 'text-orange-600 font-semibold'}>{(p.marginRate * 100).toFixed(0)}%</span></span>
+                      <span className="whitespace-nowrap">售 NT${p.sellPrice.toLocaleString()} / 福利 <span className="text-amber-600 font-semibold">NT${p.benefitPrice.toLocaleString()}</span></span>
                     </li>
                   ))}
-                  {stats.riskAlerts.lowMarginProducts.count > stats.riskAlerts.lowMarginProducts.examples.length && (
-                    <li className="text-xs text-gray-400">…還有 {stats.riskAlerts.lowMarginProducts.count - stats.riskAlerts.lowMarginProducts.examples.length} 項，請見商品管理</li>
+                  {stats.riskAlerts.benefitOverSell.count > stats.riskAlerts.benefitOverSell.examples.length && (
+                    <li className="text-xs text-gray-400">…還有 {stats.riskAlerts.benefitOverSell.count - stats.riskAlerts.benefitOverSell.examples.length} 項，請見商品管理</li>
                   )}
                 </ul>
               </div>
