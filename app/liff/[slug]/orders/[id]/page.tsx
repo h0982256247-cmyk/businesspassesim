@@ -136,6 +136,7 @@ export default function OrderDetailPage() {
   const [redeemTimeout, setRedeemTimeout] = useState(false)
   const [canOneClick, setCanOneClick] = useState(false)
   const [installOS, setInstallOS] = useState<'ios' | 'android'>('ios')
+  const [manualOpen, setManualOpen] = useState(false)   // 手動安裝一律預設收合，點按鈕才展開
   // 自訂確認彈窗（取代 window.confirm，避免 LINE 內建瀏覽器露出網址）
   const [dialog, setDialog] = useState<null | {
     title: string; lines: string[]; confirmLabel: string;
@@ -442,10 +443,29 @@ export default function OrderDetailPage() {
           {/* 手動安裝（沒有一鍵安裝時即為主要方式）：iPhone / Android 各自的「設定」
               路徑不同，分頁切換（預設依裝置），並直接附上該系統要複製貼上的資料。 */}
           {!order.activatedAt && (
-            <div style={{ background: '#f8fafc', border: `1px solid ${S.line}`, borderRadius: 12, padding: '12px 14px', margin: '0 0 14px' }}>
-              <p style={{ fontSize: 13, fontWeight: 800, color: S.ink, margin: '0 0 8px' }}>
-                {canOneClick ? '或手動安裝' : '手動安裝'}
-              </p>
+            <div style={{ margin: '0 0 14px' }}>
+              {/* 手動安裝：一律預設收合的折疊按鈕，點開才展開步驟與複製資料 */}
+              <button
+                type="button"
+                onClick={() => setManualOpen(v => !v)}
+                aria-expanded={manualOpen}
+                className="liff-press"
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: S.white, color: C.primaryText,
+                  border: `1.5px solid ${C.border}`,
+                  borderRadius: 100, padding: '12px',
+                  fontSize: 14, fontWeight: 800, letterSpacing: '0.02em', cursor: 'pointer',
+                }}
+              >
+                手動安裝
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: manualOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {manualOpen && (
+              <div style={{ background: '#f8fafc', border: `1px solid ${S.line}`, borderRadius: 12, padding: '12px 14px', marginTop: 8 }}>
               <div style={{ display: 'flex', gap: 4, marginBottom: 10, background: '#eef2f7', borderRadius: 9, padding: 3 }}>
                 {([['ios', 'iPhone'], ['android', 'Android']] as const).map(([os, label]) => (
                   <button key={os} type="button" onClick={() => setInstallOS(os)} className="liff-press"
@@ -504,6 +524,8 @@ export default function OrderDetailPage() {
                     <p style={{ fontSize: 11, color: S.faint, margin: '12px 0 0' }}>此卡無手動輸入碼，請改用上方 QR 碼掃描安裝</p>
                   )}
                 </>
+              )}
+              </div>
               )}
             </div>
           )}
