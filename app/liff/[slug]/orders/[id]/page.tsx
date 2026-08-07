@@ -217,7 +217,7 @@ export default function OrderDetailPage() {
     if (!order) return
     setDialog({
       title: '確定要安裝這張 eSIM 嗎？',
-      lines: ['安裝後會立即產生 QR 碼並綁定這支手機，', '請在要長期使用這張 eSIM 的手機上安裝。'],
+      lines: ['按下後會立即兌換、產生這張 eSIM 的安裝 QR 碼。', '兌換後就無法再轉贈，請裝在要長期使用的手機上。'],
       confirmLabel: '確定安裝',
       tone: 'primary',
       icon: <IconInstall size={24} />,
@@ -331,7 +331,7 @@ export default function OrderDetailPage() {
             </div>
             <h2 style={{ fontSize: 16, fontWeight: 800, color: S.ink, margin: '0 0 4px' }}>eSIM 已準備好</h2>
             <p style={{ fontSize: 13, color: S.muted, margin: 0, lineHeight: 1.6 }}>
-              點下方按鈕安裝，安裝後綁定此手機即可開始使用
+              點下方按鈕兌換安裝 QR 碼，掃碼安裝到手機即可開始使用
             </p>
           </div>
 
@@ -349,7 +349,7 @@ export default function OrderDetailPage() {
             {redeeming ? '處理中…' : <><IconInstall size={17} /> 我要安裝</>}
           </button>
           <p style={{ fontSize: 11, color: S.faint, textAlign: 'center', margin: '0 0 4px', lineHeight: 1.5 }}>
-            安裝後會綁定此手機
+            兌換 QR 後即無法再轉贈給好友
           </p>
           {redeemError && (
             <p style={{ fontSize: 12, color: '#dc2626', marginTop: 4, marginBottom: 4, textAlign: 'center' }}>{redeemError}</p>
