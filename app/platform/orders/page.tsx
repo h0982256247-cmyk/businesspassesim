@@ -42,6 +42,7 @@ function OrdersContent() {
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   // 保留現有篩選、覆寫指定參數後組成網址（清除某參數傳 undefined；page===1 省略）
   const buildQS = (over: Record<string, string | number | undefined>) => {
@@ -107,6 +108,34 @@ function OrdersContent() {
   const hasRange = !!(fromParam || toParam)
   const handleRetry = async (id:string) => { setActionLoading(id); await fetch(`/api/platform/orders/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'retry_esim'})}); setActionLoading(null); load() }
 
+  // 依「目前畫面篩選」下載 Excel 報表（伺服器產生 .xlsx，前端觸發下載）
+  const handleExport = async () => {
+    if (exporting) return
+    setExporting(true)
+    try {
+      const qs = new URLSearchParams()
+      if (statusFilter) qs.set('status', statusFilter)
+      if (q) qs.set('q', q)
+      if (fromParam) qs.set('from', fromParam)
+      if (toParam) qs.set('to', toParam)
+      if (companyId) qs.set('companyId', companyId)
+      const res = await fetch(`/api/platform/orders/export?${qs.toString()}`)
+      if (res.status === 401) { router.replace('/platform/login'); return }
+      if (!res.ok) { alert('匯出失敗，請稍後再試'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `商務通訂單報表_${new Date().toLocaleDateString('sv-SE').replace(/-/g, '')}.xlsx`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch {
+      alert('匯出失敗，請稍後再試')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // 開啟退款視窗（列表頁為單張退款），交給 RefundConfirmDialog。
   const openRefund = (o: Order) => {
     setRefundTarget({
@@ -163,9 +192,16 @@ function OrdersContent() {
           <option value="">全部企業</option>
           {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <div className="ml-auto text-right">
-          <p className="text-xs text-gray-400">{hasRange ? '此區間' : '全部'}結算總額</p>
-          <p className="text-lg font-bold text-gray-800">NT${rangeTotal.toLocaleString()}<span className="text-xs font-normal text-gray-400 ml-1.5">{rangeCount} 筆已付款</span></p>
+        <div className="ml-auto flex items-center gap-4">
+          <button onClick={handleExport} disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition whitespace-nowrap">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            {exporting ? '匯出中…' : '下載 Excel'}
+          </button>
+          <div className="text-right">
+            <p className="text-xs text-gray-400">{hasRange ? '此區間' : '全部'}結算總額</p>
+            <p className="text-lg font-bold text-gray-800">NT${rangeTotal.toLocaleString()}<span className="text-xs font-normal text-gray-400 ml-1.5">{rangeCount} 筆已付款</span></p>
+          </div>
         </div>
       </div>
       {loading ? <Spinner /> : error ? <ErrorState message={error} onRetry={load} /> : (
