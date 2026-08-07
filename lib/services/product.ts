@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { Prisma, ProductStatus, SupplierProductStatus, SupplierProductType } from '@prisma/client'
 import type { SupplierProductMap } from './esim'
-import { sellPriceForCostChange, benefitPriceFromCost, DEFAULT_MARGIN_GUARD, DEFAULT_BENEFIT_MARKUP, type MarginGuard } from '@/lib/utils/pricing'
+import { benefitPriceFromCost, DEFAULT_BENEFIT_MARKUP } from '@/lib/utils/pricing'
 import { getPlatformSettings } from './tenant-config'
 import { sortByCountryOrder } from '@/lib/utils/country-order'
 
@@ -240,12 +240,6 @@ const WM_PRODUCT_TYPE_MAP: Record<number, SupplierProductType> = {
 //
 // 為什麼 update 既有 Product 而非 delete+create：OrderItem.productId 是 FK，
 // 砍掉重練會破壞訂單關聯。保留 id 是唯一安全做法。
-// 毛利保護設定（驗證套用 / 匯入共用）。單一品牌改造後暫以全域預設（關閉）回傳；
-// 若要恢復可調整，改讀 PlatformSetting（見 ROADMAP，Phase 5 併入）。
-export async function getMarginGuard(): Promise<MarginGuard> {
-  return { ...DEFAULT_MARGIN_GUARD }
-}
-
 // 福利價倍率（單一來源：PlatformSetting.benefitMarkupRate，後台「福利價」分頁可調；
 // 未設定或異常則回退 DEFAULT_BENEFIT_MARKUP）。匯入 / 新增 / 驗證重算共用同一來源。
 export async function getBenefitMarkup(): Promise<number> {
@@ -256,7 +250,6 @@ export async function getBenefitMarkup(): Promise<number> {
 export async function batchCreateProducts(
   rows: CsvProductRow[],
   supplierMap?: SupplierProductMap,
-  marginGuard: MarginGuard = DEFAULT_MARGIN_GUARD,
 ): Promise<{ count: number; created: number; updated: number }> {
   if (rows.length === 0) return { count: 0, created: 0, updated: 0 }
 
@@ -349,14 +342,9 @@ export async function batchCreateProducts(
   for (const row of rows) {
     const supplierId = supplierIdMap.get(row.supplierSkuId)
     if (!supplierId) throw new Error(`找不到 SupplierProduct.id for wmProductId=${row.supplierSkuId}`)
-    // 成本/售價比照「驗證套用」：成本以 WM 即時價為準（與 SupplierProduct 一致）、
-    // 成本上升時售價維持固定利潤跟漲、毛利保護開啟則補到門檻。WM 無此方案 → 沿用 Excel 值。
-    const wmCost = supplierMap?.get(row.supplierSkuId)?.productPrice ?? row.costPrice
-    const sell = sellPriceForCostChange({
-      oldCost: row.costPrice, oldSell: row.sellPrice, newCost: wmCost,
-      guardEnabled: marginGuard.enabled, minMarginRate: marginGuard.rate,
-    })
-    const data = buildProductData(row, supplierId, { costPrice: wmCost, sellPrice: sell }, markup)
+    // 匯入完全照 Excel 填的成本/售價（業主定案 2026-08）；福利價 = 成本 × 倍率。
+    // 真實成本以 WM 為準的同步，改由「驗證方案」流程處理（見 validate/apply）。
+    const data = buildProductData(row, supplierId, { costPrice: row.costPrice, sellPrice: row.sellPrice }, markup)
     const existingId = row.planCode
       ? existingByPlan.get(row.planCode)
       : existingBySkuNoPlan.get(supplierId)

@@ -42,9 +42,7 @@ type ValidateResult = {
   }
 }
 
-type ApplyResult = { disabled: number; repriced: number; priceRaised: number; benefitRecomputed: number; syncedAt: string }
-type GuardSample = { country: string; days: number; cap: string | null; sell: number; cost: number; newSell: number }
-type GuardState = { enabled: boolean; rate: number; belowCount: number; samples: GuardSample[] }
+type ApplyResult = { disabled: number; repriced: number; benefitRecomputed: number; syncedAt: string }
 
 function formatRelativeTime(iso: string | null): string {
   if (!iso) return '從未同步'
@@ -136,9 +134,6 @@ export default function PlatformProductsPage() {
       .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))
   }, [validateResult])
 
-  // 毛利保護（per-tenant）
-  const [guard, setGuard] = useState<GuardState | null>(null)
-  const [guardBusy, setGuardBusy] = useState(false)
 
   // Edit modal state
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
@@ -253,7 +248,7 @@ export default function PlatformProductsPage() {
     if (!validateResult) return
     const disable = validateResult.issues.notFound.length
     const reprice = validateResult.issues.priceMismatch.length
-    const confirmMsg = `將執行：\n• 自動下架 ${disable} 筆查無方案\n• 更新 ${reprice} 筆成本價\n• 成本上升的方案，售價維持原利潤跟漲（毛利不足 40% 補到 40%）；成本下降不動售價\n• 依目前福利價倍率重算福利價（成本未變、但倍率有調整過的商品也一起更新）\n\n確定要套用嗎？`
+    const confirmMsg = `將執行：\n• 自動下架 ${disable} 筆查無方案\n• 更新 ${reprice} 筆成本價（售價一律維持不變）\n• 福利價依「成本 × 目前倍率」重算（成本未變、但倍率有調整過的商品也一起更新）\n\n確定要套用嗎？`
     if (!(await confirmDialog({ title: '套用商品變更？', message: confirmMsg, confirmText: '確定套用' }))) return
 
     setApplying(true)
@@ -267,39 +262,6 @@ export default function PlatformProductsPage() {
     setValidateResult(null)
     setAffectedIds(new Map())   // 套用後清除徽章
     load()
-  }
-
-  // ── 毛利保護 ──────────────────────────────────────────────
-  const loadGuard = () => {
-    fetch('/api/admin/products/margin-guard')
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d) setGuard(d) })
-      .catch(() => {})
-  }
-  useEffect(loadGuard, [])
-
-  const patchGuard = async (patch: { enabled?: boolean; rate?: number }) => {
-    setGuardBusy(true)
-    const r = await fetch('/api/admin/products/margin-guard', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
-    }).then(x => x.json()).catch(() => null)
-    setGuardBusy(false)
-    if (r?.error) toast.error(r.error)
-    else if (r) setGuard(r)
-  }
-
-  const handleRaiseMargin = async () => {
-    if (!guard || guard.belowCount === 0) return
-    const preview = guard.samples.slice(0, 3)
-      .map(s => `• ${s.country} ${s.days}天 ${s.cap ?? ''}：NT$${s.sell} → NT$${s.newSell}`).join('\n')
-    const more = guard.belowCount > 3 ? `\n…等共 ${guard.belowCount} 筆` : ''
-    if (!(await confirmDialog({ title: '補足毛利？', message: `將把毛利低於 ${guard.rate}% 的 ${guard.belowCount} 筆商品售價補到 ${guard.rate}% 毛利：\n${preview}${more}`, confirmText: '確定補價' }))) return
-    setGuardBusy(true)
-    const r = await fetch('/api/admin/products/margin-guard', { method: 'POST' }).then(x => x.json()).catch(() => null)
-    setGuardBusy(false)
-    if (r?.error) { toast.error(r.error); return }
-    toast.success(`已補價 ${r.raised} 筆`)
-    loadGuard(); load()
   }
 
   const openEdit = (p: Product) => {
@@ -425,56 +387,6 @@ export default function PlatformProductsPage() {
         </div>
       </div>
 
-      {/* 毛利保護設定列 */}
-      {guard && (
-        <div className="mb-4 flex items-center gap-3 flex-wrap bg-white border rounded-xl px-4 py-2.5">
-          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
-            <span>🛡️</span> 毛利保護
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={guard.enabled}
-            aria-label="毛利保護開關"
-            onClick={() => patchGuard({ enabled: !guard.enabled })}
-            disabled={guardBusy}
-            className={`relative w-9 h-5 rounded-full transition-colors disabled:opacity-50 ${guard.enabled ? 'bg-blue-600' : 'bg-gray-300'}`}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${guard.enabled ? 'translate-x-4' : ''}`} />
-          </button>
-          {guard.enabled ? (
-            <>
-              <label className="flex items-center gap-1.5 text-sm text-gray-600">
-                最低毛利
-                <input
-                  key={guard.rate}
-                  type="number" min={1} max={95} defaultValue={guard.rate}
-                  onBlur={e => { const v = parseInt(e.target.value); if (v && v !== guard.rate) patchGuard({ rate: v }) }}
-                  className="w-14 border rounded-lg px-2 py-1 text-center text-sm"
-                />
-                %
-              </label>
-              <button
-                onClick={handleRaiseMargin}
-                disabled={guardBusy || guard.belowCount === 0}
-                className="ml-auto bg-blue-600 text-white px-3.5 py-1.5 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-40 flex items-center gap-1.5"
-              >
-                <span>↗</span> 一鍵補到 {guard.rate}%
-              </button>
-              {guard.belowCount > 0 ? (
-                <span className="w-full text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 flex items-center gap-1.5">
-                  <span>⚠️</span> 目前有 {guard.belowCount} 筆商品毛利低於 {guard.rate}%，點「一鍵補到 {guard.rate}%」可一次調整售價
-                </span>
-              ) : (
-                <span className="w-full text-xs text-green-700">✓ 目前所有上架商品毛利都達 {guard.rate}% 以上</span>
-              )}
-            </>
-          ) : (
-            <span className="text-xs text-gray-400">關閉中 · 開啟後可設定最低毛利門檻、一鍵補價，且驗證套用／匯入也會自動把售價補到門檻</span>
-          )}
-        </div>
-      )}
-
       {/* Search bar */}
       <div className="mb-4 relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">🔍</span>
@@ -541,10 +453,8 @@ export default function PlatformProductsPage() {
                   <td className="px-4 py-3 text-gray-400">NT${p.costPrice}</td>
                   <td className="px-4 py-3">
                     <span
-                      title={lossy ? '虧損（售價未高於成本）' : marginPct < (guard?.rate ?? 40) ? `低於門檻 ${guard?.rate ?? 40}%` : undefined}
-                      className={`text-xs font-medium ${
-                        lossy ? 'text-red-600' : marginPct < (guard?.rate ?? 40) ? 'text-amber-600' : 'text-gray-600'
-                      }`}
+                      title={lossy ? '虧損（售價未高於成本）' : undefined}
+                      className={`text-xs font-medium ${lossy ? 'text-red-600' : 'text-gray-600'}`}
                     >
                       {marginPct}%
                     </span>
@@ -722,7 +632,7 @@ export default function PlatformProductsPage() {
                   </h3>
                   <div className="space-y-1">
                     {mismatchGroups.map(g => {
-                      const costUp = g.gap > 0   // 我的成本低於 WM → 成本↑ → 售價跟漲（+gap）；反之降回 WM、售價不變
+                      const costUp = g.gap > 0   // 我的成本低於 WM → 成本↑；反之降回 WM。售價一律不動，只同步成本與福利價
                       return (
                         <div key={g.skuId} className="flex items-center justify-between gap-2 bg-amber-50 rounded-lg px-3 py-2 text-sm">
                           <div className="min-w-0">
@@ -741,9 +651,7 @@ export default function PlatformProductsPage() {
                             <span className={`tabular-nums font-semibold ${costUp ? 'text-red-600' : 'text-green-600'}`}>
                               {costUp ? '+' : ''}{g.gap}
                             </span>
-                            <span className={`rounded-full px-1.5 py-0.5 ${costUp ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                              {costUp ? `售價 +${g.gap}` : '售價不變'}
-                            </span>
+                            <span className="rounded-full px-1.5 py-0.5 bg-gray-100 text-gray-500">售價不變</span>
                           </div>
                         </div>
                       )
@@ -759,7 +667,7 @@ export default function PlatformProductsPage() {
                   onClick={handleApply}
                   disabled={applying}
                   className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 transition disabled:opacity-50"
-                  title="自動下架查無方案、成本同步 WM：成本上升時售價跟漲（維持固定利潤）、成本下降時售價不變"
+                  title="自動下架查無方案、成本同步 WM（漲跌都同步）；售價一律不變、福利價依成本×倍率重算"
                 >
                   {applying ? '套用中…' : `套用變更（${validateResult.issues.notFound.length} 下架 / ${validateResult.issues.priceMismatch.length} 改價）`}
                 </button>
@@ -782,7 +690,7 @@ export default function PlatformProductsPage() {
           <div className="flex-1">
             <p className="font-medium text-sm">已套用變更</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              自動下架 {applyResult.disabled} 筆 · 成本價更新 {applyResult.repriced} 筆 · 售價跟漲 {applyResult.priceRaised} 筆 · 福利價重算 {applyResult.benefitRecomputed} 筆
+              自動下架 {applyResult.disabled} 筆 · 成本價更新 {applyResult.repriced} 筆 · 福利價重算 {applyResult.benefitRecomputed} 筆
             </p>
           </div>
           <button onClick={() => setApplyResult(null)} className="text-gray-400 hover:text-gray-600 text-lg shrink-0">✕</button>

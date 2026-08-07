@@ -1,42 +1,8 @@
-// 售價隨成本調整的共用規則（驗證套用 /api/admin/products/validate/apply 與
-// 匯入 batchCreateProducts 共用，確保兩邊邏輯一致）。業主定案 2026-06：
-//   - 成本「上升」→ 售價維持原本的絕對利潤跟漲（售價 += 成本漲幅）
-//   - 成本不變 / 下降 → 不主動調售價（只漲不降）
-//   - 毛利保護開啟時，售價不得低於門檻毛利（補到剛好門檻）
-
-// 達到指定毛利率的最低售價：margin=(sell−cost)/sell ≥ rate ⟺ sell ≥ cost/(1−rate)。
-// rate 不在 (0,1) 區間時不設限，直接回傳 cost。
-export function sellForMinMargin(cost: number, rate: number): number {
-  if (!(rate > 0 && rate < 1)) return cost
-  return Math.ceil(cost / (1 - rate))
-}
-
-export interface SellAdjustInput {
-  oldCost: number
-  oldSell: number
-  newCost: number
-  guardEnabled: boolean
-  minMarginRate: number   // 0~1，例 0.40 = 40%
-}
-
-// 依新成本算出應有售價。
-export function sellPriceForCostChange(input: SellAdjustInput): number {
-  const { oldCost, oldSell, newCost, guardEnabled, minMarginRate } = input
-  if (newCost <= oldCost) return oldSell           // 只漲不降
-  let sell = oldSell + (newCost - oldCost)         // 維持固定利潤
-  if (guardEnabled) sell = Math.max(sell, sellForMinMargin(newCost, minMarginRate))
-  return sell
-}
-
-export interface MarginGuard {
-  enabled: boolean
-  rate: number   // 0~1
-}
-
-export const DEFAULT_MARGIN_GUARD: MarginGuard = { enabled: false, rate: 0.40 }
-
 // 企業福利價（PRD 五）：福利價 = 成本 × 倍率。倍率單一來源為 PlatformSetting.benefitMarkupRate，
 // 預設 1.5。商品匯入/新增/後台計算一律走這支，不要在各處寫死 ×1.5。
+//
+// 售價（sellPrice）一律由後台/Excel 手動設定，不隨成本變動（業主定案 2026-08，
+// 舊的「成本上升售價跟漲」與「毛利保護補到門檻」已移除）。
 export const DEFAULT_BENEFIT_MARKUP = 1.5
 
 export function benefitPriceFromCost(cost: number, markup: number = DEFAULT_BENEFIT_MARKUP): number {
