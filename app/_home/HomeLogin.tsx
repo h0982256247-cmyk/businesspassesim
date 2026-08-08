@@ -6,9 +6,13 @@
 //
 // host 為白牌自訂網域時，會在 server 端（app/page.tsx）先 redirect 到該租戶 LIFF，
 // 不會走到這頁。
+//
+// 登入表單本體共用 components/platform/AdminLoginForm（與 /platform/login 同一份，
+// 避免兩邊各寫一份導致「記住我」等文案漂移）。
 
-import { Suspense, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import AdminLoginForm from '@/components/platform/AdminLoginForm'
 
 export default function HomeLogin() {
   return (
@@ -19,47 +23,9 @@ export default function HomeLogin() {
 }
 
 function HomeLoginInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   // proxy redirect 後會帶 ?from=<舊路徑>，方便我們顯示「您剛被導離 /xxx」
   const from = searchParams.get('from')
-
-  const [rememberMe, setRemember] = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-  const [loading, setLoading]     = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setLoading(true)
-    setError(null)
-
-    // 直接讀表單當下的值，確保自動填入的內容一定被抓到（不依賴可能還沒同步的 state）。
-    const fd = new FormData(e.currentTarget)
-    const email = String(fd.get('email') ?? '').trim()
-    const password = String(fd.get('password') ?? '')
-
-    let r: { admin?: { role?: string }; error?: string } = {}
-    try {
-      r = await fetch('/api/platform/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe }),
-      }).then(x => x.json())
-    } catch {
-      setError('網路錯誤，請稍候再試')
-      setLoading(false)
-      return
-    }
-
-    setLoading(false)
-
-    if (!r.admin) {
-      setError(r.error ?? '登入失敗')
-      return
-    }
-    // PLATFORM_ADMIN / SUB_ADMIN / SUPER_ADMIN 都進 /platform，後台再依角色顯示功能。
-    router.replace('/platform')
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center px-4 py-12">
@@ -74,52 +40,7 @@ function HomeLoginInner() {
           <h1 className="text-2xl font-bold text-center mb-1">後台登入</h1>
           <p className="text-sm text-gray-400 text-center mb-6">平台 / 社群管理員</p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="text-sm text-gray-600 block mb-1">電子郵件</label>
-              <input
-                type="email"
-                name="email"
-                required
-                autoComplete="username"
-                className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="admin@example.com"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-600 block mb-1">密碼</label>
-              <input
-                type="password"
-                name="password"
-                required
-                autoComplete="current-password"
-                className="w-full border rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                id="rememberMe"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={e => setRemember(e.target.checked)}
-                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-              />
-              <label htmlFor="rememberMe" className="text-sm text-gray-600 cursor-pointer select-none">
-                記住我（30 天免登入）
-              </label>
-            </div>
-
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold text-sm disabled:opacity-50 hover:bg-blue-700 transition"
-            >
-              {loading ? '登入中…' : '登入'}
-            </button>
-          </form>
+          <AdminLoginForm />
         </div>
 
         {/* 企業管理員導引 — 走 LINE LIFF，非此後台（此後台為商務通平台管理者用） */}
