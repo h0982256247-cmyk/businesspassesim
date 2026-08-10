@@ -138,8 +138,8 @@ export default function OrderDetailPage() {
   const [redeeming, setRedeeming] = useState(false)
   const [redeemError, setRedeemError] = useState<string | null>(null)
   const [redeemTimeout, setRedeemTimeout] = useState(false)
-  const [canOneClick, setCanOneClick] = useState(false)
-  const [installOS, setInstallOS] = useState<'ios' | 'android'>('ios')
+  const [canOneClick] = useState(supportsOneClickEsim)
+  const [installOS, setInstallOS] = useState<'ios' | 'android'>(() => (isIOSDevice() ? 'ios' : 'android'))
   const [manualOpen, setManualOpen] = useState(false)   // 手動安裝一律預設收合，點按鈕才展開
   // 自訂確認彈窗（取代 window.confirm，避免 LINE 內建瀏覽器露出網址）
   const [dialog, setDialog] = useState<null | {
@@ -154,8 +154,6 @@ export default function OrderDetailPage() {
       .then(() => setToast({ message: t.orderDetail.copied(label), tone: 'success' }))
       .catch(() => setToast({ message: t.orderDetail.copyFailed, tone: 'error' }))
   }, [t])
-
-  useEffect(() => { setCanOneClick(supportsOneClickEsim()); setInstallOS(isIOSDevice() ? 'ios' : 'android') }, [])
 
   // 從 TapPay (LINE Pay / 3DS) 跳轉回來時，網址會帶 ?status=<n>。
   // status=0 是付款成功（等 webhook fan-out），非零代表失敗或使用者取消。
