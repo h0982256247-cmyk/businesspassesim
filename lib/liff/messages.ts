@@ -76,6 +76,7 @@ const zh = {
     removeAria: '從購物車移除',
     addAria: '加入購物車',
     coverage: '適用國家',
+    coverageCount: (n: number) => `共 ${n} 個國家／地區可用`,
     dayUnit: '天',
     // 流量類型：value 維持中文（＝?data= 參數與 capKindOf 比對鍵），此處只翻「顯示標籤」
     dataTypeLabel: (v: string) => v,
@@ -444,6 +445,7 @@ const en: Messages = {
     removeAria: 'Remove from cart',
     addAria: 'Add to cart',
     coverage: 'Coverage',
+    coverageCount: (n: number) => `${n} ${n === 1 ? 'country / region' : 'countries / regions'} available`,
     dayUnit: 'd',
     dataTypeLabel: (v: string) =>
       ({ '總量': 'Total', '每日型': 'Daily', '吃到飽': 'Unlimited' } as Record<string, string>)[v] ?? v,
