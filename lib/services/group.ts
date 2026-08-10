@@ -281,8 +281,11 @@ export async function setMemberAdmin(
 // ─── 查詢 ────────────────────────────────────────────────────────
 
 export async function getUserMembership(userId: string) {
-  return prisma.groupMember.findUnique({
-    where: { userId },
+  // 只回「在籍」會員（leftAt=null）。已退出的舊記錄仍保留在 DB（供日後重新申請時覆寫），
+  // 但不可再顯示為企業會員，否則退出後「我的企業」畫面仍卡在「企業會員」卡。
+  // 與 getManagedCompany（管理員判斷）、isApprovedMember（取價）過濾 leftAt 的語意一致。
+  return prisma.groupMember.findFirst({
+    where: { userId, leftAt: null },
     include: { group: { select: { id: true, name: true, description: true, isActive: true } } },
   })
 }
