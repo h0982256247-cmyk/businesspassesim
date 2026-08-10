@@ -1,6 +1,8 @@
 // 目的地搜尋的單一來源：商城國家列表與主頁搜尋共用同一套比對規則，
 // 避免兩處各寫一份而行為走鐘（例：主頁不會「打日出日本」、也不吃適用國家）。
 
+import { enCountryName } from '@/lib/liff/country-names'
+
 /** 比對只需要國名兩欄；商城 Country 與主頁 HomeCountry 都相容。 */
 export interface SearchableCountry {
   countryCode: string
@@ -41,5 +43,6 @@ export function filterCountriesByQuery<C extends SearchableCountry>(
   return countries.filter(c =>
     c.countryNameZh.toLowerCase().includes(q) ||
     c.countryNameEn.toLowerCase().includes(q) ||
+    enCountryName(c.countryNameZh).toLowerCase().includes(q) ||
     byCoverage.has(c.countryCode))
 }

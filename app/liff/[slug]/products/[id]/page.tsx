@@ -10,6 +10,7 @@ import { useCart } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge, parseNetworkType } from '@/components/liff/ProductBadges'
 import { S } from '@/lib/liff/tokens'
 import { useT } from '@/components/liff/LocaleProvider'
+import { enCountryName } from '@/lib/liff/country-names'
 
 type Product = {
   id: string
@@ -49,7 +50,7 @@ export default function ProductDetailPage() {
   const C = useTenantColors()
   const cart = useCart()
   const { t, locale } = useT()
-  const cname = (zh: string, en: string) => (locale === 'en' ? (en || zh) : zh)
+  const cname = (zh: string, en: string) => (locale === 'en' ? enCountryName(zh, en) : zh)
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)

@@ -7,6 +7,7 @@ import { useTenantColors } from '@/components/liff/TenantContext'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
 import { useT } from '@/components/liff/LocaleProvider'
+import { enCountryName } from '@/lib/liff/country-names'
 
 // Pages where the floating cart should NOT appear
 const HIDE_ON = ['/checkout', '/profile/setup', '/login', '/gift/']
@@ -65,7 +66,7 @@ export default function FloatingCart() {
   const slug = params?.slug ?? ''
   const C = useTenantColors()
   const { t, locale } = useT()
-  const cname = (zh: string, en?: string | null) => (locale === 'en' ? (en || zh) : zh)
+  const cname = (zh: string, en?: string | null) => (locale === 'en' ? enCountryName(zh, en) : zh)
   const { items, count, totalQty, subtotal, remove, setQty, hydrated } = useCart()
   const [open, setOpen] = useState(false)
   const [bumped, setBumped] = useState(false)
