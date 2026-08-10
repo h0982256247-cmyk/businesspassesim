@@ -1,26 +1,12 @@
 'use client'
 
 import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
+import { useT } from '@/components/liff/LocaleProvider'
 
 const S = {
   white: '#ffffff', ink: '#1a1a1a', muted: '#4b5563', faint: '#94a3b8',
   line: 'rgba(0,0,0,0.07)',
 } as const
-
-const FAQS = [
-  {
-    q: 'eSIM 如何安裝？',
-    a: '付款完成後，在訂單頁面掃描 QR Code，或複製 LPA 碼手動輸入。iOS 14+ / Android 12+ 支援 eSIM。',
-  },
-  {
-    q: '啟動碼多久會寄出？',
-    a: '通常付款後 5 分鐘內完成。若超過 30 分鐘，請聯繫 LINE 客服。',
-  },
-  {
-    q: '可以退款嗎？',
-    a: '啟動碼尚未使用前，可聯繫客服申請退款。已安裝使用的 eSIM 恕不退款。',
-  },
-]
 
 function LineIcon() {
   return (
@@ -41,10 +27,12 @@ function ChevronDown() {
 export default function SupportPage() {
   const C = useTenantColors()
   const tenant = useTenant()
+  const { t } = useT()
+  const FAQS = t.support.faqs
 
   return (
     <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 16px 96px' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: S.ink, margin: '0 0 20px', letterSpacing: '-0.02em' }}>客服中心</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: S.ink, margin: '0 0 20px', letterSpacing: '-0.02em' }}>{t.support.title}</h1>
 
       {/* LINE 客服（導向後台設定的官方帳號連結；未設定則不顯示此卡）*/}
       {tenant?.lineOaUrl && (
@@ -70,8 +58,8 @@ export default function SupportPage() {
           <LineIcon />
         </div>
         <div style={{ flex: 1 }}>
-          <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: 0 }}>LINE 客服</p>
-          <p style={{ fontSize: 12, color: S.faint, margin: '3px 0 0' }}>週一至週五 10:00–18:00</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: 0 }}>{t.support.lineTitle}</p>
+          <p style={{ fontSize: 12, color: S.faint, margin: '3px 0 0' }}>{t.support.lineHours}</p>
         </div>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={S.faint} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="9 18 15 12 9 6" />
@@ -82,7 +70,7 @@ export default function SupportPage() {
       {/* FAQ */}
       <div style={{ background: S.white, borderRadius: 16, border: `1px solid ${S.line}`, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
         <p style={{ fontSize: 12, fontWeight: 700, color: S.faint, letterSpacing: '0.08em', margin: 0, padding: '14px 18px 10px', borderBottom: `1px solid ${S.line}` }}>
-          常見問題
+          {t.support.faqHeader}
         </p>
         {FAQS.map(({ q, a }, i) => (
           <details

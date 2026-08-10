@@ -7,6 +7,7 @@ import PageSkeleton from '@/components/liff/PageSkeleton'
 import { S } from '@/lib/liff/tokens'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import { resizeToBlob } from '@/lib/utils/image'
+import { useT } from '@/components/liff/LocaleProvider'
 
 type Membership = {
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -16,6 +17,7 @@ type Membership = {
 export default function CompanyPage() {
   const base = useLiffBase()
   const C = useTenantColors()
+  const { t } = useT()
   const [membership, setMembership] = useState<Membership>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -51,8 +53,8 @@ export default function CompanyPage() {
   const onPickFile = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] ?? null
     setMsg(null)
-    if (f && !f.type.startsWith('image/')) { setMsg('請選擇圖片檔'); return }
-    if (f && f.size > 15 * 1024 * 1024) { setMsg('原圖請小於 15MB'); return }
+    if (f && !f.type.startsWith('image/')) { setMsg(t.company.errNotImage); return }
+    if (f && f.size > 15 * 1024 * 1024) { setMsg(t.company.errTooLarge); return }
     setFile(f)
     setPreview(f ? URL.createObjectURL(f) : null)
   }
@@ -68,11 +70,11 @@ export default function CompanyPage() {
       fd.append('file', blob, 'credential.jpg')
       r = await fetch('/api/groups/join', { method: 'POST', body: fd }) // 不設 Content-Type，讓瀏覽器帶 multipart boundary
     } catch {
-      setBusy(false); setMsg('圖片處理失敗，請換一張再試'); return
+      setBusy(false); setMsg(t.company.errImageFailed); return
     }
     const d = await r.json().catch(() => ({}))
     setBusy(false)
-    if (!r.ok) { setMsg(d.error ?? '加入失敗'); return }
+    if (!r.ok) { setMsg(d.error ?? t.company.errJoinFailed); return }
     setCode('')
     setFile(null)
     setPreview(null)
@@ -93,24 +95,24 @@ export default function CompanyPage() {
 
   return (
     <div style={{ maxWidth: 520, margin: '0 auto', padding: '28px 16px 96px' }}>
-      <h1 style={{ fontSize: 20, fontWeight: 800, color: S.ink, margin: '0 0 16px' }}>我的企業</h1>
+      <h1 style={{ fontSize: 20, fontWeight: 800, color: S.ink, margin: '0 0 16px' }}>{t.company.title}</h1>
 
       {m && m.status === 'APPROVED' ? (
         <div style={{ background: S.white, borderRadius: 16, border: `1px solid ${S.line}`, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <p style={{ fontSize: 17, fontWeight: 700, color: S.ink, margin: 0 }}>{m.group.name}</p>
-            <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 100 }}>企業會員</span>
+            <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 100 }}>{t.profile.memberBadge}</span>
           </div>
           {m.group.description && <p style={{ fontSize: 13, color: S.muted, margin: '0 0 12px' }}>{m.group.description}</p>}
           <div style={{ background: C.soft, borderRadius: 12, padding: '12px 14px', marginBottom: 16 }}>
-            <p style={{ fontSize: 13, color: C.primaryText, margin: 0, fontWeight: 600 }}>✓ 購買 eSIM 享企業福利價</p>
+            <p style={{ fontSize: 13, color: C.primaryText, margin: 0, fontWeight: 600 }}>{t.company.benefit}</p>
           </div>
           {isAdmin && (
             <a
               href={`${base}/company-admin`}
               style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 12, background: C.primary, color: C.onPrimary, fontWeight: 700, fontSize: 14, textDecoration: 'none', marginBottom: 10 }}
             >
-              管理成員（審核 / 移除）
+              {t.company.manageMembers}
             </a>
           )}
           <button
@@ -118,57 +120,57 @@ export default function CompanyPage() {
             disabled={busy}
             style={{ width: '100%', padding: '11px', borderRadius: 12, background: 'transparent', border: `1px solid ${S.line}`, color: '#dc2626', fontWeight: 600, fontSize: 13, cursor: busy ? 'default' : 'pointer' }}
           >
-            退出企業
+            {t.company.leave}
           </button>
         </div>
       ) : m && m.status === 'PENDING' ? (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 16, padding: 20, textAlign: 'center' }}>
-          <p style={{ fontSize: 15, fontWeight: 700, color: '#9a3412', margin: '0 0 4px' }}>加入申請審核中</p>
-          <p style={{ fontSize: 13, color: '#c2410c', margin: 0 }}>企業「{m.group.name}」的管理員審核通過後，即可享福利價。</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#9a3412', margin: '0 0 4px' }}>{t.company.pendingTitle}</p>
+          <p style={{ fontSize: 13, color: '#c2410c', margin: 0 }}>{t.company.pendingBody(m.group.name)}</p>
         </div>
       ) : (
         <div style={{ background: S.white, borderRadius: 16, border: `1px solid ${S.line}`, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}>
-          <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: '0 0 4px' }}>加入企業</p>
-          <p style={{ fontSize: 13, color: S.muted, margin: '0 0 14px' }}>輸入公司提供的邀請碼，審核通過後購買 eSIM 享福利價。</p>
-          {m?.status === 'REJECTED' && <p style={{ fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>先前的申請未通過，可重新輸入邀請碼申請。</p>}
+          <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: '0 0 4px' }}>{t.company.joinTitle}</p>
+          <p style={{ fontSize: 13, color: S.muted, margin: '0 0 14px' }}>{t.company.joinIntro}</p>
+          {m?.status === 'REJECTED' && <p style={{ fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>{t.company.rejectedNote}</p>}
           <input
             value={code}
             onChange={e => setCode(e.target.value.toUpperCase())}
-            placeholder="邀請碼（如 A1B2C3D4）"
+            placeholder={t.company.codePlaceholder}
             maxLength={16}
             style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, border: `1px solid ${S.line}`, fontSize: 15, letterSpacing: '0.05em', marginBottom: 12, outline: 'none' }}
           />
           <label style={{ display: 'block', marginBottom: 4 }}>
-            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: S.ink, margin: '0 0 6px' }}>名片／工作證（必填）</span>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: S.ink, margin: '0 0 6px' }}>{t.company.credentialLabel}</span>
             <input type="file" accept="image/*" onChange={onPickFile} style={{ display: 'none' }} />
             {preview ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, border: `1px solid ${S.line}`, background: S.white, cursor: 'pointer' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={preview} alt="預覽" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                <img src={preview} alt={t.company.previewAlt} style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: S.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file?.name}</span>
-                <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: C.primary }}>重新選擇</span>
+                <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: C.primary }}>{t.company.reselect}</span>
               </span>
             ) : (
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '18px 12px', borderRadius: 12, border: `1.5px dashed ${S.line}`, background: C.soft, color: C.primaryText, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>＋ 上傳名片或工作證</span>
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '18px 12px', borderRadius: 12, border: `1.5px dashed ${S.line}`, background: C.soft, color: C.primaryText, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>{t.company.uploadCta}</span>
             )}
           </label>
-          <p style={{ fontSize: 11, color: S.faint, margin: '0 0 12px' }}>請上傳可佐證公司身分的圖片，供企業管理員審核。</p>
+          <p style={{ fontSize: 11, color: S.faint, margin: '0 0 12px' }}>{t.company.credentialHint}</p>
           {msg && <p style={{ fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>{msg}</p>}
           <button
             onClick={join}
             disabled={busy || !code.trim() || !file}
             style={{ width: '100%', padding: '12px', borderRadius: 12, background: C.primary, color: C.onPrimary, fontWeight: 700, fontSize: 14, border: 'none', cursor: busy || !code.trim() || !file ? 'default' : 'pointer', opacity: busy || !code.trim() || !file ? 0.6 : 1 }}
           >
-            {busy ? '送出中…' : '送出加入申請'}
+            {busy ? t.company.submitting : t.company.submitJoin}
           </button>
         </div>
       )}
 
       <ConfirmDialog
         open={confirmLeave}
-        title="退出企業"
-        lines={['退出後購買將恢復一般售價。']}
-        confirmLabel="退出"
+        title={t.company.leave}
+        lines={[t.company.leaveConfirmLine]}
+        confirmLabel={t.company.leaveConfirm}
         tone="danger"
         colors={C}
         onConfirm={leave}
