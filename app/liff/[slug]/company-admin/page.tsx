@@ -12,6 +12,7 @@ type Member = {
   id: string
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
   joinedAt: string
+  hasCredentialImage: boolean
   user: { id: string; displayName: string; avatarUrl: string | null }
 }
 type Managed = {
@@ -60,6 +61,8 @@ export default function CompanyAdminPage() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
+  const [viewUserId, setViewUserId] = useState<string | null>(null) // 正在查看名片/工作證的成員
+  const [viewError, setViewError] = useState(false)
 
   // 一鍵分享邀請碼：LINE 內用 shareTargetPicker 傳 Flex（含邀請碼 + 一鍵加入連結，
   // 連結帶 ?code= 到「加入企業」頁自動預填）；不支援時退回複製邀請碼。
@@ -162,6 +165,9 @@ export default function CompanyAdminPage() {
       <SectionTitle title={`待審核（${pending.length}）`} />
       {pending.length === 0 ? <Empty text="目前沒有待審核的申請" /> : pending.map(m => (
         <MemberRow key={m.id} m={m}>
+          {m.hasCredentialImage
+            ? <button onClick={() => { setViewError(false); setViewUserId(m.user.id) }} style={btn(C.soft, C.primaryText)}>查看</button>
+            : <span style={{ alignSelf: 'center', fontSize: 11, color: S.faint, whiteSpace: 'nowrap' }}>未提供</span>}
           <button onClick={() => act(m.user.id, 'approve')} disabled={busyId === m.user.id} style={btn(C.primary, C.onPrimary)}>核准</button>
           <button onClick={() => act(m.user.id, 'reject')} disabled={busyId === m.user.id} style={btn('transparent', '#dc2626', '#fecaca')}>拒絕</button>
         </MemberRow>
@@ -171,10 +177,39 @@ export default function CompanyAdminPage() {
         <SectionTitle title={`已核准成員（${approved.length}）`} />
         {approved.length === 0 ? <Empty text="尚無已核准成員" /> : approved.map(m => (
           <MemberRow key={m.id} m={m}>
+            {m.hasCredentialImage
+              ? <button onClick={() => { setViewError(false); setViewUserId(m.user.id) }} style={btn(C.soft, C.primaryText)}>查看</button>
+              : <span style={{ alignSelf: 'center', fontSize: 11, color: S.faint, whiteSpace: 'nowrap' }}>未提供</span>}
             <button onClick={() => setConfirmRemove(m.user.id)} disabled={busyId === m.user.id} style={btn('transparent', '#dc2626', '#fecaca')}>移除</button>
           </MemberRow>
         ))}
       </div>
+
+      {viewUserId && (
+        <div
+          onClick={() => setViewUserId(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(15,23,42,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, animation: 'cvFade 0.15s ease' }}
+        >
+          {viewError ? (
+            <p style={{ color: '#fff', fontSize: 14 }}>圖片載入失敗，請稍後再試</p>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={`/api/company-admin/members/${viewUserId}/credential`}
+              alt="名片／工作證"
+              onClick={e => e.stopPropagation()}
+              onError={() => setViewError(true)}
+              style={{ maxWidth: '100%', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 20px 50px rgba(0,0,0,0.4)' }}
+            />
+          )}
+          <button
+            onClick={() => setViewUserId(null)}
+            aria-label="關閉"
+            style={{ position: 'fixed', top: 16, right: 16, width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.92)', color: '#0f172a', fontSize: 22, fontWeight: 700, lineHeight: 1, cursor: 'pointer' }}
+          >×</button>
+          <style>{`@keyframes cvFade { from{opacity:0} to{opacity:1} }`}</style>
+        </div>
+      )}
 
       <ConfirmDialog
         open={confirmRemove !== null}

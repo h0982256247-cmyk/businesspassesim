@@ -4,31 +4,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from '@/components/platform/Toast'
 import { APPEARANCE } from '@/lib/utils/appearance'
-
-// 前端把圖縮到最長邊 maxEdge、輸出 JPEG Blob 再上傳（避開 Vercel body 上限、上傳更快）。
-function resizeToBlob(file: File, maxEdge: number, quality = 0.82): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('讀取失敗'))
-    reader.onload = () => {
-      const img = document.createElement('img')
-      img.onerror = () => reject(new Error('圖片解析失敗'))
-      img.onload = () => {
-        const scale = Math.min(1, maxEdge / Math.max(img.width, img.height))
-        const w = Math.max(1, Math.round(img.width * scale))
-        const h = Math.max(1, Math.round(img.height * scale))
-        const canvas = document.createElement('canvas')
-        canvas.width = w; canvas.height = h
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return reject(new Error('無法建立畫布'))
-        ctx.drawImage(img, 0, 0, w, h)
-        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('轉檔失敗'))), 'image/jpeg', quality)
-      }
-      img.src = reader.result as string
-    }
-    reader.readAsDataURL(file)
-  })
-}
+import { resizeToBlob } from '@/lib/utils/image'
 
 interface CountryImg {
   code: string
