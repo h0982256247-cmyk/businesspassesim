@@ -64,7 +64,8 @@ export default function FloatingCart() {
   const params = useParams<{ slug?: string }>()
   const slug = params?.slug ?? ''
   const C = useTenantColors()
-  const { t } = useT()
+  const { t, locale } = useT()
+  const cname = (zh: string, en?: string | null) => (locale === 'en' ? (en || zh) : zh)
   const { items, count, totalQty, subtotal, remove, setQty, hydrated } = useCart()
   const [open, setOpen] = useState(false)
   const [bumped, setBumped] = useState(false)
@@ -256,7 +257,7 @@ export default function FloatingCart() {
 
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: '0 0 2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {item.countryNameZh}
+                            {cname(item.countryNameZh, item.countryNameEn)}
                           </p>
                           <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
                             {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${t.formatCapacity(item.dataCapacity)}` : ''}

@@ -225,6 +225,7 @@ export default function ProductDetailPage() {
                       productId: product.id,
                       countryCode: product.countryCode,
                       countryNameZh: product.countryNameZh,
+                      countryNameEn: product.countryNameEn,
                       countryFlag: product.countryFlag,
                       displayDays: product.displayDays,
                       dataCapacity: product.dataCapacity,

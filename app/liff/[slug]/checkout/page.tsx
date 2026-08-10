@@ -33,6 +33,7 @@ type Product = {
   id: string
   countryCode: string
   countryNameZh: string
+  countryNameEn: string
   countryFlag: string | null
   displayDays: number
   sellPrice: number
@@ -119,7 +120,8 @@ function CheckoutContent() {
   const base = useLiffBase()
   const cart = useCart()
   const { liff } = useLiff()
-  const { t } = useT()
+  const { t, locale } = useT()
+  const cname = (zh: string, en?: string | null) => (locale === 'en' ? (en || zh) : zh)
 
   const [product, setProduct] = useState<Product | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'LINE_PAY'>('CREDIT_CARD')
@@ -635,7 +637,7 @@ function CheckoutContent() {
                   <CountryFlag code={item.countryCode} fallbackEmoji={item.countryFlag} size={30} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: '0 0 2px' }}>{item.countryNameZh}</p>
+                  <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: '0 0 2px' }}>{cname(item.countryNameZh, item.countryNameEn)}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11.5, color: '#64748b' }}>
                       {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${t.formatCapacity(item.dataCapacity)}` : ''}
@@ -691,7 +693,7 @@ function CheckoutContent() {
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a', margin: '0 0 4px' }}>{product!.countryNameZh}</p>
+              <p style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a', margin: '0 0 4px' }}>{cname(product!.countryNameZh, product!.countryNameEn)}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
                 <span style={{
                   fontSize: 12, fontWeight: 600, color: '#4b5563',

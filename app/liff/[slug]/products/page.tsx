@@ -178,6 +178,7 @@ function ProductsContent() {
         productId: product.id,
         countryCode: product.countryCode,
         countryNameZh: product.countryNameZh,
+        countryNameEn: product.countryNameEn,
         countryFlag: country?.countryFlag ?? null,
         displayDays: product.displayDays,
         dataCapacity: product.dataCapacity,
