@@ -11,6 +11,7 @@ interface CountryImg {
   nameZh: string
   imageUrl: string | null       // 後台上傳的覆寫
   defaultImageUrl: string | null // 內建預設
+  active: boolean               // false＝整國已無上架方案（灰階、不可編輯）
 }
 
 export default function AppearancePage() {
@@ -232,15 +233,16 @@ function CountryCell({
   c: CountryImg; busy: boolean; onPick: (f: File) => void; onRemove?: () => void
 }) {
   const effective = c.imageUrl ?? c.defaultImageUrl
-  const badge = c.imageUrl ? { t: '自訂', cls: 'bg-blue-50 text-blue-600' }
+  const badge = !c.active ? { t: '已下架', cls: 'bg-gray-200 text-gray-500' }
+    : c.imageUrl ? { t: '自訂', cls: 'bg-blue-50 text-blue-600' }
     : c.defaultImageUrl ? { t: '預設', cls: 'bg-gray-100 text-gray-500' }
     : { t: '色塊', cls: 'bg-amber-50 text-amber-600' }
   return (
-    <div className="border border-gray-100 rounded-xl p-3 flex gap-3">
+    <div className={`border border-gray-100 rounded-xl p-3 flex gap-3 ${c.active ? '' : 'opacity-60'}`}>
       <div className="w-16 h-16 rounded-lg border border-gray-200 bg-gray-50 overflow-hidden flex items-center justify-center flex-shrink-0">
         {effective
           // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={effective} alt={c.nameZh} className="w-full h-full object-cover" />
+          ? <img src={effective} alt={c.nameZh} className={`w-full h-full object-cover ${c.active ? '' : 'grayscale'}`} />
           : <span className="text-[10px] text-gray-300">無圖</span>}
       </div>
       <div className="min-w-0 flex-1">
@@ -249,10 +251,14 @@ function CountryCell({
           <span className="text-[10px] text-gray-400">{c.code}</span>
           <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${badge.cls} ml-auto flex-shrink-0`}>{badge.t}</span>
         </div>
-        <div className="flex items-center gap-2 mt-2">
-          <PickButton label={c.imageUrl ? '更換' : '上傳'} busy={busy} onPick={onPick} />
-          {onRemove && <button type="button" onClick={onRemove} disabled={busy} className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50">還原</button>}
-        </div>
+        {c.active ? (
+          <div className="flex items-center gap-2 mt-2">
+            <PickButton label={c.imageUrl ? '更換' : '上傳'} busy={busy} onPick={onPick} />
+            {onRemove && <button type="button" onClick={onRemove} disabled={busy} className="text-xs text-gray-400 hover:text-red-500 disabled:opacity-50">還原</button>}
+          </div>
+        ) : (
+          <p className="text-[11px] text-gray-400 mt-2">已無上架方案，不可編輯</p>
+        )}
       </div>
     </div>
   )

@@ -371,12 +371,12 @@ export default function PlatformProductsPage() {
               // 單國方案兩者相同（日本）；區域方案才看得出差異（中港澳 → 中國、香港、澳門）。
               const XLSX = await import('xlsx')
               const rows: (string | number)[][] = [
-                ['供應商方案ID', 'plan_code', '商品名稱', '適用地區', '適用國家', '是否為原生卡', '網絡類型', '成本價NT', '售價NT'],
-                ['WM-JP-001', 'JP-SB-1GB-3D', '日本Softbank 3天 1GB/天', '日本', '日本', '否', '4G/5G', 150, 299],
-                ['WM-CN-HK-MO-001', 'CNHKMO-5D-1GB', '中港澳 5天 1GB/天', '中港澳', '中國、香港、澳門', '否', '4G/5G', 180, 359],
+                ['供應商方案ID', 'plan_code', '商品名稱', '適用地區', '適用國家', '是否為原生卡', '網絡類型', '成本價NT', '售價NT', '產品描述（請列點）'],
+                ['WM-JP-001', 'JP-SB-1GB-3D', '日本Softbank 3天 1GB/天', '日本', '日本', '否', '4G/5G', 150, 299, '每日 1GB 高速\n超量降速不斷線\n可分享熱點'],
+                ['WM-CN-HK-MO-001', 'CNHKMO-5D-1GB', '中港澳 5天 1GB/天', '中港澳', '中國、香港、澳門', '否', '4G/5G', 180, 359, ''],
               ]
               const ws = XLSX.utils.aoa_to_sheet(rows)
-              ws['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 9 }, { wch: 9 }]
+              ws['!cols'] = [{ wch: 16 }, { wch: 16 }, { wch: 28 }, { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 9 }, { wch: 9 }, { wch: 28 }]
               const wb = XLSX.utils.book_new()
               XLSX.utils.book_append_sheet(wb, ws, '商品範本')
               XLSX.writeFile(wb, 'products_template.xlsx')

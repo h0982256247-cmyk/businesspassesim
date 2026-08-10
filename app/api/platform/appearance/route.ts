@@ -3,7 +3,7 @@ import { requirePlatformAuth } from '@/lib/auth/platform'
 import { AdminRole } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
 import { getPlatformSettings, updatePlatformSettings } from '@/lib/services/tenant-config'
-import { getAvailableCountries } from '@/lib/services/product'
+import { getAllCountriesForAppearance } from '@/lib/services/product'
 import { resolveDestImage, DEFAULT_HOME_HERO_URL } from '@/lib/utils/dest-image'
 import { uploadPublicImage, deletePublicImage } from '@/lib/services/storage'
 
@@ -21,7 +21,7 @@ async function guard(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const a = await guard(req)
   if (a instanceof NextResponse) return a
-  const [s, countries] = await Promise.all([getPlatformSettings(), getAvailableCountries()])
+  const [s, countries] = await Promise.all([getPlatformSettings(), getAllCountriesForAppearance()])
   return NextResponse.json({
     homeHeroUrl: s.homeHeroUrl,
     shopHeroUrl: s.shopHeroUrl,
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
       nameZh: c.countryNameZh,
       imageUrl: c.imageUrl,                                                     // 後台上傳的覆寫（null＝未設）
       defaultImageUrl: resolveDestImage(c.countryCode, c.countryNameZh) ?? null, // dest-image.ts 內建預設
+      active: c.active,                                                         // false＝整國已無上架方案（外觀頁灰階、不可編輯）
     })),
   })
 }

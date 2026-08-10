@@ -33,6 +33,8 @@ const HEADER_ALIAS: Record<string, string> = {
   '售價nt':         'sellPrice',
   '售價(nt)':       'sellPrice',
   '售價':           'sellPrice',
+  '產品描述請列點': 'description',   // 新報價單 J 欄「產品描述（請列點）」；normalizeHeader 去括號後
+  '產品描述':       'description',
   '利潤':           '_skip',
   // 英文欄位名（template）
   'supplierskuid':  'supplierSkuId',
@@ -329,7 +331,8 @@ export async function POST(req: NextRequest) {
   // /api/admin/products/validate 比對、POST .../apply 套用），讓匯入快速單純、
   // 不受 WM API 連線狀況影響。
   try {
-    const result = await batchCreateProducts(rows)
+    // 匯入即「取代全部」：本次匯入的方案為上架，其餘一律下架（軟下架，保留 OrderItem FK 與歷史）
+    const result = await batchCreateProducts(rows, undefined, { replaceAll: true })
 
     const warns: string[] = []
     if (skippedSheets.length > 0) warns.push(`略過非商品分頁：${skippedSheets.join('、')}`)
@@ -337,6 +340,7 @@ export async function POST(req: NextRequest) {
     const parts: string[] = []
     if (result.created > 0) parts.push(`新增 ${result.created} 筆`)
     if (result.updated > 0) parts.push(`更新 ${result.updated} 筆`)
+    if (result.deactivated > 0) parts.push(`下架 ${result.deactivated} 筆`)
     const summary = parts.length > 0 ? parts.join('、') : `處理 ${result.count} 筆`
     // 多分頁時附上實際匯入的分頁數，讓使用者確認全部分頁都吃到。
     const sheetNote = multiSheet && importedSheets.length > 0 ? `；共 ${importedSheets.length} 個分頁` : ''

@@ -89,6 +89,32 @@ export async function getAvailableCountries() {
   return sortByCountryOrder(products.map(p => ({ ...p, imageUrl: imgMap.get(p.countryCode) ?? null })))
 }
 
+// 外觀後台專用：列出「所有曾有方案的國家」（含目前全數下架者），附是否仍有上架方案(active)。
+// 用途：整國方案被匯入取代／全下架後，外觀頁仍保留該國（灰階、不可編輯），
+// 不讓先前上傳的國家圖變成看不到也管不到的孤兒。
+export async function getAllCountriesForAppearance() {
+  const [allCountries, activeCountries, imgMap] = await Promise.all([
+    // 不加 status 過濾 → 含只剩下架方案的國家（軟下架仍保留 Product 列，故國家身分還在）
+    prisma.product.findMany({
+      select: { countryCode: true, countryNameZh: true, countryNameEn: true, countryFlag: true },
+      distinct: ['countryCode'],
+      orderBy: { sortOrder: 'asc' },
+    }),
+    prisma.product.findMany({
+      where: { status: ProductStatus.ACTIVE, supplierProduct: { status: SupplierProductStatus.ACTIVE } },
+      select: { countryCode: true },
+      distinct: ['countryCode'],
+    }),
+    getDestinationImageMap(),
+  ])
+  const activeSet = new Set(activeCountries.map(c => c.countryCode))
+  return sortByCountryOrder(allCountries.map(p => ({
+    ...p,
+    imageUrl: imgMap.get(p.countryCode) ?? null,
+    active: activeSet.has(p.countryCode),
+  })))
+}
+
 // 主頁「熱門目的地」專用：只回國家清單 + 各國最低售價（約數十筆），不撈全部商品。
 // 原本主頁打 /api/products（上萬筆）只為了算每國最低價，載入很慢；改用此聚合查詢。
 export async function getCountriesWithMinPrice(isMember = false) {
@@ -250,8 +276,9 @@ export async function getBenefitMarkup(): Promise<number> {
 export async function batchCreateProducts(
   rows: CsvProductRow[],
   supplierMap?: SupplierProductMap,
-): Promise<{ count: number; created: number; updated: number }> {
-  if (rows.length === 0) return { count: 0, created: 0, updated: 0 }
+  opts?: { replaceAll?: boolean },
+): Promise<{ count: number; created: number; updated: number; deactivated: number }> {
+  if (rows.length === 0) return { count: 0, created: 0, updated: 0, deactivated: 0 }
 
   // 唯一化 wmProductId（CSV 同 SKU 多列）
   const wmIds = Array.from(new Set(rows.map(r => r.supplierSkuId)))
@@ -365,7 +392,39 @@ export async function batchCreateProducts(
     }
   }
 
-  return { count: created + updated, created, updated }
+  // ─── Step 7（選用）：匯入即「取代全部」──────────────────────────────
+  // 本次匯入的方案設為上架，其餘一律「下架」(INACTIVE)。用軟下架而非硬刪除：
+  // OrderItem.productId 是 FK，砍掉被買過的商品會破壞訂單歷史；下架可保留關聯且可還原。
+  let deactivated = 0
+  if (opts?.replaceAll) {
+    // 本次匯入涵蓋的商品（新建＋更新皆已寫入 DB，可由 plan_code / 無 plan_code 的 SKU 撈回）
+    const kept = await prisma.product.findMany({
+      where: {
+        OR: [
+          { planCode: { in: planCodesForRows } },
+          { AND: [{ planCode: null }, { supplierSkuId: { in: supplierIdsForRows } }] },
+        ],
+      },
+      select: { id: true },
+    })
+    const keptIds = kept.map(k => k.id)
+    // 防呆：撈不到任何本次商品時不動作，避免誤把全部下架
+    if (keptIds.length > 0) {
+      // 重匯先前被下架的方案 → 重新上架
+      await prisma.product.updateMany({
+        where: { id: { in: keptIds }, status: { not: ProductStatus.ACTIVE } },
+        data: { status: ProductStatus.ACTIVE },
+      })
+      // 不在本次匯入內、目前仍上架者 → 下架
+      const res = await prisma.product.updateMany({
+        where: { id: { notIn: keptIds }, status: ProductStatus.ACTIVE },
+        data: { status: ProductStatus.INACTIVE },
+      })
+      deactivated = res.count
+    }
+  }
+
+  return { count: created + updated, created, updated, deactivated }
 }
 
 // SQL bulk update — 把 N 個 update 壓成一個 `UPDATE ... FROM (VALUES ...)`。

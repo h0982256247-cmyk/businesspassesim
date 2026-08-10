@@ -86,7 +86,7 @@ export default function ProductDetailPage() {
     </div>
   )
 
-  const descLines = product.description?.split('\n').filter(Boolean) ?? []
+  const descLines = product.description?.split(/\r?\n/).map(l => l.trim()).filter(Boolean) ?? []
   const net = parseNetworkType(product.networkType)
 
   const features: string[] = [
@@ -158,9 +158,12 @@ export default function ProductDetailPage() {
           </div>
 
           {descLines.length > 0 && (
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${S.line}` }}>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${S.line}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {descLines.map((line, i) => (
-                <p key={i} style={{ fontSize: 13, color: S.faint, margin: i > 0 ? '4px 0 0' : 0 }}>{line}</p>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.primary, flexShrink: 0, marginTop: 7 }} />
+                  <span style={{ fontSize: 13, color: S.muted, lineHeight: 1.6 }}>{line}</span>
+                </div>
               ))}
             </div>
           )}
