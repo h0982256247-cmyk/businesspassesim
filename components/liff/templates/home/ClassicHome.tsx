@@ -195,8 +195,8 @@ export default function ClassicHome({
 
         {/* 篩選下拉：label 依語系翻譯，option value 維持中文（送到商城的參數/比對鍵不變）*/}
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-          <FilterDropdown label={t.home.filterDays} options={DAY_OPTIONS} value={selDays} onChange={setSelDays} primary={C.primary} />
-          <FilterDropdown label={t.home.filterData} options={DATA_OPTIONS} value={selData} onChange={setSelData} primary={C.primary} />
+          <FilterDropdown label={t.home.filterDays} options={DAY_OPTIONS} value={selDays} onChange={setSelDays} primary={C.primary} renderLabel={d => (locale === 'en' ? d.replace('天', ' days') : d)} />
+          <FilterDropdown label={t.home.filterData} options={DATA_OPTIONS} value={selData} onChange={setSelData} primary={C.primary} renderLabel={t.shop.dataTypeLabel} />
         </div>
       </div>
 
