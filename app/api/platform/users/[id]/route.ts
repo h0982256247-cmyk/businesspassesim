@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         birthday: true,
         createdAt: true,
         groupMembership: {
-          select: { status: true, role: true, joinedAt: true, group: { select: { id: true, name: true } } },
+          select: { status: true, role: true, leftAt: true, joinedAt: true, group: { select: { id: true, name: true } } },
         },
         orders: {
           select: {
@@ -65,12 +65,17 @@ export async function GET(req: NextRequest, { params }: Params) {
     return [{ ...rep, esimCount: group.length, bundleTotal: group.reduce((s, x) => s + x.totalPaid, 0) }]
   })
 
+  // 已退出（leftAt 有值）不算現任企業成員
+  const gm = user.groupMembership
   return NextResponse.json({
     user: {
       ...user,
       orders,
       phone: user.phone ? safeDecrypt(user.phone) : user.phone,
       email: user.email ? safeDecrypt(user.email) : user.email,
+      groupMembership: gm && !gm.leftAt
+        ? { status: gm.status, role: gm.role, joinedAt: gm.joinedAt, group: gm.group }
+        : null,
     },
   })
 }

@@ -42,17 +42,21 @@ export async function GET(req: NextRequest) {
         phone: true,
         email: true,
         createdAt: true,
-        groupMembership: { select: { status: true, role: true, group: { select: { name: true } } } },
+        groupMembership: { select: { status: true, role: true, leftAt: true, group: { select: { name: true } } } },
         _count: { select: { orders: true } },
       },
     }),
     prisma.user.count({ where }),
   ])
 
-  const usersDecrypted = users.map(u => ({
+  const usersDecrypted = users.map(({ groupMembership, ...u }) => ({
     ...u,
     phone: u.phone ? safeDecrypt(u.phone) : u.phone,
     email: u.email ? safeDecrypt(u.email) : u.email,
+    // 已退出（leftAt 有值）不算現任企業成員，避免後台把已退出者顯示為企業會員
+    groupMembership: groupMembership && !groupMembership.leftAt
+      ? { status: groupMembership.status, role: groupMembership.role, group: groupMembership.group }
+      : null,
   }))
 
   return NextResponse.json({ users: usersDecrypted, total, page, pageSize })
