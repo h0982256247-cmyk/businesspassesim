@@ -4,8 +4,10 @@ import type { Metadata } from 'next'
 import { LiffProvider } from '@/components/liff/LiffProvider'
 import LiffBottomNav from '@/components/liff/LiffBottomNav'
 import { TenantProvider } from '@/components/liff/TenantContext'
+import { LocaleProvider } from '@/components/liff/LocaleProvider'
 import { CartProvider } from '@/components/liff/CartProvider'
 import FloatingCart from '@/components/liff/FloatingCart'
+import { cookies } from 'next/headers'
 import { getTenantBySlug } from '@/lib/services/tenant'
 import { S, FONT } from '@/lib/liff/tokens'
 
@@ -27,9 +29,13 @@ export default async function TenantLiffLayout({ children, params }: Props) {
 
   if (!tenant) notFound()
 
+  // 語系初值讀 cookie（SSR 首屏即正確語言，避免閃爍；亦跨 LINE Pay 整頁返回保留）
+  const initialLocale = (await cookies()).get('esim_locale')?.value === 'en' ? 'en' : 'zh'
+
   return (
     <TenantProvider tenant={tenant}>
       <LiffProvider liffId={tenant.liffId} tenantSlug={slug}>
+       <LocaleProvider initialLocale={initialLocale}>
         <CartProvider>
           <div className="min-h-screen pb-16 liff-root" style={{ background: S.bg, fontFamily: FONT }}>
             {/* 全站按壓回饋的單一來源：任何點下去該有反應的按鈕/列加上 className="liff-press"
@@ -41,6 +47,7 @@ export default async function TenantLiffLayout({ children, params }: Props) {
           <FloatingCart />
           <LiffBottomNav />
         </CartProvider>
+       </LocaleProvider>
       </LiffProvider>
     </TenantProvider>
   )

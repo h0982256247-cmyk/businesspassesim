@@ -6,6 +6,7 @@ import { useCart, cartItemPrice } from '@/components/liff/CartProvider'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
+import { useT } from '@/components/liff/LocaleProvider'
 
 // Pages where the floating cart should NOT appear
 const HIDE_ON = ['/checkout', '/profile/setup', '/login', '/gift/']
@@ -63,6 +64,7 @@ export default function FloatingCart() {
   const params = useParams<{ slug?: string }>()
   const slug = params?.slug ?? ''
   const C = useTenantColors()
+  const { t } = useT()
   const { items, count, totalQty, subtotal, remove, setQty, hydrated } = useCart()
   const [open, setOpen] = useState(false)
   const [bumped, setBumped] = useState(false)
@@ -125,7 +127,7 @@ export default function FloatingCart() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`購物車（${totalQty} 張 eSIM）`}
+        aria-label={t.cart.fabAria(totalQty)}
         style={{
           position: 'fixed',
           right: 16,
@@ -201,15 +203,15 @@ export default function FloatingCart() {
               borderBottom: '1px solid rgba(0,0,0,0.06)',
             }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1a1a1a', margin: 0, letterSpacing: '-0.01em' }}>購物車</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1a1a1a', margin: 0, letterSpacing: '-0.01em' }}>{t.cart.title}</h2>
                 <span style={{ fontSize: 13, color: '#94a3b8' }}>
-                  {count} 項 · 共 {totalQty} 張
+                  {t.cart.summary(count, totalQty)}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="關閉"
+                aria-label={t.common.close}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
                   width: 32, height: 32, borderRadius: '50%',
@@ -227,7 +229,7 @@ export default function FloatingCart() {
               {items.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: '48px 20px', color: '#94a3b8' }}>
                   <div style={{ marginBottom: 12, opacity: 0.5 }}><CartIcon size={42} /></div>
-                  <p style={{ fontSize: 14, margin: 0 }}>購物車是空的</p>
+                  <p style={{ fontSize: 14, margin: 0 }}>{t.cart.empty}</p>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -257,7 +259,7 @@ export default function FloatingCart() {
                             {item.countryNameZh}
                           </p>
                           <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                            {item.displayDays} 天{item.dataCapacity ? ` · ${item.dataCapacity}` : ''}
+                            {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${item.dataCapacity}` : ''}
                           </p>
                           {(item.networkType || item.isNativeSim) && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
@@ -276,7 +278,7 @@ export default function FloatingCart() {
                             }}>
                               <button
                                 type="button"
-                                aria-label="減少數量"
+                                aria-label={t.cart.decAria}
                                 onClick={() => item.qty <= 1 ? remove(item.productId) : setQty(item.productId, item.qty - 1)}
                                 style={{
                                   width: 28, height: 28,
@@ -296,7 +298,7 @@ export default function FloatingCart() {
                               }}>{item.qty}</span>
                               <button
                                 type="button"
-                                aria-label="增加數量"
+                                aria-label={t.cart.incAria}
                                 onClick={() => setQty(item.productId, item.qty + 1)}
                                 disabled={item.qty >= 9}
                                 style={{
@@ -344,11 +346,11 @@ export default function FloatingCart() {
                 background: '#fff',
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: '#64748b' }}>
-                  <span>共 {totalQty} 張 eSIM</span>
+                  <span>{t.cart.footerTotal(totalQty)}</span>
                   <span style={{ textDecoration: hasBenefit ? 'line-through' : 'none' }}>NT${originalTotal.toLocaleString()}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6, marginBottom: 6 }}>
-                  <span style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 700 }}>應付</span>
+                  <span style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 700 }}>{t.cart.payable}</span>
                   <span style={{ fontSize: 22, fontWeight: 900, color: C.primaryText, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
                     NT${bestPrice.toLocaleString()}
                   </span>
@@ -372,7 +374,7 @@ export default function FloatingCart() {
                       boxShadow: `0 6px 18px ${C.primary}44`,
                       WebkitTapHighlightColor: 'transparent',
                     }}
-                  >前往結帳 · NT${bestPrice.toLocaleString()}</button>
+                  >{t.cart.checkoutSingle(bestPrice)}</button>
                 ) : (
                   <button
                     type="button"
@@ -391,12 +393,12 @@ export default function FloatingCart() {
                       WebkitTapHighlightColor: 'transparent',
                     }}
                   >
-                    {`全部結帳 · NT$${bestPrice.toLocaleString()}`}
+                    {t.cart.checkoutBundle(bestPrice)}
                   </button>
                 )}
 
                 <p style={{ fontSize: 10, color: '#94a3b8', margin: '10px 0 0', textAlign: 'center' }}>
-                  一次刷卡完成 · 每張 eSIM 會獨立發送
+                  {t.cart.note}
                 </p>
               </div>
             )}

@@ -1,26 +1,22 @@
 'use client'
 
-import { useState } from 'react'
 import Image from 'next/image'
 import { BeeLogoSVG } from '@/components/liff/LiffIllustrations'
 import { IconMyEsim, IconGuide, IconSupport, IconDevices } from './HomeIcons'
-import FilterDropdown from './FilterDropdown'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { resolveDestImage, DEFAULT_HOME_HERO_URL } from '@/lib/utils/dest-image'
 import { APPEARANCE } from '@/lib/utils/appearance'
-import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { HomePageProps } from './types'
+import { useT } from '@/components/liff/LocaleProvider'
 
 const QUICK_ACTIONS = [
   // 通透版：無卡框，duotone 圖示坐在品牌淡底圓角上；主色動態帶入、不寫死品牌色。
-  { key: 'orders',  label: '我的 eSIM', Icon: IconMyEsim },
-  { key: 'guide',   label: '安裝教學',  Icon: IconGuide },
-  { key: 'support', label: '客服中心',  Icon: IconSupport },
-  { key: 'devices', label: '支援裝置',  Icon: IconDevices },
+  // label 依語系於 render 內取字典（見 quickLabel）。
+  { key: 'orders',  Icon: IconMyEsim },
+  { key: 'guide',   Icon: IconGuide },
+  { key: 'support', Icon: IconSupport },
+  { key: 'devices', Icon: IconDevices },
 ]
-
-const DAY_OPTIONS  = ['3天','5天','7天','10天','15天']
-const DATA_OPTIONS = ['總量','每日型','吃到飽']
 
 // 旅遊風統一色卡：每個國家擁有自己的「目的地色」作為頂部色條，但卡片本體
 // 維持米白底以避免畫面太雜。色相控制在低飽和、柔和的旅遊感色系。
@@ -38,33 +34,20 @@ function getAccent(code: string) {
 }
 
 export default function ClassicHome({
-  tenant, countries, coverage, colors: C, onSelectCountry, onNavigate, onSearch,
+  tenant, countries, colors: C, onSelectCountry, onNavigate,
 }: HomePageProps) {
-  const [query, setQuery]       = useState('')
-  const [selDays, setSelDays]   = useState<string | null>(null)
-  const [selData, setSelData]   = useState<string | null>(null)
-  // 點下拉選到的國家先「記住」而不是直接跳頁，讓使用者接著選天數/流量再按搜尋
-  const [selCountry, setSelCountry] = useState<{ code: string; name: string } | null>(null)
-  const [searchOpen, setSearchOpen] = useState(true)   // 預設展開搜尋面板
+  const { t, locale, toggle } = useT()
   const brandName = tenant?.brandName ?? 'eSIM'
 
-  // 與商城搜尋同一套規則（filterCountriesByQuery 單一來源）：國名（中/英）＋適用國家
-  // 聯集，「打日出日本」、打香港連中港澳一起出現。coverage 尚未回來時退化成純國名比對。
-  const filtered = query.trim()
-    ? filterCountriesByQuery(countries, query, coverage)
-    : []
+  // 快速功能標籤依語系取字典
+  const quickLabel = (key: string) =>
+    key === 'orders' ? t.home.quickMyEsim
+      : key === 'guide' ? t.home.quickGuide
+        : key === 'support' ? t.home.quickSupport
+          : t.home.quickDevices
+
   // 熱門目的地：取商城排序（業主指定順序，見 lib/utils/country-order）的前 6 個。
   const hot = countries.slice(0, 6)
-
-  function handleSearch() {
-    // 國家：優先用下拉點選的；沒點則用輸入字串比對到的第一個
-    const country = selCountry ?? (filtered[0] ? { code: filtered[0].countryCode, name: filtered[0].countryNameZh } : null)
-    const p = new URLSearchParams()
-    if (country) p.set('country', country.code)
-    if (selDays) p.set('days', selDays.replace('天', ''))
-    if (selData) p.set('data', selData)   // 總量 / 每日型 / 吃到飽
-    onSearch(p.toString() ? `?${p}` : '')
-  }
 
   return (
     <div style={{
@@ -88,108 +71,28 @@ export default function ClassicHome({
               : <BeeLogoSVG size={26} />}
           </div>
           <div>
-            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, fontWeight: 500 }}>歡迎使用</p>
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: 0, fontWeight: 500 }}>{t.home.welcome}</p>
             <p style={{ fontSize: 19, fontWeight: 900, color: '#1a1a1a', margin: 0, letterSpacing: '-0.025em' }}>{brandName}</p>
           </div>
         </div>
-        {/* Search icon toggles the search panel */}
+        {/* 語言切換（中／英）：取代原本的搜尋鈕 */}
         <button
-          onClick={() => setSearchOpen(o => !o)}
+          onClick={toggle}
+          aria-label={t.common.langAria}
           style={{
-            width: 44, height: 44, borderRadius: '50%', background: '#fff',
-            border: searchOpen ? `2px solid ${C.primary}` : '2px solid rgba(0,0,0,0.06)',
+            height: 44, minWidth: 44, padding: '0 14px', borderRadius: 22, background: '#fff',
+            border: '2px solid rgba(0,0,0,0.06)',
             cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: searchOpen ? `0 6px 16px ${C.primary}33` : '0 4px 12px rgba(0,0,0,0.07)',
-            transition: 'box-shadow 0.2s, border 0.2s',
+            display: 'flex', alignItems: 'center', gap: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.07)',
+            color: '#374151', fontWeight: 800, fontSize: 13,
           }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
-            stroke={searchOpen ? C.primary : '#374151'} strokeWidth="2.2" strokeLinecap="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.primary} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/>
           </svg>
+          {locale === 'zh' ? 'EN' : '中'}
         </button>
       </div>
-
-      {/* ── Search Panel (collapsible) ── */}
-      {searchOpen && (
-        <div style={{ padding: '14px 20px 0', animation: 'dropIn 0.18s ease' }}>
-          <div style={{ display: 'flex', gap: 8, width: '100%', boxSizing: 'border-box' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-              <div style={{
-                background: '#fff', borderRadius: 18, display: 'flex', alignItems: 'center',
-                gap: 10, padding: '0 14px',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
-                border: '2px solid rgba(0,0,0,0.07)',
-              }}>
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.2" strokeLinecap="round">
-                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                </svg>
-                <input
-                  type="text" placeholder="搜尋目的地，例如：日本"
-                  autoFocus value={query}
-                  onChange={e => { setQuery(e.target.value); setSelCountry(null) }}
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                  style={{ flex: 1, border: 'none', outline: 'none', background: 'none', fontSize: 16, color: '#1a1a1a', padding: '13px 0', minWidth: 0 }}
-                />
-                {query && (
-                  <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', flexShrink: 0, display: 'flex' }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                )}
-              </div>
-
-              {/* 搜尋下拉結果（已選定國家後收起，讓使用者接著選天數/流量）*/}
-              {filtered.length > 0 && !selCountry && (
-                <div style={{
-                  position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30,
-                  background: '#fff', borderRadius: 18, overflow: 'hidden',
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.12)', animation: 'dropIn 0.15s ease',
-                }}>
-                  {filtered.map((c, i) => (
-                    <button key={c.countryCode}
-                      onClick={() => { setSelCountry({ code: c.countryCode, name: c.countryNameZh }); setQuery(c.countryNameZh) }}
-                      style={{
-                        width: '100%', background: 'none', border: 'none',
-                        borderBottom: i < filtered.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
-                        padding: '12px 16px', cursor: 'pointer', textAlign: 'left',
-                        display: 'flex', alignItems: 'center', gap: 12,
-                      }}>
-                      <CountryFlag code={c.countryCode} fallbackEmoji={c.countryFlag} size={28} />
-                      <div style={{ flex: 1 }}>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>{c.countryNameZh}</p>
-                        <p style={{ fontSize: 12, color: '#9ca3af', margin: 0 }}>{c.countryNameEn}</p>
-                      </div>
-                      {c.minPrice && <span style={{ fontSize: 13, fontWeight: 800, color: C.primary }}>NT${c.minPrice}起</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button onClick={handleSearch} style={{
-              background: C.primary,
-              border: '2px solid rgba(0,0,0,0.10)',
-              borderRadius: 18, flexShrink: 0,
-              padding: '0 18px', cursor: 'pointer', color: '#fff', fontWeight: 700, fontSize: 14,
-              height: 48, boxShadow: '0 6px 16px rgba(0,0,0,0.10)',
-              display: 'flex', alignItems: 'center', gap: 5,
-            }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-              搜尋
-            </button>
-          </div>
-
-          {/* 篩選下拉 */}
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <FilterDropdown label="天數" options={DAY_OPTIONS} value={selDays} onChange={setSelDays} primary={C.primary} />
-            <FilterDropdown label="流量" options={DATA_OPTIONS} value={selData} onChange={setSelData} primary={C.primary} />
-          </div>
-        </div>
-      )}
 
       {/* ── Hero Banner ── */}
       <div style={{ padding: '18px 20px 0' }}>
@@ -219,17 +122,17 @@ export default function ClassicHome({
               borderRadius: 8, padding: '2px 9px', marginBottom: 'clamp(5px, 1.6vw, 10px)',
               border: '1px solid rgba(255,255,255,0.3)',
             }}>
-              <p style={{ fontSize: 'clamp(8px, 2.5vw, 11px)', fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '0.14em', textTransform: 'uppercase' }}>出發前必備</p>
+              <p style={{ fontSize: 'clamp(8px, 2.5vw, 11px)', fontWeight: 800, color: '#fff', margin: 0, letterSpacing: '0.14em', textTransform: 'uppercase' }}>{t.home.heroEyebrow}</p>
             </div>
-            <h2 style={{ fontSize: 'clamp(19px, 6vw, 28px)', fontWeight: 900, color: '#fff', margin: '0 0 clamp(4px, 1.4vw, 8px)', lineHeight: 1.12, letterSpacing: '-0.025em', textShadow: '0 2px 10px rgba(0,0,0,0.35)' }}>探索世界，<br/>隨時在線</h2>
-            <p style={{ fontSize: 'clamp(11px, 3vw, 14px)', color: 'rgba(255,255,255,0.9)', margin: '0 0 clamp(8px, 2.6vw, 16px)', lineHeight: 1.35, textShadow: '0 1px 5px rgba(0,0,0,0.3)' }}>最便宜的旅遊 eSIM 方案</p>
+            <h2 style={{ fontSize: 'clamp(19px, 6vw, 28px)', fontWeight: 900, color: '#fff', margin: '0 0 clamp(4px, 1.4vw, 8px)', lineHeight: 1.12, letterSpacing: '-0.025em', textShadow: '0 2px 10px rgba(0,0,0,0.35)' }}>{t.home.heroTitle}</h2>
+            <p style={{ fontSize: 'clamp(11px, 3vw, 14px)', color: 'rgba(255,255,255,0.9)', margin: '0 0 clamp(8px, 2.6vw, 16px)', lineHeight: 1.35, textShadow: '0 1px 5px rgba(0,0,0,0.3)' }}>{t.home.heroSubtitle}</p>
             <button onClick={() => onNavigate('products')} style={{
               background: '#fff', border: '2px solid rgba(255,255,255,0.85)', borderRadius: 22,
               padding: 'clamp(7px, 2vw, 10px) clamp(16px, 4.5vw, 22px)', cursor: 'pointer',
               fontSize: 'clamp(12px, 3.3vw, 14px)', fontWeight: 800, color: C.primary,
               boxShadow: '0 6px 16px rgba(0,0,0,0.16)', whiteSpace: 'nowrap',
             }}>
-              立即選購 →
+              {t.home.heroCta}
             </button>
           </div>
         </div>
@@ -237,9 +140,9 @@ export default function ClassicHome({
 
       {/* ── 快速功能 ── */}
       <div style={{ padding: '22px 20px 0' }}>
-        <p style={{ fontSize: 19, fontWeight: 900, color: '#1a1a1a', margin: '0 0 14px', letterSpacing: '-0.025em' }}>快速功能</p>
+        <p style={{ fontSize: 19, fontWeight: 900, color: '#1a1a1a', margin: '0 0 14px', letterSpacing: '-0.025em' }}>{t.home.secQuickActions}</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-          {QUICK_ACTIONS.map(({ key, label, Icon }, i) => (
+          {QUICK_ACTIONS.map(({ key, Icon }, i) => (
             <button key={key} onClick={() => onNavigate(key)}
               className="liff-press"
               style={{
@@ -255,7 +158,7 @@ export default function ClassicHome({
               }}>
                 <Icon color={C.primary} size={27} />
               </div>
-              <span style={{ fontSize: 12, color: '#1a1a2e', fontWeight: 600, textAlign: 'center', letterSpacing: '0.01em' }}>{label}</span>
+              <span style={{ fontSize: 12, color: '#1a1a2e', fontWeight: 600, textAlign: 'center', letterSpacing: '0.01em' }}>{quickLabel(key)}</span>
             </button>
           ))}
         </div>
@@ -270,7 +173,7 @@ export default function ClassicHome({
               width: 4, height: 18, borderRadius: 3,
               background: `linear-gradient(180deg, ${C.primary}, ${C.primary}80)`,
             }} />
-            <p style={{ fontSize: 19, fontWeight: 900, color: '#1a1a1a', margin: 0, letterSpacing: '-0.025em' }}>熱門目的地</p>
+            <p style={{ fontSize: 19, fontWeight: 900, color: '#1a1a1a', margin: 0, letterSpacing: '-0.025em' }}>{t.home.secPopularDest}</p>
           </div>
           <button onClick={() => onNavigate('products')} style={{
             background: `${C.primary}14`, border: 'none', cursor: 'pointer',
@@ -278,7 +181,7 @@ export default function ClassicHome({
             display: 'flex', alignItems: 'center', gap: 3,
             padding: '6px 12px', borderRadius: 100,
           }}>
-            查看全部
+            {t.home.viewAll}
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <polyline points="9 18 15 12 9 6"/>
             </svg>
@@ -286,7 +189,7 @@ export default function ClassicHome({
         </div>
 
         {hot.length === 0 ? (
-          <p style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 0', fontSize: 14 }}>暫無商品</p>
+          <p style={{ textAlign: 'center', color: '#9ca3af', padding: '32px 0', fontSize: 14 }}>{t.home.emptyProducts}</p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             {hot.map((c, i) => {
@@ -352,10 +255,10 @@ export default function ClassicHome({
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>NT$</span>
                         <span style={{ fontSize: 18, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>{c.minPrice}</span>
-                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>起</span>
+                        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>{t.home.priceFrom}</span>
                       </div>
                     ) : (
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>立即選購 →</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: 700 }}>{t.home.heroCta}</span>
                     )}
                   </div>
                 </button>
@@ -395,7 +298,7 @@ export default function ClassicHome({
                 </svg>
               </span>
             </span>
-            <span className="ch-va-text">查看全部目的地</span>
+            <span className="ch-va-text">{t.home.viewAllDest}</span>
             <svg className="ch-va-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
               <polyline points="9 18 15 12 9 6"/>
             </svg>

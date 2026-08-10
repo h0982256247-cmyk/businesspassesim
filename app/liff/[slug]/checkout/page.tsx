@@ -10,6 +10,7 @@ import { useLiff } from '@/components/liff/LiffProvider'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { useCart, cartItemPrice } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
+import { useT } from '@/components/liff/LocaleProvider'
 
 declare global {
   interface Window {
@@ -118,6 +119,7 @@ function CheckoutContent() {
   const base = useLiffBase()
   const cart = useCart()
   const { liff } = useLiff()
+  const { t } = useT()
 
   const [product, setProduct] = useState<Product | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'LINE_PAY'>('CREDIT_CARD')
@@ -310,7 +312,7 @@ function CheckoutContent() {
       clearCartAfterCommit()
       router.replace(successHref)
     } else {
-      setErrorMsg(res.error ?? '付款失敗，請重試')
+      setErrorMsg(res.error ?? t.checkout.errors.payFailed)
       setSubmitting(false)
     }
   }
@@ -336,7 +338,7 @@ function CheckoutContent() {
     if (paymentMethod === 'CREDIT_CARD' && useNewCard && (!canPay || !sdkReady)) return
     // LINE Pay：SDK 需已載入才能取得 prime
     if (paymentMethod === 'LINE_PAY' && !sdkLoaded) {
-      setErrorMsg('付款模組載入中，請稍候再試')
+      setErrorMsg(t.checkout.errors.moduleLoading)
       return
     }
 
@@ -356,7 +358,7 @@ function CheckoutContent() {
     const watchdog = setTimeout(() => {
       watchdogFired = true
       console.error('[checkout] watchdog fired — no response within 30s')
-      setErrorMsg('付款處理逾時（30 秒未回應）。請檢查網路後再試一次，或改用其他付款方式。')
+      setErrorMsg(t.checkout.errors.timeout)
       setSubmitting(false)
     }, 30_000)
     const stopWatchdog = () => {
@@ -368,7 +370,7 @@ function CheckoutContent() {
 
     if (bundleMode) {
       // ── 多張：建立 bundle 訂單 ──
-      if (cart.items.length === 0) { stopWatchdog(); setErrorMsg('購物車是空的'); setSubmitting(false); return }
+      if (cart.items.length === 0) { stopWatchdog(); setErrorMsg(t.checkout.emptyCart); setSubmitting(false); return }
       let res: { ok?: boolean; bundleId?: string; error?: string } | null
       try {
         dbg('POST /api/orders/bundle ...')
@@ -384,14 +386,14 @@ function CheckoutContent() {
         res = await r.json().catch(() => null)
         if (!r.ok || !res || !res.ok || !res.bundleId) {
           stopWatchdog()
-          setErrorMsg(res?.error ?? `建立訂單失敗（${r.status}），請稍後再試`)
+          setErrorMsg(res?.error ?? t.checkout.errors.createOrderFailedStatus(r.status))
           setSubmitting(false)
           return
         }
       } catch (e) {
         stopWatchdog()
         console.error('[checkout] bundle order failed', e)
-        setErrorMsg('網路錯誤，請重試')
+        setErrorMsg(t.checkout.errors.network)
         setSubmitting(false)
         return
       }
@@ -413,13 +415,13 @@ function CheckoutContent() {
       } catch (e) {
         stopWatchdog()
         console.error('[checkout] single order failed', e)
-        setErrorMsg('網路錯誤，請重試')
+        setErrorMsg(t.checkout.errors.network)
         setSubmitting(false)
         return
       }
       if (!orderRes.ok || !orderRes.orderId) {
         stopWatchdog()
-        setErrorMsg(orderRes.error ?? '建立訂單失敗')
+        setErrorMsg(orderRes.error ?? t.checkout.errors.createOrderFailed)
         setSubmitting(false)
         return
       }
@@ -434,13 +436,13 @@ function CheckoutContent() {
     if (paymentMethod === 'LINE_PAY') {
       if (!ensureSetup()) {
         stopWatchdog()
-        setErrorMsg('付款設定未就緒（後端尚未配置商家 TapPay 金鑰），請聯絡客服')
+        setErrorMsg(t.checkout.errors.payConfigNotReady)
         setSubmitting(false)
         return
       }
       if (typeof window.TPDirect?.linePay?.getPrime !== 'function') {
         stopWatchdog()
-        setErrorMsg('LINE Pay 模組尚未就緒，請稍候再試')
+        setErrorMsg(t.checkout.errors.linePayNotReady)
         setSubmitting(false)
         return
       }
@@ -449,7 +451,7 @@ function CheckoutContent() {
         dbg('linePay.getPrime result', { prime: result?.prime ? `${result.prime.slice(0,8)}...` : null, status: result?.status, msg: result?.msg })
         if (!result?.prime) {
           stopWatchdog()
-          setErrorMsg(result?.msg ?? '取得 LINE Pay 付款資訊失敗')
+          setErrorMsg(result?.msg ?? t.checkout.errors.linePayInfoFailed)
           setSubmitting(false)
           return
         }
@@ -468,7 +470,7 @@ function CheckoutContent() {
         } catch (e) {
           stopWatchdog()
           console.error('[checkout] LINE Pay tappay call failed', e)
-          setErrorMsg('網路錯誤，請重試')
+          setErrorMsg(t.checkout.errors.network)
           setSubmitting(false)
         }
       })
@@ -492,7 +494,7 @@ function CheckoutContent() {
       } catch (e) {
         stopWatchdog()
         console.error('[checkout] saved-card tappay call failed', e)
-        setErrorMsg('網路錯誤，請重試')
+        setErrorMsg(t.checkout.errors.network)
         setSubmitting(false)
       }
       return
@@ -504,7 +506,7 @@ function CheckoutContent() {
       dbg('card.getPrime result', { status: result.status, msg: result.msg, prime: result?.card?.prime ? `${result.card.prime.slice(0,8)}...` : null })
       if (result.status !== 0) {
         stopWatchdog()
-        setErrorMsg(result.msg ?? '取得卡片資訊失敗')
+        setErrorMsg(result.msg ?? t.checkout.errors.cardInfoFailed)
         setSubmitting(false)
         return
       }
@@ -522,7 +524,7 @@ function CheckoutContent() {
       } catch (e) {
         stopWatchdog()
         console.error('[checkout] new-card tappay call failed', e)
-        setErrorMsg('網路錯誤，請重試')
+        setErrorMsg(t.checkout.errors.network)
         setSubmitting(false)
       }
     })
@@ -557,12 +559,12 @@ function CheckoutContent() {
   if (bundleMode && cart.items.length === 0 && !submitting) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 14, padding: 24 }}>
-        <p style={{ color: '#94a3b8', fontSize: 15 }}>購物車是空的</p>
+        <p style={{ color: '#94a3b8', fontSize: 15 }}>{t.checkout.emptyCart}</p>
         <button
           onClick={() => router.back()}
           style={{ background: C.primary, color: C.onPrimary, border: 'none', borderRadius: 100, padding: '12px 28px', fontSize: 15, fontWeight: 700, cursor: 'pointer' }}
         >
-          返回
+          {t.common.back}
         </button>
       </div>
     )
@@ -595,9 +597,9 @@ function CheckoutContent() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
-          返回
+          {t.common.back}
         </button>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a1a1a', margin: 0, letterSpacing: '-0.02em' }}>確認訂單</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a1a1a', margin: 0, letterSpacing: '-0.02em' }}>{t.checkout.title}</h1>
       </div>
 
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -611,13 +613,13 @@ function CheckoutContent() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontSize: 16, fontWeight: 800, color: '#1a1a1a', margin: 0 }}>
-                共 {bundleQty} 張 eSIM
+                {t.checkout.bundleQty(bundleQty)}
               </p>
               <span style={{
                 fontSize: 12, fontWeight: 700, color: C.primaryText,
                 background: C.light, borderRadius: 100, padding: '3px 12px',
               }}>
-                {bundleItems.length} 項
+                {t.checkout.bundleItems(bundleItems.length)}
               </span>
             </div>
 
@@ -636,7 +638,7 @@ function CheckoutContent() {
                   <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: '0 0 2px' }}>{item.countryNameZh}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11.5, color: '#64748b' }}>
-                      {item.displayDays} 天{item.dataCapacity ? ` · ${item.dataCapacity}` : ''}
+                      {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${item.dataCapacity}` : ''}
                     </span>
                     <NetworkBadge networkType={item.networkType} />
                     <NativeSimBadge isNative={item.isNativeSim} />
@@ -667,7 +669,7 @@ function CheckoutContent() {
             ))}
 
             <p style={{ fontSize: 11, color: '#94a3b8', margin: '2px 0 0' }}>
-              一次刷卡完成 · 每張 eSIM 會獨立發送
+              {t.checkout.bundleNote}
             </p>
           </div>
         ) : (
@@ -695,7 +697,7 @@ function CheckoutContent() {
                   fontSize: 12, fontWeight: 600, color: '#4b5563',
                   background: '#f3f4f6', borderRadius: 6, padding: '2px 8px',
                 }}>
-                  {product!.displayDays} 天
+                  {t.checkout.singleDays(product!.displayDays)}
                 </span>
                 {product!.dataCapacity && (
                   <span style={{
@@ -724,7 +726,7 @@ function CheckoutContent() {
 
         {/* Payment method */}
         <div>
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: '0 0 8px 4px' }}>付款方式</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: '0 0 8px 4px' }}>{t.checkout.payMethod}</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
             {/* 信用卡：可展開的同一框格，刷卡欄位就在框內 */}
@@ -756,7 +758,7 @@ function CheckoutContent() {
                   <CreditCardIcon />
                 </div>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', margin: 0 }}>信用卡</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', margin: 0 }}>{t.checkout.creditCard}</p>
                   <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>Visa / Mastercard / JCB</p>
                 </div>
               </label>
@@ -765,7 +767,7 @@ function CheckoutContent() {
               {cc && (
                 <div style={{ borderTop: '1px solid rgba(0,0,0,0.07)', padding: '14px 16px', background: '#fff' }}>
                   {savedCard === undefined ? (
-                    <div style={{ padding: '8px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>載入付款模組中…</div>
+                    <div style={{ padding: '8px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>{t.checkout.loadingPayment}</div>
                   ) : (
                     <>
                       {/* 已儲存卡片 */}
@@ -781,7 +783,7 @@ function CheckoutContent() {
                               {savedCard.cardTypeLabel} **** {savedCard.lastFour}
                             </p>
                             {savedCard.expiresAt && (
-                              <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>有效期限 {savedCard.expiresAt}</p>
+                              <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>{t.checkout.savedCardExp(savedCard.expiresAt)}</p>
                             )}
                           </div>
                           <button
@@ -792,7 +794,7 @@ function CheckoutContent() {
                               fontSize: 12, fontWeight: 600, color: '#4b5563', cursor: 'pointer',
                             }}
                           >
-                            更換
+                            {t.checkout.change}
                           </button>
                         </div>
                       )}
@@ -812,22 +814,22 @@ function CheckoutContent() {
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <polyline points="15 18 9 12 15 6" />
                               </svg>
-                              使用已儲存的卡片
+                              {t.checkout.useSavedCard}
                             </button>
                           )}
 
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             <div>
-                              <label style={fieldLabel}>卡號</label>
+                              <label style={fieldLabel}>{t.checkout.cardNumber}</label>
                               <div id="card-number" style={fieldStyle} />
                             </div>
                             <div style={{ display: 'flex', gap: 12 }}>
                               <div style={{ flex: 1 }}>
-                                <label style={fieldLabel}>有效期限</label>
+                                <label style={fieldLabel}>{t.checkout.cardExp}</label>
                                 <div id="card-expiry" style={fieldStyle} />
                               </div>
                               <div style={{ flex: 1 }}>
-                                <label style={fieldLabel}>安全碼</label>
+                                <label style={fieldLabel}>{t.checkout.cardCvc}</label>
                                 <div id="card-ccv" style={fieldStyle} />
                               </div>
                             </div>
@@ -850,8 +852,8 @@ function CheckoutContent() {
                                   </svg>
                                 )}
                               </div>
-                              <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>記住此卡片</span>
-                              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>下次快速付款</span>
+                              <span style={{ fontSize: 14, fontWeight: 600, color: '#374151' }}>{t.checkout.rememberCard}</span>
+                              <span style={{ fontSize: 12, color: '#94a3b8', marginLeft: 'auto' }}>{t.checkout.rememberCardHint}</span>
                             </label>
                           </div>
 
@@ -862,12 +864,12 @@ function CheckoutContent() {
                               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                             </svg>
                             <p style={{ fontSize: 11, lineHeight: 1.6, color: '#9ca3af', margin: 0 }}>
-                              本公司採用喬睿科技 TapPay 金流交易系統，消費者刷卡時直接在銀行端系統中交易，本公司不會留下您的信用卡資料，資料傳輸採用 SSL 2048bit 加密技術保護。
+                              {t.checkout.tapPayNotice}
                             </p>
                           </div>
 
                           {!sdkReady && (
-                            <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 10 }}>載入付款模組中…</p>
+                            <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: 13, marginTop: 10 }}>{t.checkout.loadingPayment}</p>
                           )}
                         </>
                       )}
@@ -905,12 +907,12 @@ function CheckoutContent() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1a1a', margin: 0 }}>LINE Pay</p>
-                  <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>使用 LINE Pay 付款</p>
+                  <p style={{ fontSize: 12, color: '#94a3b8', margin: '2px 0 0' }}>{t.checkout.linePaySub}</p>
                 </div>
               </label>
               {lp && (
                 <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0 0 4px' }}>
-                  點「確認付款」後將導向 LINE Pay 完成授權
+                  {t.checkout.linePayHint}
                 </p>
               )}
             </div>
@@ -918,7 +920,7 @@ function CheckoutContent() {
 
             {!methods.creditCard && !methods.linePay && (
               <p style={{ fontSize: 13, color: '#94a3b8', textAlign: 'center', padding: '12px 0' }}>
-                目前未開放線上付款，請聯絡客服。
+                {t.checkout.noOnlinePay}
               </p>
             )}
           </div>
@@ -932,7 +934,7 @@ function CheckoutContent() {
           display: 'flex', flexDirection: 'column', gap: 8,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#64748b' }}>
-            <span>{bundleMode ? `商品小計（${bundleQty} 張）` : '商品金額'}</span>
+            <span>{bundleMode ? t.checkout.subtotal(bundleQty) : t.checkout.amountLabel}</span>
             <span>NT${payable.toLocaleString()}</span>
           </div>
           <div style={{
@@ -940,7 +942,7 @@ function CheckoutContent() {
             fontSize: 15, fontWeight: 700,
             borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 10, marginTop: 2,
           }}>
-            <span style={{ color: '#1a1a1a' }}>實付金額</span>
+            <span style={{ color: '#1a1a1a' }}>{t.checkout.payable}</span>
             <span style={{ color: C.primaryText, fontSize: 18, letterSpacing: '-0.02em' }}>NT${payable.toLocaleString()}</span>
           </div>
         </div>
@@ -956,8 +958,8 @@ function CheckoutContent() {
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14,
         }}>
           <div style={{ width: 34, height: 34, border: `3px solid ${C.light}`, borderTopColor: C.primary, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-          <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>處理付款中…</p>
-          <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>請稍候，正在前往付款頁，勿關閉或返回</p>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>{t.checkout.processing}</p>
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: 0 }}>{t.checkout.processingHint}</p>
           <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
         </div>
       )}
@@ -984,7 +986,7 @@ function CheckoutContent() {
             }}
           >
             <div style={{ fontSize: 36, lineHeight: 1, marginBottom: 12 }}>⚠️</div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a', margin: '0 0 8px' }}>付款失敗</p>
+            <p style={{ fontSize: 16, fontWeight: 700, color: '#1a1a1a', margin: '0 0 8px' }}>{t.checkout.payFailed}</p>
             <p style={{ fontSize: 14, color: '#dc2626', margin: '0 0 20px', lineHeight: 1.5 }}>{errorMsg}</p>
             <button
               onClick={() => setErrorMsg(null)}
@@ -994,7 +996,7 @@ function CheckoutContent() {
                 cursor: 'pointer',
               }}
             >
-              我知道了
+              {t.common.gotIt}
             </button>
           </div>
         </div>
@@ -1011,8 +1013,8 @@ function CheckoutContent() {
       }}>
         {profileComplete === false && (
           <div style={{ maxWidth: 520, margin: '0 auto 10px', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 12, padding: '10px 14px' }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: '#9a3412', margin: 0 }}>⚠️ 請先完成基本資料才能付款</p>
-            <p style={{ fontSize: 12, color: '#c2410c', margin: '2px 0 0', lineHeight: 1.5 }}>付款與 eSIM 開卡需要你的姓名／電話／Email，點下方按鈕前往填寫。</p>
+            <p style={{ fontSize: 13, fontWeight: 700, color: '#9a3412', margin: 0 }}>{t.checkout.profileGateTitle}</p>
+            <p style={{ fontSize: 12, color: '#c2410c', margin: '2px 0 0', lineHeight: 1.5 }}>{t.checkout.profileGateBody}</p>
           </div>
         )}
         <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -1036,7 +1038,7 @@ function CheckoutContent() {
                 whiteSpace: 'nowrap',
               }}
             >
-              前往填寫基本資料 →
+              {t.checkout.profileGateCta}
             </button>
           ) : (
             <button
@@ -1055,7 +1057,7 @@ function CheckoutContent() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {submitting ? '付款中…' : '確認付款 →'}
+              {submitting ? t.checkout.paying : t.checkout.confirmPay}
             </button>
           )}
         </div>

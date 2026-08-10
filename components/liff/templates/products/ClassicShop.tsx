@@ -8,6 +8,7 @@ import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
 import { resolveDestImage } from '@/lib/utils/dest-image'
 import { APPEARANCE } from '@/lib/utils/appearance'
 import { filterCountriesByQuery } from '@/lib/utils/country-search'
+import { useT } from '@/components/liff/LocaleProvider'
 import type { ProductsTemplateProps } from './types'
 
 const S = {
@@ -106,6 +107,7 @@ export default function ClassicShop({
   filter, cart, shopHeroUrl,
 }: ProductsTemplateProps) {
   // Hooks 一律在任何 early return 之前呼叫（react-hooks/rules-of-hooks）
+  const { t } = useT()
   const displays = useMemo(() => sortByValue(annotatePlans(products)), [products])
   // 適用國家（匯入 L 欄）：用整組（未經日篩）的字串，共用解析 + 彈窗
   const [showCoverage, setShowCoverage] = useState(false)
@@ -161,13 +163,13 @@ export default function ClassicShop({
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="#fff">
                   <path d="M2.5 19l19-8L2.5 3v6l13 2-13 2v6z" />
                 </svg>
-                <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', letterSpacing: '0.14em', textTransform: 'uppercase' }}>準備出發</span>
+                <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', letterSpacing: '0.14em', textTransform: 'uppercase' }}>{t.shop.heroEyebrow}</span>
               </div>
               <h1 style={{ fontSize: 24, fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', lineHeight: 1.15, textShadow: '0 1px 4px rgba(0,0,0,0.15)' }}>
-                選擇你的目的地
+                {t.shop.heroTitle}
               </h1>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.86)', margin: '6px 0 0', letterSpacing: '0.02em' }}>
-                {countries.length > 0 ? `${countries.length} 個熱門國家 · 即買即用 eSIM` : '購買出國 eSIM · 即插即用'}
+                {countries.length > 0 ? t.shop.heroSubtitle(countries.length) : t.shop.heroSubtitleFallback}
               </p>
             </div>
           </div>
@@ -179,19 +181,19 @@ export default function ClassicShop({
             display: 'inline-flex', width: 4, height: 18, borderRadius: 3,
             background: `linear-gradient(180deg, ${C.primary}, ${C.soft})`,
           }} />
-          <p style={{ fontSize: 16, fontWeight: 900, color: S.ink, margin: 0, letterSpacing: '-0.02em' }}>所有目的地</p>
+          <p style={{ fontSize: 16, fontWeight: 900, color: S.ink, margin: 0, letterSpacing: '-0.02em' }}>{t.shop.allDest}</p>
           {countries.length > 0 && (
             <span style={{ fontSize: 11, color: S.faint, fontWeight: 600, marginLeft: 'auto' }}>
-              {searchQ.trim() ? `符合 ${shownCountries.length} 國` : `共 ${countries.length} 國`}
+              {searchQ.trim() ? t.shop.matchCount(shownCountries.length) : t.shop.totalCount(countries.length)}
             </span>
           )}
         </div>
 
         {countries.length === 0 ? (
-          <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>目前沒有可購買的商品</p>
+          <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>{t.shop.empty}</p>
         ) : shownCountries.length === 0 ? (
           <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>
-            找不到「{searchQ.trim()}」的目的地，換個關鍵字試試
+            {t.shop.noResult(searchQ.trim())}
           </p>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, padding: '0 16px' }}>
@@ -244,7 +246,7 @@ export default function ClassicShop({
                     <p style={{ fontSize: 18, fontWeight: 900, color: '#fff', margin: '0 0 1px', letterSpacing: '-0.02em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>{c.countryNameZh}</p>
                     <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.82)', margin: '0 0 7px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{c.countryNameEn}</p>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#fff', background: 'rgba(255,255,255,0.18)', padding: '3px 10px', borderRadius: 100, backdropFilter: 'blur(2px)' }}>
-                      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.02em' }}>查看方案</span>
+                      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.02em' }}>{t.shop.viewPlans}</span>
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                         <polyline points="9 18 15 12 9 6" />
                       </svg>
@@ -276,7 +278,7 @@ export default function ClassicShop({
               <input
                 value={searchQ}
                 onChange={e => setSearchQ(e.target.value)}
-                placeholder="搜尋目的地，如：日本、韓國"
+                placeholder={t.shop.searchPlaceholder}
                 enterKeyHint="search"
                 style={{
                   flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent',
@@ -325,7 +327,7 @@ export default function ClassicShop({
           background: `linear-gradient(90deg, ${countryAccent.accent}, ${countryAccent.accent}66)`,
         }} />
         <div style={{ padding: '12px 16px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={onBack} aria-label="返回"
+          <button onClick={onBack} aria-label={t.common.back}
             style={{
               width: 36, height: 36, borderRadius: '50%',
               background: '#fff', border: '1px solid rgba(15,23,42,0.06)',
@@ -349,7 +351,7 @@ export default function ClassicShop({
             )}
             <div style={{ minWidth: 0 }}>
               <h1 style={{ fontSize: 16, fontWeight: 900, color: S.ink, margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                {country?.countryNameZh ?? '方案'}
+                {country?.countryNameZh ?? t.shop.filterPlan}
               </h1>
             </div>
           </div>
@@ -386,7 +388,7 @@ export default function ClassicShop({
                 }}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>
-                適用國家
+                {t.shop.coverage}
               </button>
             )}
             <div style={{
@@ -408,7 +410,7 @@ export default function ClassicShop({
                 </span>
               </div>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.92)', margin: '5px 0 0', fontWeight: 600, letterSpacing: '0.02em' }}>
-                {filter.totalCount > 0 ? `${filter.totalCount} 個 eSIM 方案 · 即買即用` : '即插即用 eSIM'}
+                {filter.totalCount > 0 ? t.shop.countryPlanCount(filter.totalCount) : t.shop.countryPlanFallback}
               </p>
             </div>
           </div>
@@ -426,17 +428,17 @@ export default function ClassicShop({
             }}>
               <div style={{ display: 'flex', gap: 10 }}>
                 <FilterSelect
-                  label="方案"
+                  label={t.shop.filterPlan}
                   value={filter.dataType ?? ''}
                   onChange={v => filter.onDataType(v || null)}
-                  options={[{ value: '', label: '全部方案' }, ...filter.availableDataTypes.map(t => ({ value: t, label: t }))]}
+                  options={[{ value: '', label: t.shop.allPlans }, ...filter.availableDataTypes.map(dt => ({ value: dt, label: t.shop.dataTypeLabel(dt) }))]}
                   primary={C.primary}
                 />
                 <FilterSelect
-                  label="天數"
+                  label={t.shop.filterDays}
                   value={filter.dayFilter ? String(filter.dayFilter) : ''}
                   onChange={v => filter.onDay(v ? Number(v) : 0)}
-                  options={[{ value: '', label: '全部天數' }, ...filter.availableDays.map(d => ({ value: String(d), label: `${d} 天` }))]}
+                  options={[{ value: '', label: t.shop.allDays }, ...filter.availableDays.map(d => ({ value: String(d), label: t.shop.dayOpt(d) }))]}
                   primary={C.primary}
                 />
               </div>
@@ -454,7 +456,7 @@ export default function ClassicShop({
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                       <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                     </svg>
-                    清除篩選
+                    {t.shop.clearFilter}
                   </button>
                 </div>
               )}
@@ -466,7 +468,7 @@ export default function ClassicShop({
       {/* Plans */}
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {filter.totalCount === 0 && (
-          <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>此目的地暫無可購買方案</p>
+          <p style={{ textAlign: 'center', color: S.faint, padding: '48px 0', fontSize: 14 }}>{t.shop.emptyCountryPlans}</p>
         )}
 
         {displays.map(d => {
@@ -512,7 +514,7 @@ export default function ClassicShop({
                     boxShadow: `inset 0 0 0 1.5px ${tier.accent}1a`,
                   }}>
                     <span style={{ fontSize: 19, fontWeight: 900, lineHeight: 1, letterSpacing: '-0.03em' }}>{p.displayDays}</span>
-                    <span style={{ fontSize: 9, fontWeight: 800, marginTop: 1, letterSpacing: '0.1em' }}>天</span>
+                    <span style={{ fontSize: 9, fontWeight: 800, marginTop: 1, letterSpacing: '0.1em' }}>{t.shop.dayUnit}</span>
                   </div>
 
                   {/* Info：流量直接顯示完整字串（總量5GB / 1GB/天 / 無限吃到飽 / 鈦金吃到飽）*/}
@@ -552,7 +554,7 @@ export default function ClassicShop({
                         letterSpacing: '0.06em', marginBottom: 4,
                         boxShadow: '0 2px 6px rgba(217,119,6,0.28)',
                       }}>
-                        <CrownIcon size={9} /> 最划算
+                        <CrownIcon size={9} /> {t.shop.bestValue}
                       </span>
                     )}
                     {hasDiscount && (
@@ -567,7 +569,7 @@ export default function ClassicShop({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); cart.toggle(p) }}
-                    aria-label={inCart ? '從購物車移除' : '加入購物車'}
+                    aria-label={inCart ? t.shop.removeAria : t.shop.addAria}
                     className="cs-cart-tap"
                     style={{
                       display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
@@ -583,7 +585,7 @@ export default function ClassicShop({
                     }}
                   >
                     {inCart ? <CartCheckIcon /> : <CartPlusIcon />}
-                    {inCart ? '已加入' : '加入'}
+                    {inCart ? t.shop.inCart : t.shop.addToCart}
                   </button>
                 </div>
               </div>
