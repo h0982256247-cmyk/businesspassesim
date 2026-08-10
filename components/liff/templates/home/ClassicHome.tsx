@@ -1,11 +1,14 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import { BeeLogoSVG } from '@/components/liff/LiffIllustrations'
 import { IconMyEsim, IconGuide, IconSupport, IconDevices } from './HomeIcons'
+import FilterDropdown from './FilterDropdown'
 import { CountryFlag } from '@/components/common/CountryFlag'
 import { resolveDestImage, DEFAULT_HOME_HERO_URL } from '@/lib/utils/dest-image'
 import { APPEARANCE } from '@/lib/utils/appearance'
+import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { HomePageProps } from './types'
 import { useT } from '@/components/liff/LocaleProvider'
 
@@ -17,6 +20,11 @@ const QUICK_ACTIONS = [
   { key: 'support', Icon: IconSupport },
   { key: 'devices', Icon: IconDevices },
 ]
+
+// 天數 / 流量篩選：value 維持中文（＝送到商城的 ?days= / ?data= 參數與比對鍵），
+// 顯示標籤在 FilterDropdown 的 label 依語系翻譯。
+const DAY_OPTIONS  = ['3天','5天','7天','10天','15天']
+const DATA_OPTIONS = ['總量','每日型','吃到飽']
 
 // 旅遊風統一色卡：每個國家擁有自己的「目的地色」作為頂部色條，但卡片本體
 // 維持米白底以避免畫面太雜。色相控制在低飽和、柔和的旅遊感色系。
@@ -34,10 +42,19 @@ function getAccent(code: string) {
 }
 
 export default function ClassicHome({
-  tenant, countries, colors: C, onSelectCountry, onNavigate,
+  tenant, countries, coverage, colors: C, onSelectCountry, onNavigate, onSearch,
 }: HomePageProps) {
   const { t, locale, toggle } = useT()
   const brandName = tenant?.brandName ?? 'eSIM'
+
+  const [query, setQuery]       = useState('')
+  const [selDays, setSelDays]   = useState<string | null>(null)
+  const [selData, setSelData]   = useState<string | null>(null)
+  // 點下拉選到的國家先記住，讓使用者接著選天數/流量再按搜尋
+  const [selCountry, setSelCountry] = useState<{ code: string; name: string } | null>(null)
+
+  // 國家名依語系：英文模式顯示英文名（無則退回中文），中文模式顯示中文名
+  const cname = (zh: string, en: string) => (locale === 'en' ? (en || zh) : zh)
 
   // 快速功能標籤依語系取字典
   const quickLabel = (key: string) =>
@@ -46,8 +63,20 @@ export default function ClassicHome({
         : key === 'support' ? t.home.quickSupport
           : t.home.quickDevices
 
+  // 與商城搜尋同一套規則（filterCountriesByQuery）：國名（中/英）＋適用國家聯集
+  const filtered = query.trim() ? filterCountriesByQuery(countries, query, coverage) : []
+
   // 熱門目的地：取商城排序（業主指定順序，見 lib/utils/country-order）的前 6 個。
   const hot = countries.slice(0, 6)
+
+  function handleSearch() {
+    const country = selCountry ?? (filtered[0] ? { code: filtered[0].countryCode, name: filtered[0].countryNameZh } : null)
+    const p = new URLSearchParams()
+    if (country) p.set('country', country.code)
+    if (selDays) p.set('days', selDays.replace('天', ''))
+    if (selData) p.set('data', selData)   // 總量 / 每日型 / 吃到飽（value 維持中文）
+    onSearch(p.toString() ? `?${p}` : '')
+  }
 
   return (
     <div style={{
@@ -92,6 +121,83 @@ export default function ClassicHome({
           </svg>
           {locale === 'zh' ? 'EN' : '中'}
         </button>
+      </div>
+
+      {/* ── Search Panel（首頁搜尋，常駐顯示；右上角按鈕已改為語言切換）── */}
+      <div style={{ padding: '14px 20px 0' }}>
+        <div style={{ display: 'flex', gap: 8, width: '100%', boxSizing: 'border-box' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+            <div style={{
+              background: '#fff', borderRadius: 18, display: 'flex', alignItems: 'center',
+              gap: 10, padding: '0 14px',
+              boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
+              border: '2px solid rgba(0,0,0,0.07)',
+            }}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.2" strokeLinecap="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text" placeholder={t.home.searchPlaceholder}
+                value={query}
+                onChange={e => { setQuery(e.target.value); setSelCountry(null) }}
+                onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                style={{ flex: 1, border: 'none', outline: 'none', background: 'none', fontSize: 16, color: '#1a1a1a', padding: '13px 0', minWidth: 0 }}
+              />
+              {query && (
+                <button onClick={() => setQuery('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', flexShrink: 0, display: 'flex' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {filtered.length > 0 && !selCountry && (
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 30,
+                background: '#fff', borderRadius: 18, overflow: 'hidden',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.12)', animation: 'dropIn 0.15s ease',
+              }}>
+                {filtered.map((c, i) => (
+                  <button key={c.countryCode}
+                    onClick={() => { setSelCountry({ code: c.countryCode, name: c.countryNameZh }); setQuery(cname(c.countryNameZh, c.countryNameEn)) }}
+                    style={{
+                      width: '100%', background: 'none', border: 'none',
+                      borderBottom: i < filtered.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
+                      padding: '12px 16px', cursor: 'pointer', textAlign: 'left',
+                      display: 'flex', alignItems: 'center', gap: 12,
+                    }}>
+                    <CountryFlag code={c.countryCode} fallbackEmoji={c.countryFlag} size={28} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: 0 }}>{cname(c.countryNameZh, c.countryNameEn)}</p>
+                    </div>
+                    {c.minPrice && <span style={{ fontSize: 13, fontWeight: 800, color: C.primary }}>NT${c.minPrice}{t.home.priceFrom}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button onClick={handleSearch} style={{
+            background: C.primary,
+            border: '2px solid rgba(0,0,0,0.10)',
+            borderRadius: 18, flexShrink: 0,
+            padding: '0 18px', cursor: 'pointer', color: '#fff', fontWeight: 700, fontSize: 14,
+            height: 48, boxShadow: '0 6px 16px rgba(0,0,0,0.10)',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            {t.home.searchBtn}
+          </button>
+        </div>
+
+        {/* 篩選下拉：label 依語系翻譯，option value 維持中文（送到商城的參數/比對鍵不變）*/}
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <FilterDropdown label={t.home.filterDays} options={DAY_OPTIONS} value={selDays} onChange={setSelDays} primary={C.primary} />
+          <FilterDropdown label={t.home.filterData} options={DATA_OPTIONS} value={selData} onChange={setSelData} primary={C.primary} />
+        </div>
       </div>
 
       {/* ── Hero Banner ── */}
@@ -249,8 +355,7 @@ export default function ClassicHome({
 
                   {/* 國名 + 價格（左下白字） */}
                   <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12 }}>
-                    <p style={{ fontSize: 18, fontWeight: 900, color: '#fff', margin: '0 0 1px', letterSpacing: '-0.02em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>{c.countryNameZh}</p>
-                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.82)', margin: '0 0 7px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{c.countryNameEn}</p>
+                    <p style={{ fontSize: 18, fontWeight: 900, color: '#fff', margin: '0 0 7px', letterSpacing: '-0.02em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>{cname(c.countryNameZh, c.countryNameEn)}</p>
                       {c.minPrice ? (
                       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
                         <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>NT$</span>

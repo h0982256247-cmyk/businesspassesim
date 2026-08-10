@@ -107,7 +107,8 @@ export default function ClassicShop({
   filter, cart, shopHeroUrl,
 }: ProductsTemplateProps) {
   // Hooks 一律在任何 early return 之前呼叫（react-hooks/rules-of-hooks）
-  const { t } = useT()
+  const { t, locale } = useT()
+  const cname = (zh: string, en: string) => (locale === 'en' ? (en || zh) : zh)
   const displays = useMemo(() => sortByValue(annotatePlans(products)), [products])
   // 適用國家（匯入 L 欄）：用整組（未經日篩）的字串，共用解析 + 彈窗
   const [showCoverage, setShowCoverage] = useState(false)
@@ -243,8 +244,7 @@ export default function ClassicShop({
 
                   {/* 國名 + 查看方案（左下白字） */}
                   <div style={{ position: 'absolute', left: 14, right: 14, bottom: 12 }}>
-                    <p style={{ fontSize: 18, fontWeight: 900, color: '#fff', margin: '0 0 1px', letterSpacing: '-0.02em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>{c.countryNameZh}</p>
-                    <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.82)', margin: '0 0 7px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}>{c.countryNameEn}</p>
+                    <p style={{ fontSize: 18, fontWeight: 900, color: '#fff', margin: '0 0 7px', letterSpacing: '-0.02em', textShadow: '0 1px 6px rgba(0,0,0,0.5)' }}>{cname(c.countryNameZh, c.countryNameEn)}</p>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#fff', background: 'rgba(255,255,255,0.18)', padding: '3px 10px', borderRadius: 100, backdropFilter: 'blur(2px)' }}>
                       <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.02em' }}>{t.shop.viewPlans}</span>
                       <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
@@ -351,7 +351,7 @@ export default function ClassicShop({
             )}
             <div style={{ minWidth: 0 }}>
               <h1 style={{ fontSize: 16, fontWeight: 900, color: S.ink, margin: 0, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                {country?.countryNameZh ?? t.shop.filterPlan}
+                {country ? cname(country.countryNameZh, country.countryNameEn) : t.shop.filterPlan}
               </h1>
             </div>
           </div>
@@ -403,11 +403,8 @@ export default function ClassicShop({
             <div style={{ position: 'relative', zIndex: 1, minWidth: 0, flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', textShadow: '0 1px 3px rgba(0,0,0,0.18)' }}>
-                  {country.countryNameZh}
+                  {cname(country.countryNameZh, country.countryNameEn)}
                 </h2>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                  {country.countryNameEn}
-                </span>
               </div>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.92)', margin: '5px 0 0', fontWeight: 600, letterSpacing: '0.02em' }}>
                 {filter.totalCount > 0 ? t.shop.countryPlanCount(filter.totalCount) : t.shop.countryPlanFallback}

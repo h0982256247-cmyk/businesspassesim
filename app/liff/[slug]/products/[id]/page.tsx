@@ -48,7 +48,8 @@ export default function ProductDetailPage() {
   const base = useLiffBase()
   const C = useTenantColors()
   const cart = useCart()
-  const { t } = useT()
+  const { t, locale } = useT()
+  const cname = (zh: string, en: string) => (locale === 'en' ? (en || zh) : zh)
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -109,7 +110,7 @@ export default function ProductDetailPage() {
         >
           <BackArrow />
         </button>
-        <span style={{ fontSize: 14, color: S.muted }}>{product.countryNameZh}</span>
+        <span style={{ fontSize: 14, color: S.muted }}>{cname(product.countryNameZh, product.countryNameEn)}</span>
       </div>
 
       {/* Hero card */}
@@ -124,8 +125,7 @@ export default function ProductDetailPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <CountryFlag code={product.countryCode} fallbackEmoji={product.countryFlag} size={36} />
               <div>
-                <p style={{ fontSize: 17, fontWeight: 700, color: S.ink, margin: 0 }}>{product.countryNameZh}</p>
-                <p style={{ fontSize: 12, color: S.faint, margin: 0 }}>{product.countryNameEn}</p>
+                <p style={{ fontSize: 17, fontWeight: 700, color: S.ink, margin: 0 }}>{cname(product.countryNameZh, product.countryNameEn)}</p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
