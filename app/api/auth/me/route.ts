@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
 
+  // 已退出（leftAt 有值）不算現任會員；否則個人頁標頭/選單仍顯示「企業會員」。
+  // 與 getUserMembership、isApprovedMember 過濾 leftAt 的語意一致。
+  const gm = user.groupMembership
   return NextResponse.json({
     user: {
       id: user.id,
@@ -29,8 +32,8 @@ export async function GET(req: NextRequest) {
       profileComplete: isProfileComplete(user),
     },
     // 企業歸屬 + 審核狀態（前端據此顯示福利價資格）
-    membership: user.groupMembership
-      ? { status: user.groupMembership.status, group: user.groupMembership.group }
+    membership: gm && !gm.leftAt
+      ? { status: gm.status, group: gm.group }
       : null,
   })
 }
