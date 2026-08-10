@@ -223,6 +223,44 @@ export async function getMemberCredentialPath(
   return m?.credentialImagePath ?? null
 }
 
+// 平台（Super Admin）查看某成員名片/工作證：全域權限，不經企業管理員檢查（授權在 route 層以
+// requirePlatformAuth 把關）。回傳私有物件路徑（null＝未提供）；圖片由 route 以 byte-proxy 串回。
+export async function getMemberCredentialPathForPlatform(targetUserId: string): Promise<string | null> {
+  const m = await prisma.groupMember.findUnique({
+    where: { userId: targetUserId },
+    select: { credentialImagePath: true },
+  })
+  return m?.credentialImagePath ?? null
+}
+
+// 平台（Super Admin）後台審核成員加入：不經企業管理員（平台有全域權限）。
+// reviewedById 留 null（審核者是平台 AdminUser，非 LINE User，無法對應 User FK）。
+export async function reviewMemberByPlatform(
+  targetUserId: string,
+  approve: boolean,
+): Promise<{ ok: boolean; reason?: string }> {
+  const membership = await prisma.groupMember.findUnique({
+    where: { userId: targetUserId },
+    select: { leftAt: true, group: { select: { name: true } } },
+  })
+  if (!membership || membership.leftAt) return { ok: false, reason: '找不到此成員或已退出' }
+
+  await prisma.groupMember.update({
+    where: { userId: targetUserId },
+    data: {
+      status: approve ? MemberStatus.APPROVED : MemberStatus.REJECTED,
+      reviewedAt: new Date(),
+      reviewedById: null,
+    },
+  })
+
+  const companyName = membership.group.name
+  if (approve) notifyMemberApproved(targetUserId, companyName).catch(() => {})
+  else notifyMemberRejected(targetUserId, companyName).catch(() => {})
+
+  return { ok: true }
+}
+
 async function reviewMember(actingUserId: string, targetUserId: string, approve: boolean) {
   const membership = await assertCompanyAdmin(actingUserId, targetUserId)
 

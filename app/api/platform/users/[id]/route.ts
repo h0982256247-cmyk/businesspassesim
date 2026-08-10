@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
+import { AdminRole } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
 import { safeDecrypt } from '@/lib/utils/crypto'
+import { reviewMemberByPlatform } from '@/lib/services/group'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -27,7 +29,7 @@ export async function GET(req: NextRequest, { params }: Params) {
         birthday: true,
         createdAt: true,
         groupMembership: {
-          select: { status: true, role: true, leftAt: true, joinedAt: true, group: { select: { id: true, name: true } } },
+          select: { status: true, role: true, leftAt: true, joinedAt: true, credentialImagePath: true, group: { select: { id: true, name: true } } },
         },
         orders: {
           select: {
@@ -74,8 +76,25 @@ export async function GET(req: NextRequest, { params }: Params) {
       phone: user.phone ? safeDecrypt(user.phone) : user.phone,
       email: user.email ? safeDecrypt(user.email) : user.email,
       groupMembership: gm && !gm.leftAt
-        ? { status: gm.status, role: gm.role, joinedAt: gm.joinedAt, group: gm.group }
+        ? { status: gm.status, role: gm.role, joinedAt: gm.joinedAt, group: gm.group, hasCredentialImage: !!gm.credentialImagePath }
         : null,
     },
   })
+}
+
+// PATCH /api/platform/users/:id — Super Admin 後台審核該會員的企業加入（body: { action: 'approve' | 'reject' }）
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const auth = await requirePlatformAuth(req)
+  if (auth instanceof NextResponse) return auth
+  if (auth.role !== AdminRole.SUPER_ADMIN) return NextResponse.json({ error: '權限不足' }, { status: 403 })
+
+  const { id } = await params
+  const { action } = await req.json().catch(() => ({}))
+  if (action !== 'approve' && action !== 'reject') {
+    return NextResponse.json({ error: 'action 無效' }, { status: 400 })
+  }
+
+  const r = await reviewMemberByPlatform(id, action === 'approve')
+  if (!r.ok) return NextResponse.json({ error: r.reason }, { status: 422 })
+  return NextResponse.json({ ok: true })
 }

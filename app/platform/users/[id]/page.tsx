@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { OrderStatusBadge } from '@/components/platform/OrderStatusBadge'
+import { toast } from '@/components/platform/Toast'
 
 type Order = {
   id: string
@@ -25,7 +26,7 @@ type UserDetail = {
   email: string | null
   birthday: string | null
   createdAt: string
-  groupMembership: { status: string; role: string; joinedAt: string; group: { id: string; name: string } } | null
+  groupMembership: { status: string; role: string; joinedAt: string; hasCredentialImage: boolean; group: { id: string; name: string } } | null
   orders: Order[]
 }
 
@@ -44,6 +45,8 @@ export default function UserDetailPage() {
   const [user, setUser] = useState<UserDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('基本資料')
+  const [busy, setBusy] = useState(false)
+  const [viewingCredential, setViewingCredential] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -60,6 +63,27 @@ export default function UserDetailPage() {
   }, [id, router])
 
   useEffect(() => { load() }, [load])
+
+  // Super Admin 後台審核該會員的企業加入（同意 / 拒絕）
+  const review = async (action: 'approve' | 'reject') => {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/platform/users/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      })
+      if (res.status === 401) { router.replace('/platform/login'); return }
+      const d = await res.json().catch(() => ({}))
+      if (!res.ok) { toast.error(d.error ?? '操作失敗'); return }
+      toast.success(action === 'approve' ? '已同意加入' : '已拒絕加入')
+      await load()
+    } catch {
+      toast.error('操作失敗')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -151,18 +175,50 @@ export default function UserDetailPage() {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h2 className="text-sm font-semibold text-gray-500 mb-4">企業歸屬</h2>
             {m ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-gray-800">{m.group.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    加入於 {new Date(m.joinedAt).toLocaleDateString('zh-TW')}
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-800">{m.group.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      加入於 {new Date(m.joinedAt).toLocaleDateString('zh-TW')}
+                    </p>
+                  </div>
+                  {m.role === 'ADMIN'
+                    ? <span className="text-xs px-2 py-1 rounded-full font-medium bg-indigo-50 text-indigo-600">企業管理員</span>
+                    : <span className={`text-xs px-2 py-1 rounded-full font-medium ${MEMBER_STATUS[m.status]?.cls ?? 'bg-gray-100 text-gray-500'}`}>
+                        {MEMBER_STATUS[m.status]?.text ?? m.status}
+                      </span>}
                 </div>
-                {m.role === 'ADMIN'
-                  ? <span className="text-xs px-2 py-1 rounded-full font-medium bg-indigo-50 text-indigo-600">企業管理員</span>
-                  : <span className={`text-xs px-2 py-1 rounded-full font-medium ${MEMBER_STATUS[m.status]?.cls ?? 'bg-gray-100 text-gray-500'}`}>
-                      {MEMBER_STATUS[m.status]?.text ?? m.status}
-                    </span>}
+                {(m.hasCredentialImage || m.status === 'PENDING') && (
+                  <div className="flex items-center gap-2 pt-3 border-t border-gray-50">
+                    {m.hasCredentialImage && (
+                      <button
+                        onClick={() => setViewingCredential(true)}
+                        className="px-3 py-1.5 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+                      >
+                        查看名片／工作證
+                      </button>
+                    )}
+                    {m.status === 'PENDING' && (
+                      <>
+                        <button
+                          onClick={() => review('approve')}
+                          disabled={busy}
+                          className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                        >
+                          同意加入
+                        </button>
+                        <button
+                          onClick={() => review('reject')}
+                          disabled={busy}
+                          className="px-3 py-1.5 text-sm font-semibold rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition"
+                        >
+                          拒絕
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-sm text-gray-400">尚未加入任何企業</p>
@@ -212,6 +268,26 @@ export default function UserDetailPage() {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {viewingCredential && (
+        <div
+          onClick={() => setViewingCredential(false)}
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/api/platform/users/${id}/credential`}
+            alt="名片／工作證"
+            onClick={e => e.stopPropagation()}
+            className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+          />
+          <button
+            onClick={() => setViewingCredential(false)}
+            aria-label="關閉"
+            className="fixed top-4 right-4 w-10 h-10 rounded-full bg-white/90 text-gray-900 text-xl font-bold leading-none"
+          >×</button>
         </div>
       )}
 
