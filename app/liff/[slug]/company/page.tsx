@@ -21,31 +21,40 @@ export default function CompanyPage() {
   const [membership, setMembership] = useState<Membership>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [code, setCode] = useState('')
+  // 邀請碼：分享連結帶入（?code=）時直接預填，避免掛載後才 setState
+  const [code, setCode] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return new URLSearchParams(window.location.search).get('code')?.trim().toUpperCase() ?? ''
+  })
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [confirmLeave, setConfirmLeave] = useState(false)
 
-  const load = useCallback(async () => {
+  // 抓取企業狀態（純讀取、不 setState）：掛載與 join/leave 後刷新共用同一來源
+  const fetchCompanyState = useCallback(async () => {
     const [g, adminOk] = await Promise.all([
       fetch('/api/groups').then(r => (r.ok ? r.json() : null)).catch(() => null),
       fetch('/api/company-admin').then(r => r.ok).catch(() => false),
     ])
-    setMembership(g?.membership ?? null)
-    setIsAdmin(adminOk === true)
+    return { membership: (g?.membership ?? null) as Membership, isAdmin: adminOk === true }
+  }, [])
+
+  const applyState = useCallback((s: { membership: Membership; isAdmin: boolean }) => {
+    setMembership(s.membership)
+    setIsAdmin(s.isAdmin)
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  const load = useCallback(async () => { applyState(await fetchCompanyState()) }, [applyState, fetchCompanyState])
 
-  // 由分享連結帶入邀請碼（?code=）→ 自動填入輸入框，員工點連結即可直接送出
+  // 掛載抓一次；用 .then（非同步）套用，避免在 effect 同步呼叫 setState
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const c = new URLSearchParams(window.location.search).get('code')
-    if (c) setCode(c.trim().toUpperCase())
-  }, [])
+    let alive = true
+    fetchCompanyState().then(s => { if (alive) applyState(s) })
+    return () => { alive = false }
+  }, [fetchCompanyState, applyState])
 
   // 釋放預覽用的 object URL（切換圖片時清舊的、離開頁面時清當前）
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
