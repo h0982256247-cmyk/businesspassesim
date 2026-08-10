@@ -9,9 +9,11 @@ interface Props {
   onChange: (v: string | null) => void
   primary: string
   dark?: boolean
+  // 顯示轉換：把 option 值（維持原文，作為搜尋參數/比對鍵）轉成顯示標籤（可依語系翻譯）。
+  renderLabel?: (opt: string) => string
 }
 
-export default function FilterDropdown({ label, options, value, onChange, primary, dark = false }: Props) {
+export default function FilterDropdown({ label, options, value, onChange, primary, dark = false, renderLabel }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -43,7 +45,7 @@ export default function FilterDropdown({ label, options, value, onChange, primar
           transition: 'all 0.15s',
         }}
       >
-        {selected ? value : label}
+        {value != null ? (renderLabel ? renderLabel(value) : value) : label}
         {selected ? (
           // Clear × 按鈕
           <span
@@ -84,7 +86,7 @@ export default function FilterDropdown({ label, options, value, onChange, primar
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
               }}
             >
-              {opt}
+              {renderLabel ? renderLabel(opt) : opt}
               {opt === value && (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={primary} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>

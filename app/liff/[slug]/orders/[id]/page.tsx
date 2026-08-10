@@ -9,6 +9,7 @@ import { IconSim, IconInstall, IconCheck, IconClock, IconAlert, IconShare } from
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
 import { S } from '@/lib/liff/tokens'
+import { useT } from '@/components/liff/LocaleProvider'
 import type { ReactNode } from 'react'
 
 type OrderDetail = {
@@ -48,17 +49,19 @@ type EsimUsage = {
 
 // 啟動碼／LPA 複製鈕：mono 長字串手選極易出錯，一鍵複製 + Toast 回饋。
 function CopyBtn({ color, onClick }: { color: string; onClick: () => void }) {
+  const { t } = useT()
   return (
     <button type="button" onClick={onClick} className="liff-press" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', color, fontSize: 12, fontWeight: 700, WebkitTapHighlightColor: 'transparent' }}>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-      </svg>複製
+      </svg>{t.orderDetail.copyBtn}
     </button>
   )
 }
 
 // 流量圓環：中心顯示剩餘百分比，弧色隨用量分級（綠→橘→紅）。
 function UsageDonut({ used, total }: { used: number; total: number }) {
+  const { t } = useT()
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0
   const remainPct = Math.round(100 - pct)
   const color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e'
@@ -74,7 +77,7 @@ function UsageDonut({ used, total }: { used: number; total: number }) {
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontSize: 18, fontWeight: 900, color: S.ink, letterSpacing: '-0.03em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{remainPct}<span style={{ fontSize: 10, fontWeight: 700 }}>%</span></span>
-        <span style={{ fontSize: 9, color: S.faint, marginTop: 1 }}>剩餘</span>
+        <span style={{ fontSize: 9, color: S.faint, marginTop: 1 }}>{t.orderDetail.donutRemaining}</span>
       </div>
     </div>
   )
@@ -125,6 +128,7 @@ export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const C = useTenantColors()
+  const { t, locale } = useT()
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [usage, setUsage] = useState<EsimUsage | null>(null)
   const [usageLoading, setUsageLoading] = useState(false)
@@ -134,8 +138,8 @@ export default function OrderDetailPage() {
   const [redeeming, setRedeeming] = useState(false)
   const [redeemError, setRedeemError] = useState<string | null>(null)
   const [redeemTimeout, setRedeemTimeout] = useState(false)
-  const [canOneClick, setCanOneClick] = useState(false)
-  const [installOS, setInstallOS] = useState<'ios' | 'android'>('ios')
+  const [canOneClick] = useState(supportsOneClickEsim)
+  const [installOS, setInstallOS] = useState<'ios' | 'android'>(() => (isIOSDevice() ? 'ios' : 'android'))
   const [manualOpen, setManualOpen] = useState(false)   // 手動安裝一律預設收合，點按鈕才展開
   // 自訂確認彈窗（取代 window.confirm，避免 LINE 內建瀏覽器露出網址）
   const [dialog, setDialog] = useState<null | {
@@ -147,11 +151,9 @@ export default function OrderDetailPage() {
   const dismissToast = useCallback(() => setToast(null), [])
   const copyText = useCallback((text: string, label: string) => {
     navigator.clipboard?.writeText(text)
-      .then(() => setToast({ message: `已複製${label}`, tone: 'success' }))
-      .catch(() => setToast({ message: '複製失敗，請長按文字手動選取', tone: 'error' }))
-  }, [])
-
-  useEffect(() => { setCanOneClick(supportsOneClickEsim()); setInstallOS(isIOSDevice() ? 'ios' : 'android') }, [])
+      .then(() => setToast({ message: t.orderDetail.copied(label), tone: 'success' }))
+      .catch(() => setToast({ message: t.orderDetail.copyFailed, tone: 'error' }))
+  }, [t])
 
   // 從 TapPay (LINE Pay / 3DS) 跳轉回來時，網址會帶 ?status=<n>。
   // status=0 是付款成功（等 webhook fan-out），非零代表失敗或使用者取消。
@@ -227,9 +229,9 @@ export default function OrderDetailPage() {
   const handleRedeem = () => {
     if (!order) return
     setDialog({
-      title: '確定要安裝這張 eSIM 嗎？',
-      lines: ['按下後會立即兌換、產生 QR 碼', '兌換後就無法再轉贈'],
-      confirmLabel: '確定安裝',
+      title: t.orders.installConfirmTitle,
+      lines: [t.orders.installConfirmLine1, t.orders.installConfirmLine2],
+      confirmLabel: t.orders.installConfirm,
       tone: 'primary',
       icon: <IconInstall size={24} />,
       onConfirm: () => { setDialog(null); doRedeem() },
@@ -259,9 +261,9 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/orders/${id}/usage`)
       const data = await res.json()
       if (data.usage) setUsage(data.usage)
-      else setUsageError(data.error ?? '無法取得用量')
+      else setUsageError(data.error ?? t.orderDetail.usageErrorNoData)
     } catch {
-      setUsageError('查詢失敗，請稍後再試')
+      setUsageError(t.orderDetail.usageErrorFailed)
     } finally {
       setUsageLoading(false)
     }
@@ -287,9 +289,9 @@ export default function OrderDetailPage() {
 
   if (notFound || !order) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 12 }}>
-      <p style={{ color: S.faint }}>訂單不存在</p>
+      <p style={{ color: S.faint }}>{t.orderDetail.notFound}</p>
       <button onClick={() => router.push(`${base}/orders`)} style={{ color: C.primaryText, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-        查看所有訂單
+        {t.orderDetail.viewAllOrders}
       </button>
     </div>
   )
@@ -308,16 +310,16 @@ export default function OrderDetailPage() {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
-          所有訂單
+          {t.orderDetail.backAllOrders}
         </button>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: S.ink, margin: 0, letterSpacing: '-0.02em' }}>訂單詳情</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: S.ink, margin: 0, letterSpacing: '-0.02em' }}>{t.orderDetail.title}</h1>
           <span style={{
             fontSize: 11, fontWeight: 700,
             background: sTone.bg, color: sTone.fg,
             padding: '3px 10px', borderRadius: 100,
           }}>
-            {sv.label}
+            {t.esimStatus.of(sv.phase, sv.daysLeft).label}
           </span>
         </div>
         <p style={{ fontSize: 12, color: S.faint, marginTop: 4 }}>{order.orderNumber ?? `#${order.id.slice(-8).toUpperCase()}`}</p>
@@ -327,10 +329,10 @@ export default function OrderDetailPage() {
       {order.transferredAway && (
         <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 16, padding: '18px 20px', marginBottom: 12 }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: '#6d28d9', margin: '0 0 4px', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <IconShare size={15} /> 已轉贈{order.gift?.toName ? `給 ${order.gift.toName}` : '出去'}
+            <IconShare size={15} /> {order.gift?.toName ? t.orderDetail.transferredTo(order.gift.toName) : t.orderDetail.transferredAway}
           </p>
           <p style={{ fontSize: 13, color: '#7c3aed', margin: 0, lineHeight: 1.6 }}>
-            這張 eSIM 的擁有權已移轉，無法在此安裝或操作。
+            {t.orderDetail.transferredBody}
           </p>
         </div>
       )}
@@ -342,9 +344,9 @@ export default function OrderDetailPage() {
             <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#fff', border: `1px solid ${C.border}`, color: C.primaryText, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
               <IconSim size={24} />
             </div>
-            <h2 style={{ fontSize: 16, fontWeight: 800, color: S.ink, margin: '0 0 4px' }}>eSIM 已準備好</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 800, color: S.ink, margin: '0 0 4px' }}>{t.orderDetail.readyTitle}</h2>
             <p style={{ fontSize: 13, color: S.muted, margin: 0, lineHeight: 1.6 }}>
-              點下方按鈕兌換安裝 QR 碼，掃碼安裝到手機即可開始使用
+              {t.orderDetail.readyBody}
             </p>
           </div>
 
@@ -359,10 +361,10 @@ export default function OrderDetailPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
           >
-            {redeeming ? '處理中…' : <><IconInstall size={17} /> 我要安裝</>}
+            {redeeming ? t.orders.processing : <><IconInstall size={17} /> {t.orders.install}</>}
           </button>
           <p style={{ fontSize: 11, color: S.faint, textAlign: 'center', margin: '0 0 4px', lineHeight: 1.5 }}>
-            兌換 QR 後即無法再轉贈給好友
+            {t.orderDetail.redeemNote}
           </p>
           {redeemError && (
             <p style={{ fontSize: 12, color: '#dc2626', marginTop: 4, marginBottom: 4, textAlign: 'center' }}>{redeemError}</p>
@@ -374,13 +376,13 @@ export default function OrderDetailPage() {
       {order.isCurrentOwner && order.redeemedAt && !order.esimQrcode && !order.activatedAt && (
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 16, padding: '20px', marginBottom: 12, textAlign: 'center' }}>
           <div style={{ width: 28, height: 28, border: '3px solid #fed7aa', borderTopColor: '#ea580c', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 10px' }} />
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#c2410c', margin: '0 0 4px' }}>正在準備 QR 碼…</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#c2410c', margin: '0 0 4px' }}>{t.orderDetail.preparingQrTitle}</p>
           <p style={{ fontSize: 12, color: '#9a3412', margin: 0, lineHeight: 1.6 }}>
-            通常 10 秒到 1 分鐘內完成，請稍候
+            {t.orderDetail.preparingQrBody}
           </p>
           {redeemTimeout && (
             <p style={{ fontSize: 11, color: '#9a3412', marginTop: 8, lineHeight: 1.5 }}>
-              處理時間較長，可暫時離開頁面，完成後會收到 LINE 通知
+              {t.orderDetail.preparingQrTimeout}
             </p>
           )}
         </div>
@@ -392,7 +394,7 @@ export default function OrderDetailPage() {
           {/* 登機證式交付票券：品牌色頭部 + 票根虛線 + QR */}
           <div style={{ borderRadius: 16, overflow: 'hidden', background: S.white, border: `1px solid ${S.line}`, boxShadow: '0 10px 26px rgba(15,23,42,0.12)', marginBottom: 16 }}>
             <div style={{ background: `linear-gradient(135deg, ${C.primaryText} 0%, ${C.primary} 100%)`, padding: '13px 18px', color: C.onPrimary }}>
-              <p style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', margin: 0, opacity: 0.82 }}>eSIM 安裝憑證</p>
+              <p style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', margin: 0, opacity: 0.82 }}>{t.orderDetail.credential}</p>
               <p style={{ fontSize: 15, fontWeight: 800, margin: '3px 0 0', letterSpacing: '-0.01em' }}>{order.orderItems[0]?.productName ?? 'eSIM'}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 18px', borderTop: `1.5px dashed ${C.border}` }}>
@@ -407,12 +409,12 @@ export default function OrderDetailPage() {
               </div>
               <p style={{ fontSize: 11, color: S.faint, margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" /></svg>
-                掃碼前建議調高螢幕亮度
+                {t.orderDetail.brightness}
               </p>
               <a href={order.esimQrcode} download="esim-qrcode.png" className="liff-press"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 10, padding: '7px 16px', borderRadius: 100, background: C.light, color: C.primaryText, fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
-                儲存 QR 到相簿
+                {t.orderDetail.saveQr}
               </a>
             </div>
           </div>
@@ -432,10 +434,10 @@ export default function OrderDetailPage() {
                   fontSize: 14, fontWeight: 800, marginBottom: 8, letterSpacing: '0.02em',
                 }}
               >
-                <IconInstall size={16} /> 一鍵安裝
+                <IconInstall size={16} /> {t.orderDetail.oneClick}
               </a>
               <p style={{ fontSize: 11, color: S.faint, textAlign: 'center', margin: '0 0 14px', lineHeight: 1.6 }}>
-                iOS 17.4 以上版本推薦使用
+                {t.orderDetail.oneClickNote}
               </p>
             </>
           )}
@@ -458,7 +460,7 @@ export default function OrderDetailPage() {
                   fontSize: 14, fontWeight: 800, letterSpacing: '0.02em', cursor: 'pointer',
                 }}
               >
-                手動安裝
+                {t.orderDetail.manualInstall}
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: manualOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
                   <polyline points="6 9 12 15 18 9" />
                 </svg>
@@ -476,52 +478,70 @@ export default function OrderDetailPage() {
               </div>
               {installOS === 'ios' ? (
                 <>
+                  {locale === 'en' ? (
+                  <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
+                    <li>On your phone go to <strong style={{ color: S.ink }}>Settings → Cellular → Add eSIM</strong></li>
+                    <li>Choose “<strong style={{ color: S.ink }}>Use QR Code</strong>”, scroll to the bottom and tap “<strong style={{ color: S.ink }}>Enter Details Manually</strong>”</li>
+                    <li>Paste the <strong style={{ color: S.ink }}>Address</strong> and <strong style={{ color: S.ink }}>Activation code</strong> below (confirmation code not required), then tap “<strong style={{ color: S.ink }}>Next</strong>” to install</li>
+                    <li>Turn on “Cellular Data” and “Data Roaming” for this eSIM; once connected this page updates to <strong style={{ color: '#047857' }}>Active</strong></li>
+                  </ol>
+                  ) : (
                   <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
                     <li>到手機<strong style={{ color: S.ink }}>設定 → 行動服務 → 加入 eSIM</strong></li>
                     <li>選「<strong style={{ color: S.ink }}>使用行動條碼</strong>」，拉到最底點「<strong style={{ color: S.ink }}>手動輸入詳細資料</strong>」</li>
                     <li>貼上下方「<strong style={{ color: S.ink }}>位址</strong>」與「<strong style={{ color: S.ink }}>啟用碼</strong>」（確認碼免填），按右上角「<strong style={{ color: S.ink }}>下一步</strong>」安裝</li>
                     <li>開啟此 eSIM 的「行動數據」與「數據漫遊」，連上網路後本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
                   </ol>
+                  )}
                   {iosManual ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, marginTop: 12, paddingTop: 12, borderTop: `1px solid ${S.line}` }}>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                          <span style={{ color: S.muted }}>位址（SM-DP+ 位址）</span>
-                          <CopyBtn color={C.primaryText} onClick={() => copyText(iosManual.address, '位址')} />
+                          <span style={{ color: S.muted }}>{t.orderDetail.addressFull}</span>
+                          <CopyBtn color={C.primaryText} onClick={() => copyText(iosManual.address, t.orderDetail.address)} />
                         </div>
                         <span style={{ fontFamily: 'ui-monospace, monospace', color: S.ink, wordBreak: 'break-all', fontWeight: 600 }}>{iosManual.address}</span>
                       </div>
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                          <span style={{ color: S.muted }}>啟用碼</span>
-                          <CopyBtn color={C.primaryText} onClick={() => copyText(iosManual.activationCode, '啟用碼')} />
+                          <span style={{ color: S.muted }}>{t.orderDetail.activationCode}</span>
+                          <CopyBtn color={C.primaryText} onClick={() => copyText(iosManual.activationCode, t.orderDetail.activationCode)} />
                         </div>
                         <span style={{ fontFamily: 'ui-monospace, monospace', color: S.ink, wordBreak: 'break-all', fontWeight: 600 }}>{iosManual.activationCode}</span>
                       </div>
-                      <p style={{ fontSize: 11, color: S.faint, margin: 0 }}>確認碼免填</p>
+                      <p style={{ fontSize: 11, color: S.faint, margin: 0 }}>{t.orderDetail.confirmCodeSkip}</p>
                     </div>
                   ) : (
-                    <p style={{ fontSize: 11, color: S.faint, margin: '12px 0 0' }}>此卡無手動輸入碼，請改用上方 QR 碼或一鍵安裝</p>
+                    <p style={{ fontSize: 11, color: S.faint, margin: '12px 0 0' }}>{t.orderDetail.noManualIos}</p>
                   )}
                 </>
               ) : (
                 <>
+                  {locale === 'en' ? (
+                  <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
+                    <li>First <strong style={{ color: S.ink }}>connect your phone to the internet</strong> (Wi-Fi or another line)</li>
+                    <li>Go to <strong style={{ color: S.ink }}>Settings → Network &amp; internet</strong>, tap the “<strong style={{ color: S.ink }}>＋</strong>” next to eSIM or “Add eSIM”</li>
+                    <li>Tap “Continue” → “Need help?” → “<strong style={{ color: S.ink }}>Enter it manually</strong>”, then paste the <strong style={{ color: S.ink }}>LPA</strong> below to finish</li>
+                    <li>Turn on “Cellular Data” and “Data Roaming” for this eSIM; once connected this page updates to <strong style={{ color: '#047857' }}>Active</strong></li>
+                  </ol>
+                  ) : (
                   <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: S.muted, lineHeight: 1.8 }}>
                     <li>手機先<strong style={{ color: S.ink }}>連上網路</strong>（Wi-Fi 或其他門號）</li>
                     <li>到<strong style={{ color: S.ink }}>設定 → 網路與網際網路</strong>，點 eSIM 旁的「<strong style={{ color: S.ink }}>＋</strong>」或「新增使用 eSIM 卡的號碼」</li>
                     <li>點「繼續」→「需要協助嗎？」→「<strong style={{ color: S.ink }}>請手動輸入</strong>」，貼上下方 <strong style={{ color: S.ink }}>LPA</strong> 那一條完成安裝</li>
                     <li>開啟此 eSIM 的「行動數據」與「數據漫遊」，連上網路後本頁會自動更新為 <strong style={{ color: '#047857' }}>使用中</strong></li>
                   </ol>
+                  )}
                   {order.esimLpa ? (
                     <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${S.line}`, fontSize: 13 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                        <span style={{ color: S.muted }}>LPA（手動輸入用）</span>
+                        <span style={{ color: S.muted }}>{t.orderDetail.lpaLabel}</span>
                         <CopyBtn color={C.primaryText} onClick={() => copyText(order.esimLpa!, 'LPA')} />
                       </div>
                       <span style={{ fontFamily: 'ui-monospace, monospace', color: S.ink, fontSize: 11, wordBreak: 'break-all' }}>{order.esimLpa}</span>
                     </div>
                   ) : (
-                    <p style={{ fontSize: 11, color: S.faint, margin: '12px 0 0' }}>此卡無手動輸入碼，請改用上方 QR 碼掃描安裝</p>
+                    <p style={{ fontSize: 11, color: S.faint, margin: '12px 0 0' }}>{t.orderDetail.noManualAndroid}</p>
                   )}
                 </>
               )}
@@ -532,7 +552,7 @@ export default function OrderDetailPage() {
 
           {order.activationStart && order.activationEnd && (
             <div style={{ fontSize: 13, marginBottom: 4 }}>
-              <span style={{ color: S.muted, display: 'block', marginBottom: 2 }}>使用期間</span>
+              <span style={{ color: S.muted, display: 'block', marginBottom: 2 }}>{t.orderDetail.usagePeriod}</span>
               <span style={{ color: S.ink, fontWeight: 600 }}>
                 {new Date(order.activationStart).toLocaleDateString('zh-TW')} ～ {new Date(order.activationEnd).toLocaleDateString('zh-TW')}
               </span>
@@ -547,12 +567,12 @@ export default function OrderDetailPage() {
                 const sv = deriveEsimStatus(order)
                 const ts = TONE_STYLE[sv.tone]
                 const meta = sv.tone === 'ended'
-                  ? { sub: '#94a3b8', title: '已結束', Icon: IconClock }
+                  ? { sub: '#94a3b8', title: t.orderDetail.activeEnded, Icon: IconClock }
                   : sv.tone === 'warn'
-                    ? { sub: '#9a3412', title: '即將到期', Icon: IconAlert }
-                    : { sub: '#166534', title: '已激活使用中', Icon: IconCheck }
+                    ? { sub: '#9a3412', title: t.orderDetail.activeExpiring, Icon: IconAlert }
+                    : { sub: '#166534', title: t.orderDetail.activeInUse, Icon: IconCheck }
                 const dl = sv.daysLeft
-                const remain = dl === null ? null : dl < 0 ? '使用期間已過' : dl === 0 ? '今天到期' : `剩 ${dl} 天`
+                const remain = dl === null ? null : dl < 0 ? t.orderDetail.usagePassed : dl === 0 ? t.orderDetail.expiresToday : t.orderDetail.daysLeft(dl)
                 return (
                   <div style={{ background: ts.bg, border: `1px solid ${ts.border}`, borderRadius: 12, padding: '12px 14px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -562,8 +582,8 @@ export default function OrderDetailPage() {
                       )}
                     </div>
                     <p style={{ fontSize: 11, color: meta.sub, margin: '4px 0 0', lineHeight: 1.5 }}>
-                      已於 {new Date(order.activatedAt).toLocaleDateString('zh-TW')} 激活
-                      {order.activationEnd ? ` · ${new Date(order.activationEnd).toLocaleDateString('zh-TW')} 到期` : ''}
+                      {t.orderDetail.activatedOn(new Date(order.activatedAt).toLocaleDateString('zh-TW'))}
+                      {order.activationEnd ? t.orderDetail.andExpires(new Date(order.activationEnd).toLocaleDateString('zh-TW')) : ''}
                     </p>
                   </div>
                 )
@@ -575,7 +595,7 @@ export default function OrderDetailPage() {
           {order.esimIccid && (
             <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: S.ink }}>流量使用狀況</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: S.ink }}>{t.orderDetail.usageStatus}</span>
                 <button
                   onClick={fetchUsage}
                   disabled={usageLoading}
@@ -590,9 +610,9 @@ export default function OrderDetailPage() {
                   {usageLoading ? (
                     <>
                       <span style={{ display: 'inline-block', width: 10, height: 10, border: `1.5px solid ${C.light}`, borderTopColor: C.primary, borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
-                      查詢中
+                      {t.orderDetail.querying}
                     </>
-                  ) : '查詢流量'}
+                  ) : t.orderDetail.queryUsage}
                 </button>
               </div>
 
@@ -604,15 +624,15 @@ export default function OrderDetailPage() {
                     <UsageDonut used={usage.usedData} total={usage.totalData} />
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <span style={{ fontSize: 12, color: S.muted }}>剩餘</span>
+                        <span style={{ fontSize: 12, color: S.muted }}>{t.orderDetail.usageRemaining}</span>
                         <strong style={{ fontSize: 15, color: '#16a34a', fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.remainingData, usage.unit)}</strong>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <span style={{ fontSize: 12, color: S.muted }}>已用</span>
+                        <span style={{ fontSize: 12, color: S.muted }}>{t.orderDetail.usageUsed}</span>
                         <span style={{ fontSize: 12, color: S.ink, fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.usedData, usage.unit)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <span style={{ fontSize: 12, color: S.muted }}>總量</span>
+                        <span style={{ fontSize: 12, color: S.muted }}>{t.orderDetail.usageTotal}</span>
                         <span style={{ fontSize: 12, color: S.ink, fontVariantNumeric: 'tabular-nums' }}>{formatData(usage.totalData, usage.unit)}</span>
                       </div>
                     </div>
@@ -620,7 +640,7 @@ export default function OrderDetailPage() {
                   <p style={{ fontSize: 10, color: S.faint, margin: '10px 0 0', textAlign: 'right' }}>ICCID: {usage.iccid.slice(-8)}</p>
                 </div>
               ) : !usageError && (
-                <p style={{ fontSize: 12, color: S.faint, margin: 0 }}>點擊「查詢流量」取得即時用量資料</p>
+                <p style={{ fontSize: 12, color: S.faint, margin: 0 }}>{t.orderDetail.usageHint}</p>
               )}
             </div>
           )}
@@ -630,9 +650,9 @@ export default function OrderDetailPage() {
       {/* 已取消 */}
       {order.status === 'CANCELLED' && (
         <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 16, padding: '18px 20px', marginBottom: 12 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#475569', margin: '0 0 4px' }}>訂單已取消</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#475569', margin: '0 0 4px' }}>{t.orderDetail.cancelledTitle}</p>
           <p style={{ fontSize: 13, color: '#94a3b8', margin: 0, lineHeight: 1.6 }}>
-            {order.cancelReason ?? '此訂單已取消，如需購買請重新下單。'}
+            {order.cancelReason ?? t.orderDetail.cancelledBody}
           </p>
         </div>
       )}
@@ -641,10 +661,10 @@ export default function OrderDetailPage() {
       {order.status === 'FAILED' && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 16, padding: '18px 20px', marginBottom: 12 }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: '#b91c1c', margin: '0 0 6px' }}>
-            付款未完成
+            {t.orders.paymentIncomplete}
           </p>
           <p style={{ fontSize: 13, color: '#dc2626', margin: '0 0 14px', lineHeight: 1.6 }}>
-            {order.failureReason ?? '此訂單付款失敗，請重新下單再試一次。'}
+            {order.failureReason ?? t.orderDetail.failedBody}
           </p>
           <button
             onClick={() => router.push(`${base}/products`)}
@@ -661,7 +681,7 @@ export default function OrderDetailPage() {
               transition: 'opacity 0.15s',
             }}
           >
-            重新下單
+            {t.orders.reorder}
           </button>
         </div>
       )}
@@ -671,28 +691,28 @@ export default function OrderDetailPage() {
         <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 16, padding: '18px 20px', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
             <div style={{ width: 18, height: 18, border: '2.5px solid #fde68a', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
-            <p style={{ fontSize: 14, fontWeight: 700, color: '#a16207', margin: 0 }}>待付款</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#a16207', margin: 0 }}>{t.orderDetail.pendingTitle}</p>
           </div>
           <p style={{ fontSize: 13, color: '#92400e', margin: '0 0 12px', lineHeight: 1.6 }}>
-            正在等待銀行確認付款結果，通常在幾秒內完成。請勿關閉此頁面。
+            {t.orderDetail.pendingBody}
           </p>
           <p style={{ fontSize: 12, color: '#a16207', margin: 0, lineHeight: 1.6 }}>
-            若您剛在 LINE Pay 或銀行頁面取消了付款，可
+            {t.orderDetail.pendingCancelPrefix}
             <button
               onClick={() => setDialog({
-                title: '確定要取消這筆訂單嗎？',
-                lines: ['若你剛取消了付款，按確定可立即釋出此訂單，', '不必等候系統自動處理。'],
-                confirmLabel: '取消訂單',
+                title: t.orderDetail.cancelDialogTitle,
+                lines: [t.orderDetail.cancelDialogLine1, t.orderDetail.cancelDialogLine2],
+                confirmLabel: t.orders.cancelOrder,
                 tone: 'danger',
                 onConfirm: async () => {
                   setDialog(null)
                   try {
                     const r = await fetch(`/api/orders/${order.id}/cancel`, { method: 'POST' }).then(x => x.json())
-                    if (!r.ok) { setToast({ message: r.error ?? '取消失敗，請稍候再試', tone: 'error' }); return }
+                    if (!r.ok) { setToast({ message: r.error ?? t.orderDetail.cancelFailed, tone: 'error' }); return }
                     // 立即重抓一次訂單，UI 就會切到 CANCELLED banner
                     await fetch(`/api/orders/${order.id}`).then(r => r.json()).then(d => d.order && setOrder(d.order))
                   } catch {
-                    setToast({ message: '網路錯誤，請稍候再試', tone: 'error' })
+                    setToast({ message: t.orderDetail.networkRetry, tone: 'error' })
                   }
                 },
               })}
@@ -702,9 +722,9 @@ export default function OrderDetailPage() {
                 textDecoration: 'underline', cursor: 'pointer',
               }}
             >
-              按此標記訂單為已取消
+              {t.orderDetail.markCancelled}
             </button>
-            。
+            {t.orderDetail.pendingCancelSuffix}
           </p>
         </div>
       )}
@@ -714,10 +734,10 @@ export default function OrderDetailPage() {
         <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 16, padding: '18px 20px', marginBottom: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#f97316', animation: 'pulse 1.5s ease-in-out infinite' }} />
-            <p style={{ fontSize: 14, fontWeight: 700, color: '#c2410c', margin: 0 }}>eSIM 啟動碼準備中</p>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#c2410c', margin: 0 }}>{t.orderDetail.esimPreparingTitle}</p>
           </div>
           <p style={{ fontSize: 13, color: '#ea580c', margin: 0, lineHeight: 1.6 }}>
-            系統正在取得啟動碼，通常在幾分鐘內完成。若超過 30 分鐘仍未收到，請聯繫客服。
+            {t.orderDetail.esimPreparingBody}
           </p>
           <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
         </div>
@@ -725,33 +745,33 @@ export default function OrderDetailPage() {
 
       {/* 訂單資訊 */}
       <div style={{ background: S.white, borderRadius: 16, border: `1px solid ${S.line}`, padding: '18px 20px', marginBottom: 12 }}>
-        <p style={{ fontSize: 14, fontWeight: 700, color: S.ink, margin: '0 0 14px' }}>訂單資訊</p>
+        <p style={{ fontSize: 14, fontWeight: 700, color: S.ink, margin: '0 0 14px' }}>{t.orderDetail.orderInfo}</p>
         <div style={{ marginBottom: 14 }}>
-          <p style={{ fontSize: 12, color: S.faint, margin: '0 0 4px' }}>商品</p>
+          <p style={{ fontSize: 12, color: S.faint, margin: '0 0 4px' }}>{t.orderDetail.product}</p>
           <p style={{ fontSize: 15, fontWeight: 600, color: S.ink, margin: 0 }}>{order.orderItems[0]?.productName ?? '—'}</p>
         </div>
         <div style={{ borderTop: `1px solid ${S.line}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: S.muted }}>
-            <span>商品金額</span><span>NT${order.subtotal.toLocaleString()}</span>
+            <span>{t.checkout.amountLabel}</span><span>NT${order.subtotal.toLocaleString()}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, borderTop: `1px solid ${S.line}`, paddingTop: 12, marginTop: 2 }}>
-            <span style={{ color: S.ink }}>實付金額</span>
+            <span style={{ color: S.ink }}>{t.checkout.payable}</span>
             <span style={{ color: C.primaryText, letterSpacing: '-0.02em' }}>NT${order.totalPaid.toLocaleString()}</span>
           </div>
         </div>
         <div style={{ borderTop: `1px solid ${S.line}`, paddingTop: 12, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12, color: S.faint }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>付款方式</span>
-            <span>{order.paymentMethod === 'CREDIT_CARD' ? '信用卡' : 'LINE Pay'}</span>
+            <span>{t.checkout.payMethod}</span>
+            <span>{order.paymentMethod === 'CREDIT_CARD' ? t.checkout.creditCard : 'LINE Pay'}</span>
           </div>
           {order.paidAt && (
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>付款時間</span>
+              <span>{t.orderDetail.paidTime}</span>
               <span>{new Date(order.paidAt).toLocaleString('zh-TW')}</span>
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>下單時間</span>
+            <span>{t.orderDetail.orderTime}</span>
             <span>{new Date(order.createdAt).toLocaleString('zh-TW')}</span>
           </div>
         </div>
@@ -761,25 +781,25 @@ export default function OrderDetailPage() {
       <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
         <button onClick={() => router.push(`${base}`)}
           style={{ flex: 1, padding: '12px 0', border: `1px solid ${S.line}`, borderRadius: 12, background: S.white, color: S.muted, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-          回首頁
+          {t.orderDetail.backHome}
         </button>
         <button onClick={() => router.push(`${base}/orders`)}
           style={{ flex: 1, padding: '12px 0', border: 'none', borderRadius: 12, background: C.primary, color: C.onPrimary, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-          查看我的 eSIM
+          {t.orderDetail.viewMyEsim}
         </button>
       </div>
 
       {/* 客服 */}
       <div style={{ textAlign: 'center', marginTop: 12 }}>
         <button onClick={() => router.push(`${base}/support`)} style={{ fontSize: 13, color: S.faint, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
-          需要協助？聯絡客服
+          {t.orderDetail.contactSupport}
         </button>
       </div>
       <ConfirmDialog
         open={!!dialog}
         title={dialog?.title ?? ''}
         lines={dialog?.lines}
-        confirmLabel={dialog?.confirmLabel ?? '確定'}
+        confirmLabel={dialog?.confirmLabel ?? t.common.confirm}
         tone={dialog?.tone}
         icon={dialog?.icon}
         colors={C}

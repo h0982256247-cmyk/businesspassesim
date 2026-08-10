@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useTenantColors } from '@/components/liff/TenantContext'
+import { useT } from '@/components/liff/LocaleProvider'
 
 function IconHome({ size = 20 }: { size?: number }) {
   return (
@@ -59,16 +60,17 @@ const ADMIN_PATH = 'company-admin'
 // 把按鈕蓋住（看起來像破圖／按不到），所以在這些流程中隱藏分頁導覽。
 const HIDE_ON = ['/checkout', '/profile/setup', '/login', '/gift/']
 
-type TabDef = { path: string; label: string; Icon: React.FC<{ size?: number }>; ownerOnly?: boolean; isRoot?: boolean }
+type NavKey = 'home' | 'shop' | 'esim' | 'profile' | 'admin'
+type TabDef = { path: string; navKey: NavKey; Icon: React.FC<{ size?: number }>; ownerOnly?: boolean; isRoot?: boolean }
 
 const TABS: TabDef[] = [
-  { path: '',         label: '主頁',  Icon: IconHome,    isRoot: true },
-  { path: 'products', label: '商城',  Icon: IconShop },
-  { path: 'orders',   label: 'eSIM',  Icon: IconEsim },
-  { path: 'profile',  label: '個人',  Icon: IconProfile },
+  { path: '',         navKey: 'home',    Icon: IconHome,    isRoot: true },
+  { path: 'products', navKey: 'shop',    Icon: IconShop },
+  { path: 'orders',   navKey: 'esim',    Icon: IconEsim },
+  { path: 'profile',  navKey: 'profile', Icon: IconProfile },
 ]
 
-const ADMIN_TAB: TabDef = { path: ADMIN_PATH, label: '管理', Icon: IconAdmin, ownerOnly: true }
+const ADMIN_TAB: TabDef = { path: ADMIN_PATH, navKey: 'admin', Icon: IconAdmin, ownerOnly: true }
 
 function useBasePath() {
   const pathname = usePathname()
@@ -81,6 +83,7 @@ export default function LiffBottomNav() {
   const pathname = usePathname()
   const base = useBasePath()
   const C = useTenantColors()
+  const { t } = useT()
   const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
   const navRef = useRef<HTMLDivElement>(null)
 
@@ -139,7 +142,7 @@ export default function LiffBottomNav() {
         }
       `}</style>
       <div style={{ maxWidth: 520, margin: '0 auto', display: 'flex', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-        {tabs.map(({ path, label, Icon, isRoot }) => {
+        {tabs.map(({ path, navKey, Icon, isRoot }) => {
           const href = isRoot ? (base || '/') : `${base}/${path}`
           // 主頁：精確匹配根路徑；其他：前綴匹配
           const active = isRoot
@@ -181,7 +184,7 @@ export default function LiffBottomNav() {
                 letterSpacing: '0.02em',
                 lineHeight: 1,
               }}>
-                {label}
+                {t.nav[navKey]}
               </span>
             </Link>
           )

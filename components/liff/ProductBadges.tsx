@@ -1,6 +1,7 @@
 'use client'
 
 import { type CSSProperties } from 'react'
+import { useT } from '@/components/liff/LocaleProvider'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,7 @@ interface NativeSimBadgeProps extends BaseBadgeProps {
  * Renders nothing if `isNative` isn't truthy.
  */
 export function NativeSimBadge({ isNative, size = 'sm', style }: NativeSimBadgeProps) {
+  const { t } = useT()
   if (!isNative) return null
   const sm = size === 'sm'
   return (
@@ -113,7 +115,7 @@ export function NativeSimBadge({ isNative, size = 'sm', style }: NativeSimBadgeP
       <svg width={sm ? 10 : 12} height={sm ? 10 : 12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M12 2l3 6 6 1-4.5 4.5L18 21l-6-3.5L6 21l1.5-7.5L3 9l6-1z" />
       </svg>
-      原生
+      {t.badges.native}
     </span>
   )
 }

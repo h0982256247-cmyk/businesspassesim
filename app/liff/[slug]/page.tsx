@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useT } from '@/components/liff/LocaleProvider'
 import { useRouter, useParams } from 'next/navigation'
 import { useLiff } from '@/components/liff/LiffProvider'
 import { useTenant, useTenantColors } from '@/components/liff/TenantContext'
@@ -35,6 +36,7 @@ export default function LiffHomePage() {
   const slug = params.slug as string
   const tenant = useTenant()
   const C = useTenantColors()
+  const { t } = useT()
 
   const brandName = tenant?.brandName ?? 'eSIM'
   const primary   = C.primary
@@ -144,7 +146,7 @@ export default function LiffHomePage() {
           {/* 品牌名 */}
           <div style={{ textAlign: 'center' }}>
             <p style={{ fontSize: 24, fontWeight: 900, color: '#1a1a1a', margin: 0, letterSpacing: '-0.02em' }}>{brandName}</p>
-            <p style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0 0', letterSpacing: '0.1em' }}>旅遊 eSIM 專門店</p>
+            <p style={{ fontSize: 12, color: '#9ca3af', margin: '6px 0 0', letterSpacing: '0.1em' }}>{t.home.splashTagline}</p>
           </div>
 
           {/* 跳動點 */}

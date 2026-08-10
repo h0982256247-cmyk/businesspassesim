@@ -7,6 +7,7 @@ export type CartItem = {
   productId: string
   countryCode: string
   countryNameZh: string
+  countryNameEn?: string   // 選填：加入時帶入，供英文語系顯示；舊購物車無此欄則退回中文名
   countryFlag: string | null
   displayDays: number
   dataCapacity: string | null

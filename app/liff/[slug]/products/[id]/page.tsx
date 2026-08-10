@@ -9,6 +9,7 @@ import { CountryFlag } from '@/components/common/CountryFlag'
 import { useCart } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge, parseNetworkType } from '@/components/liff/ProductBadges'
 import { S } from '@/lib/liff/tokens'
+import { useT } from '@/components/liff/LocaleProvider'
 
 type Product = {
   id: string
@@ -47,6 +48,8 @@ export default function ProductDetailPage() {
   const base = useLiffBase()
   const C = useTenantColors()
   const cart = useCart()
+  const { t, locale } = useT()
+  const cname = (zh: string, en: string) => (locale === 'en' ? (en || zh) : zh)
   const [product, setProduct] = useState<Product | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
@@ -81,8 +84,8 @@ export default function ProductDetailPage() {
 
   if (notFound || !product) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 16 }}>
-      <p style={{ color: S.faint, fontSize: 14 }}>商品不存在或已下架</p>
-      <button onClick={() => router.back()} style={{ color: C.primaryText, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer' }}>返回上一頁</button>
+      <p style={{ color: S.faint, fontSize: 14 }}>{t.product.notFound}</p>
+      <button onClick={() => router.back()} style={{ color: C.primaryText, fontSize: 14, background: 'none', border: 'none', cursor: 'pointer' }}>{t.common.backToPrev}</button>
     </div>
   )
 
@@ -90,11 +93,11 @@ export default function ProductDetailPage() {
   const net = parseNetworkType(product.networkType)
 
   const features: string[] = [
-    product.dataCapacity ? product.dataCapacity : null,
-    net.label ? `支援 ${net.label} 高速網路` : null,
-    product.isNativeSim ? '原生 SIM · 非漫遊，穩定連線' : null,
-    'eSIM 即插即用，無需實體 SIM',
-    '購買後即可收到安裝教學',
+    product.dataCapacity ? t.formatCapacity(product.dataCapacity) : null,   // 流量：顯示時依語系轉英文（不改資料）
+    net.label ? t.product.featNet(net.label) : null,
+    product.isNativeSim ? t.product.featNative : null,
+    t.product.featEsim,
+    t.product.featGuide,
   ].filter(Boolean) as string[]
 
   return (
@@ -107,7 +110,7 @@ export default function ProductDetailPage() {
         >
           <BackArrow />
         </button>
-        <span style={{ fontSize: 14, color: S.muted }}>{product.countryNameZh}</span>
+        <span style={{ fontSize: 14, color: S.muted }}>{cname(product.countryNameZh, product.countryNameEn)}</span>
       </div>
 
       {/* Hero card */}
@@ -122,13 +125,12 @@ export default function ProductDetailPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <CountryFlag code={product.countryCode} fallbackEmoji={product.countryFlag} size={36} />
               <div>
-                <p style={{ fontSize: 17, fontWeight: 700, color: S.ink, margin: 0 }}>{product.countryNameZh}</p>
-                <p style={{ fontSize: 12, color: S.faint, margin: 0 }}>{product.countryNameEn}</p>
+                <p style={{ fontSize: 17, fontWeight: 700, color: S.ink, margin: 0 }}>{cname(product.countryNameZh, product.countryNameEn)}</p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
               <span style={{ fontSize: 40, fontWeight: 800, color: S.ink, letterSpacing: '-0.04em', lineHeight: 1 }}>{product.displayDays}</span>
-              <span style={{ fontSize: 16, color: S.muted, fontWeight: 500 }}>天方案</span>
+              <span style={{ fontSize: 16, color: S.muted, fontWeight: 500 }}>{t.product.dayPlan}</span>
             </div>
             {(net.label || product.isNativeSim) && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 12 }}>
@@ -196,12 +198,12 @@ export default function ProductDetailPage() {
                     NT${bestPrice.toLocaleString()}
                   </p>
                   <p style={{ fontSize: 11, color: '#16a34a', marginTop: 1, fontWeight: 600 }}>
-                    省 NT${savedAmount.toLocaleString()}
+                    {t.product.saved(savedAmount)}
                   </p>
                 </>
               ) : (
                 <>
-                  <p style={{ fontSize: 11, color: S.faint, margin: 0 }}>售價</p>
+                  <p style={{ fontSize: 11, color: S.faint, margin: 0 }}>{t.product.priceLabel}</p>
                   <p style={{ fontSize: 24, fontWeight: 800, color: C.primaryText, margin: 0, letterSpacing: '-0.03em', lineHeight: 1.1 }}>
                     NT${product.sellPrice.toLocaleString()}
                   </p>
@@ -223,6 +225,7 @@ export default function ProductDetailPage() {
                       productId: product.id,
                       countryCode: product.countryCode,
                       countryNameZh: product.countryNameZh,
+                      countryNameEn: product.countryNameEn,
                       countryFlag: product.countryFlag,
                       displayDays: product.displayDays,
                       dataCapacity: product.dataCapacity,
@@ -235,7 +238,7 @@ export default function ProductDetailPage() {
                     setTimeout(() => setJustAdded(false), 1200)
                   }
                 }}
-                aria-label={inCart ? '從購物車移除' : '加入購物車'}
+                aria-label={inCart ? t.shop.removeAria : t.shop.addAria}
                 style={{
                   width: 54, height: 54, flexShrink: 0,
                   borderRadius: '50%',
@@ -279,7 +282,7 @@ export default function ProductDetailPage() {
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            立即購買
+            {t.product.buyNow}
           </button>
         </div>
 
@@ -298,7 +301,7 @@ export default function ProductDetailPage() {
             whiteSpace: 'nowrap',
             animation: 'pdToast 1.2s ease',
             pointerEvents: 'none',
-          }}>已加入購物車</div>
+          }}>{t.product.addedToast}</div>
         )}
         <style>{`
           @keyframes pdToast {
