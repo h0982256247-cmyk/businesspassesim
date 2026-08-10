@@ -518,7 +518,7 @@ export default function ClassicShop({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {p.dataCapacity && (
                       <p style={{ fontSize: 16, fontWeight: 900, color: S.ink, letterSpacing: '-0.02em', margin: 0, lineHeight: 1.2 }}>
-                        {p.dataCapacity}
+                        {t.formatCapacity(p.dataCapacity)}
                       </p>
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4, flexWrap: 'wrap' }}>

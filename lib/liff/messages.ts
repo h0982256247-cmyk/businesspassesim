@@ -154,6 +154,8 @@ const zh = {
   badges: {
     native: '原生',
   },
+  // 流量字串顯示用轉換（不改 DB 資料）。中文模式原樣回傳。
+  formatCapacity: (dc: string) => dc,
 }
 
 export type Messages = typeof zh
@@ -304,6 +306,18 @@ const en: Messages = {
   },
   badges: {
     native: 'Native',
+  },
+  // 把中文流量字串（normalizeCapacity 產出的形態）轉英文；認不得的原樣保留（安全 fallback）。
+  formatCapacity: (dc: string) => {
+    if (!dc) return dc
+    if (dc === '無限吃到飽') return 'Unlimited'
+    if (dc === '鈦金吃到飽') return 'Unlimited (Premium)'
+    if (dc === '高速吃到飽') return 'High-speed unlimited'
+    const day = dc.match(/^(\d+(?:\.\d+)?(?:MB|GB|TB))\s*\/\s*(?:天|日|day)$/i)
+    if (day) return `Daily ${day[1]}`
+    const tot = dc.match(/^總量\s*(\d+(?:\.\d+)?(?:MB|GB|TB))$/i)
+    if (tot) return `Total ${tot[1]}`
+    return dc
   },
 }
 

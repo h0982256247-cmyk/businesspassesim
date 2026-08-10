@@ -259,7 +259,7 @@ export default function FloatingCart() {
                             {item.countryNameZh}
                           </p>
                           <p style={{ fontSize: 12, color: '#64748b', margin: 0 }}>
-                            {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${item.dataCapacity}` : ''}
+                            {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${t.formatCapacity(item.dataCapacity)}` : ''}
                           </p>
                           {(item.networkType || item.isNativeSim) && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>

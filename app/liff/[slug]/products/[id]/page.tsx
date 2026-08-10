@@ -93,7 +93,7 @@ export default function ProductDetailPage() {
   const net = parseNetworkType(product.networkType)
 
   const features: string[] = [
-    product.dataCapacity ? product.dataCapacity : null,   // 流量字串為資料，維持原文
+    product.dataCapacity ? t.formatCapacity(product.dataCapacity) : null,   // 流量：顯示時依語系轉英文（不改資料）
     net.label ? t.product.featNet(net.label) : null,
     product.isNativeSim ? t.product.featNative : null,
     t.product.featEsim,

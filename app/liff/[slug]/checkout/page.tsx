@@ -638,7 +638,7 @@ function CheckoutContent() {
                   <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1a1a', margin: '0 0 2px' }}>{item.countryNameZh}</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11.5, color: '#64748b' }}>
-                      {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${item.dataCapacity}` : ''}
+                      {t.cart.dayMeta(item.displayDays)}{item.dataCapacity ? ` · ${t.formatCapacity(item.dataCapacity)}` : ''}
                     </span>
                     <NetworkBadge networkType={item.networkType} />
                     <NativeSimBadge isNative={item.isNativeSim} />
@@ -704,7 +704,7 @@ function CheckoutContent() {
                     fontSize: 12, fontWeight: 600, color: '#4b5563',
                     background: '#f3f4f6', borderRadius: 6, padding: '2px 8px',
                   }}>
-                    {product!.dataCapacity}
+                    {t.formatCapacity(product!.dataCapacity)}
                   </span>
                 )}
                 <NetworkBadge networkType={product!.networkType} />
