@@ -376,22 +376,6 @@ export default function ClassicShop({
                 ))}
               </g>
             </svg>
-            {coverageList.length > 0 && (
-              <button
-                onClick={() => setShowCoverage(true)}
-                style={{
-                  position: 'absolute', top: 14, right: 14, zIndex: 2,
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  background: 'rgba(255,255,255,0.95)', color: countryAccent.accent,
-                  border: 'none', borderRadius: 100, padding: '7px 13px',
-                  fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                  boxShadow: '0 3px 10px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>
-                {t.shop.coverage}
-              </button>
-            )}
             <div style={{
               width: 60, height: 60, borderRadius: '50%', flexShrink: 0,
               background: 'rgba(255,255,255,0.92)',
@@ -402,14 +386,28 @@ export default function ClassicShop({
               <CountryFlag code={country.countryCode} fallbackEmoji={country.countryFlag} size={40} />
             </div>
             <div style={{ position: 'relative', zIndex: 1, minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-                <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', textShadow: '0 1px 3px rgba(0,0,0,0.18)' }}>
-                  {cname(country.countryNameZh, country.countryNameEn)}
-                </h2>
-              </div>
+              <h2 style={{ fontSize: 22, fontWeight: 900, color: '#fff', margin: 0, letterSpacing: '-0.025em', textShadow: '0 1px 3px rgba(0,0,0,0.18)', lineHeight: 1.15 }}>
+                {cname(country.countryNameZh, country.countryNameEn)}
+              </h2>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.92)', margin: '5px 0 0', fontWeight: 600, letterSpacing: '0.02em' }}>
                 {filter.totalCount > 0 ? t.shop.countryPlanCount(filter.totalCount) : t.shop.countryPlanFallback}
               </p>
+              {coverageList.length > 0 && (
+                <button
+                  onClick={() => setShowCoverage(true)}
+                  style={{
+                    marginTop: 10,
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    background: 'rgba(255,255,255,0.95)', color: countryAccent.accent,
+                    border: 'none', borderRadius: 100, padding: '6px 12px',
+                    fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                    boxShadow: '0 3px 10px rgba(0,0,0,0.18)', WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18" /></svg>
+                  {t.shop.coverage}
+                </button>
+              )}
             </div>
           </div>
         </div>
