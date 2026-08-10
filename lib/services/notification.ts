@@ -178,6 +178,40 @@ function buildOrderPaidFlex(opts: {
   return bubble
 }
 
+// 企業加入審核通過卡片：品牌 header + 淺灰企業框（公司名＋福利價）＋踏上旅途按鈕。
+function buildMemberApprovedFlex(opts: {
+  primaryColor: string
+  companyName: string
+  buttonUri?: string
+}): object {
+  const { primaryColor, companyName, buttonUri } = opts
+  const bubble: Record<string, unknown> = {
+    type: 'bubble',
+    header: brandHeader(primaryColor, '🎉 申請通過', '你已加入企業'),
+    body: {
+      type: 'box',
+      layout: 'vertical',
+      spacing: 'lg',
+      contents: [
+        {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#F5F5F7',
+          cornerRadius: '12px',
+          paddingAll: '16px',
+          spacing: 'sm',
+          contents: [
+            { type: 'text', text: companyName, size: 'xl', weight: 'bold', color: '#1A1A1A', wrap: true },
+            { type: 'text', text: '現在起購買 eSIM 可享企業福利價', size: 'md', color: '#6E6E73', wrap: true },
+          ],
+        },
+      ],
+    },
+  }
+  if (buttonUri) bubble.footer = brandFooter(primaryColor, '踏上旅途', buttonUri)
+  return bubble
+}
+
 // 付款成功訊息的「訂單內容」區塊：同方案合併計量。
 export function formatPaidItemsBlock(items: { productName: string; qty: number }[]): string {
   const map = new Map<string, number>()
@@ -308,10 +342,14 @@ export async function notifyEsimPending(userId: string, productName: string) {
 
 // 企業加入審核結果通知（企業管理員審核成員後呼叫）
 export async function notifyMemberApproved(userId: string, companyName: string) {
+  const { primaryColor, liffId } = await getBrand()
+  const buttonUri = liffId ? `https://liff.line.me/${liffId}` : undefined   // 主頁（LIFF 根）
+  const flex = buildMemberApprovedFlex({ primaryColor, companyName, buttonUri })
   await sendNotification({
     userId,
     type: NotificationType.MEMBER_APPROVED,
     data: { companyName },
+    flex,
   })
 }
 
