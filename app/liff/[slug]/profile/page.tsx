@@ -7,6 +7,7 @@ import { useTenantColors, useTenant } from '@/components/liff/TenantContext'
 import { useCachedData } from '@/hooks/useCachedData'
 import PageSkeleton from '@/components/liff/PageSkeleton'
 import { S } from '@/lib/liff/tokens'
+import { useT } from '@/components/liff/LocaleProvider'
 
 type UserInfo = {
   id: string
@@ -66,6 +67,7 @@ export default function ProfilePage() {
   const base = useLiffBase()
   const C = useTenantColors()
   const tenant = useTenant()
+  const { t } = useT()
 
   const { data, loading } = useCachedData('profile', async () => {
     const d = await fetch('/api/auth/me').then(r => r.ok ? r.json() : null)
@@ -80,20 +82,20 @@ export default function ProfilePage() {
   const m = user.membership
   const isApproved = m?.status === 'APPROVED'
   const groupLabel = !m
-    ? '尚未加入企業'
+    ? t.profile.notJoined
     : m.status === 'PENDING'
-    ? `審核中 · ${m.group.name}`
+    ? t.profile.reviewing(m.group.name)
     : m.status === 'REJECTED'
-    ? '加入申請未通過'
-    : `企業會員 · ${m.group.name}`
+    ? t.profile.rejected
+    : t.profile.member(m.group.name)
 
   const menuItems: { label: string; sub: string; icon: React.ReactNode; href: string; external?: boolean }[] = [
-    { label: '個人資料', sub: '姓名、電話、電郵', icon: <IconEdit />, href: `${base}/profile/setup` },
-    { label: '我的企業', sub: groupLabel,           icon: <IconGroup />, href: `${base}/company` },
-    { label: '客服中心', sub: '問題回報與聯絡',    icon: <IconSupport />, href: `${base}/support` },
+    { label: t.profile.itemProfile, sub: t.profile.itemProfileSub, icon: <IconEdit />, href: `${base}/profile/setup` },
+    { label: t.profile.itemCompany, sub: groupLabel,               icon: <IconGroup />, href: `${base}/company` },
+    { label: t.profile.itemSupport, sub: t.profile.itemSupportSub,  icon: <IconSupport />, href: `${base}/support` },
     // 聯繫客服：直開後台「系統設定 → 客服 / LINE OA 連結」；未設定則不顯示（與 support 頁同防呆）
     ...(tenant?.lineOaUrl
-      ? [{ label: '聯繫客服', sub: 'LINE 官方帳號線上諮詢', icon: <IconHeadset />, href: tenant.lineOaUrl, external: true }]
+      ? [{ label: t.profile.itemLineOa, sub: t.profile.itemLineOaSub, icon: <IconHeadset />, href: tenant.lineOaUrl, external: true }]
       : []),
   ]
 
@@ -119,7 +121,7 @@ export default function ProfilePage() {
             <p style={{ fontSize: 18, fontWeight: 700, color: S.ink, margin: 0 }}>{user.displayName}</p>
             {isApproved && (
               <span style={{ fontSize: 11, fontWeight: 700, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 100 }}>
-                企業會員
+                {t.profile.memberBadge}
               </span>
             )}
           </div>
@@ -145,8 +147,8 @@ export default function ProfilePage() {
             <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
           <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 13, fontWeight: 600, color: '#9a3412', margin: 0 }}>個人資料未填寫</p>
-            <p style={{ fontSize: 12, color: '#c2410c', margin: 0 }}>填寫後才能完成結帳</p>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#9a3412', margin: 0 }}>{t.profile.incompleteTitle}</p>
+            <p style={{ fontSize: 12, color: '#c2410c', margin: 0 }}>{t.profile.incompleteSub}</p>
           </div>
           <ChevronRight />
         </button>

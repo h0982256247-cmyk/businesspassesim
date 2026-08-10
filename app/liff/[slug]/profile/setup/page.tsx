@@ -6,6 +6,7 @@ import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import { invalidateCache } from '@/hooks/useCachedData'
 import { S as BASE } from '@/lib/liff/tokens'
+import { useT } from '@/components/liff/LocaleProvider'
 
 // 沿用共用中性色，分隔線維持本頁原本較淺的 #e2e8f0（零視覺變化）
 const S = { ...BASE, line: '#e2e8f0' } as const
@@ -14,6 +15,7 @@ export default function ProfileSetup() {
   const router = useRouter()
   const base = useLiffBase()
   const C = useTenantColors()
+  const { t } = useT()
 
   const [form, setForm] = useState({ name: '', phone: '', email: '', birthday: '' })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -42,10 +44,10 @@ export default function ProfileSetup() {
 
   function validate() {
     const e: Record<string, string> = {}
-    if (!form.name.trim()) e.name = '請輸入姓名'
-    if (!/^09\d{8}$/.test(form.phone)) e.phone = '請輸入正確手機號碼（09xxxxxxxx）'
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = '請輸入正確 Email'
-    if (!form.birthday) e.birthday = '請選擇生日'
+    if (!form.name.trim()) e.name = t.profile.errName
+    if (!/^09\d{8}$/.test(form.phone)) e.phone = t.profile.errPhone
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = t.profile.errEmail
+    if (!form.birthday) e.birthday = t.profile.errBirthday
     return e
   }
 
@@ -74,7 +76,7 @@ export default function ProfileSetup() {
         : null
       router.replace(redirect && redirect.startsWith(`${base}/`) ? redirect : `${base}/products`)
     } catch {
-      setErrors({ submit: '送出失敗，請稍後再試' })
+      setErrors({ submit: t.profile.errSubmit })
     } finally {
       setLoading(false)
     }
@@ -88,10 +90,10 @@ export default function ProfileSetup() {
   }
 
   const fields = [
-    { key: 'name',     label: '姓名',   type: 'text',  placeholder: '請輸入真實姓名' },
-    { key: 'phone',    label: '手機號碼', type: 'tel',  placeholder: '09xxxxxxxx' },
-    { key: 'email',    label: '電子信箱', type: 'email', placeholder: 'email@example.com' },
-    { key: 'birthday', label: '生日',    type: 'date',  placeholder: '' },
+    { key: 'name',     label: t.profile.fieldName,     type: 'text',  placeholder: t.profile.fieldNamePlaceholder },
+    { key: 'phone',    label: t.profile.fieldPhone,    type: 'tel',   placeholder: '09xxxxxxxx' },
+    { key: 'email',    label: t.profile.fieldEmail,    type: 'email', placeholder: 'email@example.com' },
+    { key: 'birthday', label: t.profile.fieldBirthday, type: 'date',  placeholder: '' },
   ] as const
 
   return (
@@ -110,10 +112,10 @@ export default function ProfileSetup() {
             </svg>
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: S.ink, margin: '0 0 6px', letterSpacing: '-0.02em' }}>
-            {alreadyFilled ? '個人資料' : '完成註冊'}
+            {alreadyFilled ? t.profile.itemProfile : t.profile.finishSignup}
           </h1>
           <p style={{ fontSize: 14, color: S.muted, margin: 0 }}>
-            {alreadyFilled ? '更新你的基本資料' : '填寫以下資料即可開始購買 eSIM'}
+            {alreadyFilled ? t.profile.setupSubtitleFilled : t.profile.setupSubtitleNew}
           </p>
         </div>
 
@@ -160,13 +162,13 @@ export default function ProfileSetup() {
                 boxShadow: loading ? 'none' : `0 6px 18px ${C.primary}40`,
               }}
             >
-              {loading ? '儲存中...' : alreadyFilled ? '儲存' : '完成註冊'}
+              {loading ? t.profile.saving : alreadyFilled ? t.profile.save : t.profile.finishSignup}
             </button>
           </form>
         </div>
 
         <p style={{ fontSize: 12, color: S.faint, textAlign: 'center', marginTop: 16, lineHeight: 1.6 }}>
-          資料僅用於 eSIM 開卡與訂單聯絡，已加密安全保存。
+          {t.profile.privacyNote}
         </p>
       </div>
 
