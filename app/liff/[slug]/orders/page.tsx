@@ -14,6 +14,7 @@ import {
   TAB_ORDER, type OrdersTab,
 } from '@/lib/esimStatus'
 import { useT } from '@/components/liff/LocaleProvider'
+import { planTitle } from '@/lib/liff/plan-label'
 import { IconSim, IconQr, IconInstall, IconClock, IconShare, IconGift } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
@@ -37,7 +38,7 @@ type Order = {
   activationEnd: string | null
   redeemedAt: string | null
   activatedAt: string | null
-  orderItems: { productName: string; qty: number; unitPrice: number; product?: { dataCapacity: string | null } | null }[]
+  orderItems: { productName: string; qty: number; unitPrice: number; product?: { countryNameZh: string; countryNameEn: string; displayDays: number; dataCapacity: string | null } | null }[]
   transferredAway: boolean   // 我買的、已轉贈出去（歷史顯示）
   receivedGift: boolean      // 我收到的轉贈
   gift: { claimedAt: string | null; cancelledAt: string | null; expiresAt: string; toName: string | null; fromName: string | null } | null
@@ -495,8 +496,8 @@ function UsageBar({ used, total }: { used: number; total: number }) {
 function ActiveCard({ order, usage, primary, onClick }: {
   order: Order; usage: EsimUsage | null | undefined; primary: string; onClick: () => void
 }) {
-  const { t } = useT()
-  const productName = order.orderItems[0]?.productName ?? 'eSIM'
+  const { t, locale } = useT()
+  const productName = planTitle(locale, t, order.orderItems[0])
   const view = deriveEsimStatus(order)
   const expiring = view.phase === 'expiringSoon'
 
@@ -571,8 +572,8 @@ const actionCardSurface = (primary: string) => ({
 })
 
 function InstallableCard({ order, primary, primaryText, onClick }: { order: Order; primary: string; primaryText: string; onClick: () => void }) {
-  const { t } = useT()
-  const productName = order.orderItems[0]?.productName ?? 'eSIM'
+  const { t, locale } = useT()
+  const productName = planTitle(locale, t, order.orderItems[0])
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
   return (
     <button onClick={onClick}
@@ -584,7 +585,7 @@ function InstallableCard({ order, primary, primaryText, onClick }: { order: Orde
           </span>
           <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: '8px 0 2px' }}>
             {productName}
-            {dataCapacity && !productName.includes(dataCapacity) && <span style={{ fontSize: 12.5, fontWeight: 600, color: S.muted, marginLeft: 6 }}>· {dataCapacity}</span>}
+            {locale !== 'en' && dataCapacity && !productName.includes(dataCapacity) && <span style={{ fontSize: 12.5, fontWeight: 600, color: S.muted, marginLeft: 6 }}>· {dataCapacity}</span>}
           </p>
           <p style={{ fontSize: 11, color: S.muted, margin: 0 }}>{t.orders.tapToInstall}</p>
         </div>
@@ -598,8 +599,8 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
   order: Order; primary: string; primaryText: string; onPrimary: string; actioning: boolean; canShare: boolean;
   onRedeem: () => void; onShare: () => void; onClick: () => void
 }) {
-  const { t } = useT()
-  const productName = order.orderItems[0]?.productName ?? 'eSIM'
+  const { t, locale } = useT()
+  const productName = planTitle(locale, t, order.orderItems[0])
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
   const gift = giftBadge(order)
   const isReceived = order.receivedGift   // 收到的轉贈 → 不可再轉贈出去
@@ -619,7 +620,7 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
         </div>
         <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: '0 0 3px' }}>
           {productName}
-          {dataCapacity && !productName.includes(dataCapacity) && <span style={{ fontSize: 13, fontWeight: 600, color: S.muted, marginLeft: 6 }}>· {dataCapacity}</span>}
+          {locale !== 'en' && dataCapacity && !productName.includes(dataCapacity) && <span style={{ fontSize: 13, fontWeight: 600, color: S.muted, marginLeft: 6 }}>· {dataCapacity}</span>}
         </p>
         <p style={{ fontSize: 11, color: S.faint, margin: '0 0 11px' }}>
           {new Date(order.createdAt).toLocaleDateString('zh-TW')}
@@ -647,8 +648,8 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
 function ProcessingRow({ order, stage, boxed, onClick }: {
   order: Order; stage: 'awaiting' | 'ordered' | 'redeeming'; boxed?: boolean; onClick: () => void
 }) {
-  const { t } = useT()
-  const productName = order.orderItems[0]?.productName ?? 'eSIM'
+  const { t, locale } = useT()
+  const productName = planTitle(locale, t, order.orderItems[0])
   const text = stage === 'awaiting' ? t.orders.stageAwaiting
              : stage === 'ordered'  ? t.orders.stageOrdered
              :                         t.orders.stageRedeeming
@@ -671,8 +672,8 @@ function ProcessingRow({ order, stage, boxed, onClick }: {
 }
 
 function CompactRow({ order, onClick }: { order: Order; onClick: () => void }) {
-  const { t } = useT()
-  const productName = order.orderItems[0]?.productName ?? 'eSIM'
+  const { t, locale } = useT()
+  const productName = planTitle(locale, t, order.orderItems[0])
   const gifted = order.transferredAway
   const giftedTo = order.gift?.toName ?? t.orders.friend
   const view = deriveEsimStatus(order)

@@ -10,6 +10,7 @@ import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
 import { S } from '@/lib/liff/tokens'
 import { useT } from '@/components/liff/LocaleProvider'
+import { planTitle } from '@/lib/liff/plan-label'
 import type { ReactNode } from 'react'
 
 type OrderDetail = {
@@ -33,7 +34,7 @@ type OrderDetail = {
   activationEnd: string | null
   redeemedAt: string | null
   activatedAt: string | null
-  orderItems: { productName: string; qty: number; unitPrice: number; product?: { dataCapacity: string | null } | null }[]
+  orderItems: { productName: string; qty: number; unitPrice: number; product?: { countryNameZh: string; countryNameEn: string; displayDays: number; dataCapacity: string | null } | null }[]
   isCurrentOwner: boolean         // 只有目前擁有者可安裝/操作（轉贈後為 false）
   transferredAway: boolean        // 我買的、已轉贈出去 → 只能看歷史
   gift?: { toName: string | null } | null
@@ -395,7 +396,7 @@ export default function OrderDetailPage() {
           <div style={{ borderRadius: 16, overflow: 'hidden', background: S.white, border: `1px solid ${S.line}`, boxShadow: '0 10px 26px rgba(15,23,42,0.12)', marginBottom: 16 }}>
             <div style={{ background: `linear-gradient(135deg, ${C.primaryText} 0%, ${C.primary} 100%)`, padding: '13px 18px', color: C.onPrimary }}>
               <p style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', margin: 0, opacity: 0.82 }}>{t.orderDetail.credential}</p>
-              <p style={{ fontSize: 15, fontWeight: 800, margin: '3px 0 0', letterSpacing: '-0.01em' }}>{order.orderItems[0]?.productName ?? 'eSIM'}</p>
+              <p style={{ fontSize: 15, fontWeight: 800, margin: '3px 0 0', letterSpacing: '-0.01em' }}>{planTitle(locale, t, order.orderItems[0])}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 18px', borderTop: `1.5px dashed ${C.border}` }}>
               <div style={{ position: 'relative', padding: 12, background: '#fff', borderRadius: 14, border: `1px solid ${S.line}` }}>
@@ -748,7 +749,7 @@ export default function OrderDetailPage() {
         <p style={{ fontSize: 14, fontWeight: 700, color: S.ink, margin: '0 0 14px' }}>{t.orderDetail.orderInfo}</p>
         <div style={{ marginBottom: 14 }}>
           <p style={{ fontSize: 12, color: S.faint, margin: '0 0 4px' }}>{t.orderDetail.product}</p>
-          <p style={{ fontSize: 15, fontWeight: 600, color: S.ink, margin: 0 }}>{order.orderItems[0]?.productName ?? '—'}</p>
+          <p style={{ fontSize: 15, fontWeight: 600, color: S.ink, margin: 0 }}>{order.orderItems[0] ? planTitle(locale, t, order.orderItems[0]) : '—'}</p>
         </div>
         <div style={{ borderTop: `1px solid ${S.line}`, paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: S.muted }}>
