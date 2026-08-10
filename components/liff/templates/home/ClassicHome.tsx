@@ -11,6 +11,7 @@ import { APPEARANCE } from '@/lib/utils/appearance'
 import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import type { HomePageProps } from './types'
 import { useT } from '@/components/liff/LocaleProvider'
+import { enCountryName } from '@/lib/liff/country-names'
 
 const QUICK_ACTIONS = [
   // 通透版：無卡框，duotone 圖示坐在品牌淡底圓角上；主色動態帶入、不寫死品牌色。
@@ -54,7 +55,7 @@ export default function ClassicHome({
   const [selCountry, setSelCountry] = useState<{ code: string; name: string } | null>(null)
 
   // 國家名依語系：英文模式顯示英文名（無則退回中文），中文模式顯示中文名
-  const cname = (zh: string, en: string) => (locale === 'en' ? (en || zh) : zh)
+  const cname = (zh: string, en: string) => (locale === 'en' ? enCountryName(zh, en) : zh)
 
   // 快速功能標籤依語系取字典
   const quickLabel = (key: string) =>

@@ -9,6 +9,7 @@ import { resolveDestImage } from '@/lib/utils/dest-image'
 import { APPEARANCE } from '@/lib/utils/appearance'
 import { filterCountriesByQuery } from '@/lib/utils/country-search'
 import { useT } from '@/components/liff/LocaleProvider'
+import { enCountryName } from '@/lib/liff/country-names'
 import type { ProductsTemplateProps } from './types'
 
 const S = {
@@ -108,7 +109,7 @@ export default function ClassicShop({
 }: ProductsTemplateProps) {
   // Hooks 一律在任何 early return 之前呼叫（react-hooks/rules-of-hooks）
   const { t, locale } = useT()
-  const cname = (zh: string, en: string) => (locale === 'en' ? (en || zh) : zh)
+  const cname = (zh: string, en: string) => (locale === 'en' ? enCountryName(zh, en) : zh)
   const displays = useMemo(() => sortByValue(annotatePlans(products)), [products])
   // 適用國家（匯入 L 欄）：用整組（未經日篩）的字串，共用解析 + 彈窗
   const [showCoverage, setShowCoverage] = useState(false)

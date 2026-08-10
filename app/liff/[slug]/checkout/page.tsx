@@ -11,6 +11,7 @@ import { CountryFlag } from '@/components/common/CountryFlag'
 import { useCart, cartItemPrice } from '@/components/liff/CartProvider'
 import { NetworkBadge, NativeSimBadge } from '@/components/liff/ProductBadges'
 import { useT } from '@/components/liff/LocaleProvider'
+import { enCountryName } from '@/lib/liff/country-names'
 
 declare global {
   interface Window {
@@ -121,7 +122,7 @@ function CheckoutContent() {
   const cart = useCart()
   const { liff } = useLiff()
   const { t, locale } = useT()
-  const cname = (zh: string, en?: string | null) => (locale === 'en' ? (en || zh) : zh)
+  const cname = (zh: string, en?: string | null) => (locale === 'en' ? enCountryName(zh, en) : zh)
 
   const [product, setProduct] = useState<Product | null>(null)
   const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'LINE_PAY'>('CREDIT_CARD')
