@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db/prisma'
 import { MemberStatus, GroupMemberRole } from '@prisma/client'
 import { notifyMemberApproved, notifyMemberRejected } from './notification'
+import { deletePrivateImage } from './storage'
 import { randomBytes } from 'crypto'
 
 // 企業（沿用 Group model）。單一品牌 B2B2C：企業由 Super Admin 後台建立並產生邀請碼，
@@ -97,7 +98,11 @@ export type JoinResult =
   | { ok: true; companyName: string; status: 'PENDING' }
   | { ok: false; reason: string }
 
-export async function joinByInviteCode(userId: string, inviteCode: string): Promise<JoinResult> {
+export async function joinByInviteCode(
+  userId: string,
+  inviteCode: string,
+  credentialImagePath: string,
+): Promise<JoinResult> {
   const group = await prisma.group.findUnique({
     where: { inviteCode },
     select: { id: true, name: true, isActive: true },
@@ -107,7 +112,7 @@ export async function joinByInviteCode(userId: string, inviteCode: string): Prom
 
   const existing = await prisma.groupMember.findUnique({
     where: { userId },
-    select: { groupId: true, status: true, leftAt: true },
+    select: { groupId: true, status: true, leftAt: true, credentialImagePath: true },
   })
 
   // 一人一企業：仍在某企業（未離開）不可再加入
@@ -132,11 +137,14 @@ export async function joinByInviteCode(userId: string, inviteCode: string): Prom
         reviewedAt: null,
         reviewedById: null,
         leftAt: null,
+        credentialImagePath,
       },
     })
+    // 重新申請換了新圖 → 盡力清掉舊圖（孤兒檔，避免個資在 storage 堆積）
+    await deletePrivateImage(existing.credentialImagePath)
   } else {
     await prisma.groupMember.create({
-      data: { groupId: group.id, userId, status: MemberStatus.PENDING },
+      data: { groupId: group.id, userId, status: MemberStatus.PENDING, credentialImagePath },
     })
   }
 
@@ -198,6 +206,20 @@ async function assertCompanyAdmin(actingUserId: string, targetUserId: string) {
   })
   if (!actingAdmin) throw new Error('無權操作此成員')
   return membership
+}
+
+// 企業管理員查看某成員上傳的名片/工作證：先驗證是同企業 ADMIN（assertCompanyAdmin 丟錯 → 上層轉 403），
+// 回傳該成員的私有物件路徑（null＝未提供）。實際圖片由 route 以 byte-proxy 串回，不外露路徑給前端。
+export async function getMemberCredentialPath(
+  actingUserId: string,
+  targetUserId: string,
+): Promise<string | null> {
+  await assertCompanyAdmin(actingUserId, targetUserId)
+  const m = await prisma.groupMember.findUnique({
+    where: { userId: targetUserId },
+    select: { credentialImagePath: true },
+  })
+  return m?.credentialImagePath ?? null
 }
 
 async function reviewMember(actingUserId: string, targetUserId: string, approve: boolean) {

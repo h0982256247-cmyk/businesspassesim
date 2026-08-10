@@ -64,3 +64,61 @@ export async function deletePublicImage(publicUrl: string | null | undefined): P
     return res.ok
   } catch { return false }
 }
+
+// ─── 私有 bucket（名片／工作證等個資圖）─────────────────────────────
+// 與公開 bucket 分開：個資檔不可公開讀取，DB 只存「物件路徑」（非公開網址）；
+// 讀取一律經後端授權後以 byte-proxy 串回（見 getPrivateImage）。獨立的 ready flag。
+const PRIVATE_BUCKET = 'member-credentials'
+const CRED_PREFIX = 'credentials'
+
+let privateBucketReady = false
+async function ensurePrivateBucket(url: string, headers: Record<string, string>) {
+  if (privateBucketReady) return
+  const res = await fetch(`${url}/storage/v1/bucket`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: PRIVATE_BUCKET, name: PRIVATE_BUCKET, public: false }),
+  })
+  if (res.ok) { privateBucketReady = true; return }
+  const txt = await res.text().catch(() => '')
+  if (res.status === 409 || /exist/i.test(txt)) { privateBucketReady = true; return }
+  throw new Error(`建立私有 storage bucket 失敗：${res.status} ${txt}`)
+}
+
+/** 上傳一張私有圖，回傳「物件路徑」（非公開網址）。kind 只讓檔名可讀；唯一性靠 uuid。 */
+export async function uploadPrivateImage(kind: string, bytes: ArrayBuffer, contentType: string): Promise<string> {
+  const { url, headers } = creds()
+  await ensurePrivateBucket(url, headers)
+  const ext = EXT[contentType] ?? 'bin'
+  const objectPath = `${CRED_PREFIX}/${kind}-${randomUUID()}.${ext}`
+  const res = await fetch(`${url}/storage/v1/object/${PRIVATE_BUCKET}/${objectPath}`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': contentType, 'x-upsert': 'true' },
+    body: Buffer.from(bytes),
+  })
+  if (!res.ok) throw new Error(`上傳圖片失敗：${res.status} ${await res.text().catch(() => '')}`)
+  return objectPath
+}
+
+/** 讀取私有圖（service role 略過 storage RLS）；回傳位元組 + content-type，找不到回 null。 */
+export async function getPrivateImage(
+  objectPath: string,
+): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+  const { url, headers } = creds()
+  const res = await fetch(`${url}/storage/v1/object/authenticated/${PRIVATE_BUCKET}/${objectPath}`, { headers })
+  if (!res.ok) return null
+  const contentType = res.headers.get('content-type') || 'application/octet-stream'
+  const bytes = await res.arrayBuffer()
+  return { bytes, contentType }
+}
+
+/** 盡力刪掉私有圖（換圖／重新申請時清孤兒檔）；失敗不拋、回傳是否成功。 */
+export async function deletePrivateImage(objectPath: string | null | undefined): Promise<boolean> {
+  if (!objectPath) return false
+  let url: string, headers: Record<string, string>
+  try { ({ url, headers } = creds()) } catch { return false }
+  try {
+    const res = await fetch(`${url}/storage/v1/object/${PRIVATE_BUCKET}/${objectPath}`, { method: 'DELETE', headers })
+    return res.ok
+  } catch { return false }
+}

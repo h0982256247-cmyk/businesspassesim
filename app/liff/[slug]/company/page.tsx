@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ChangeEvent } from 'react'
 import { useLiffBase } from '@/hooks/useLiffBase'
 import { useTenantColors } from '@/components/liff/TenantContext'
 import PageSkeleton from '@/components/liff/PageSkeleton'
 import { S } from '@/lib/liff/tokens'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
+import { resizeToBlob } from '@/lib/utils/image'
 
 type Membership = {
   status: 'PENDING' | 'APPROVED' | 'REJECTED'
@@ -19,6 +20,8 @@ export default function CompanyPage() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const [code, setCode] = useState('')
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
   const [confirmLeave, setConfirmLeave] = useState(false)
@@ -42,18 +45,37 @@ export default function CompanyPage() {
     if (c) setCode(c.trim().toUpperCase())
   }, [])
 
+  // 釋放預覽用的 object URL（切換圖片時清舊的、離開頁面時清當前）
+  useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
+
+  const onPickFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null
+    setMsg(null)
+    if (f && !f.type.startsWith('image/')) { setMsg('請選擇圖片檔'); return }
+    if (f && f.size > 15 * 1024 * 1024) { setMsg('原圖請小於 15MB'); return }
+    setFile(f)
+    setPreview(f ? URL.createObjectURL(f) : null)
+  }
+
   const join = async () => {
-    if (!code.trim()) return
+    if (!code.trim() || !file) return
     setBusy(true); setMsg(null)
-    const r = await fetch('/api/groups/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ inviteCode: code.trim() }),
-    })
+    let r: Response
+    try {
+      const blob = await resizeToBlob(file, 1600, 0.85) // 名片/工作證要看清字，用較高解析
+      const fd = new FormData()
+      fd.append('inviteCode', code.trim())
+      fd.append('file', blob, 'credential.jpg')
+      r = await fetch('/api/groups/join', { method: 'POST', body: fd }) // 不設 Content-Type，讓瀏覽器帶 multipart boundary
+    } catch {
+      setBusy(false); setMsg('圖片處理失敗，請換一張再試'); return
+    }
     const d = await r.json().catch(() => ({}))
     setBusy(false)
     if (!r.ok) { setMsg(d.error ?? '加入失敗'); return }
     setCode('')
+    setFile(null)
+    setPreview(null)
     await load()
   }
 
@@ -114,13 +136,28 @@ export default function CompanyPage() {
             onChange={e => setCode(e.target.value.toUpperCase())}
             placeholder="邀請碼（如 A1B2C3D4）"
             maxLength={16}
-            style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, border: `1px solid ${S.line}`, fontSize: 15, letterSpacing: '0.05em', marginBottom: 10, outline: 'none' }}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12, border: `1px solid ${S.line}`, fontSize: 15, letterSpacing: '0.05em', marginBottom: 12, outline: 'none' }}
           />
+          <label style={{ display: 'block', marginBottom: 4 }}>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: S.ink, margin: '0 0 6px' }}>名片／工作證（必填）</span>
+            <input type="file" accept="image/*" onChange={onPickFile} style={{ display: 'none' }} />
+            {preview ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 12, border: `1px solid ${S.line}`, background: S.white, cursor: 'pointer' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={preview} alt="預覽" style={{ width: 56, height: 56, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: S.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file?.name}</span>
+                <span style={{ flexShrink: 0, fontSize: 12, fontWeight: 700, color: C.primary }}>重新選擇</span>
+              </span>
+            ) : (
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '18px 12px', borderRadius: 12, border: `1.5px dashed ${S.line}`, background: C.soft, color: C.primaryText, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>＋ 上傳名片或工作證</span>
+            )}
+          </label>
+          <p style={{ fontSize: 11, color: S.faint, margin: '0 0 12px' }}>請上傳可佐證公司身分的圖片，供企業管理員審核。</p>
           {msg && <p style={{ fontSize: 12, color: '#dc2626', margin: '0 0 10px' }}>{msg}</p>}
           <button
             onClick={join}
-            disabled={busy || !code.trim()}
-            style={{ width: '100%', padding: '12px', borderRadius: 12, background: C.primary, color: C.onPrimary, fontWeight: 700, fontSize: 14, border: 'none', cursor: busy || !code.trim() ? 'default' : 'pointer', opacity: busy || !code.trim() ? 0.6 : 1 }}
+            disabled={busy || !code.trim() || !file}
+            style={{ width: '100%', padding: '12px', borderRadius: 12, background: C.primary, color: C.onPrimary, fontWeight: 700, fontSize: 14, border: 'none', cursor: busy || !code.trim() || !file ? 'default' : 'pointer', opacity: busy || !code.trim() || !file ? 0.6 : 1 }}
           >
             {busy ? '送出中…' : '送出加入申請'}
           </button>
