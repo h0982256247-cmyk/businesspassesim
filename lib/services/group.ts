@@ -133,6 +133,7 @@ export async function joinByInviteCode(
       data: {
         groupId: group.id,
         status: MemberStatus.PENDING,
+        role: GroupMemberRole.MEMBER, // 重新申請＝新申請：清掉舊管理員身分，須重新核准；要當管理員得由後台重新指派
         joinedAt: new Date(),
         reviewedAt: null,
         reviewedById: null,
