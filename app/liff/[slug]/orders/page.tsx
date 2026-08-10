@@ -11,8 +11,9 @@ import { S, CARD } from '@/lib/liff/tokens'
 import { EmptyOrdersIllustration } from '@/components/liff/LiffIllustrations'
 import {
   deriveEsimStatus, groupOf,
-  TAB_ORDER, TAB_LABEL, type OrdersTab,
+  TAB_ORDER, type OrdersTab,
 } from '@/lib/esimStatus'
+import { useT } from '@/components/liff/LocaleProvider'
 import { IconSim, IconQr, IconInstall, IconClock, IconShare, IconGift } from '@/components/liff/EsimIcons'
 import ConfirmDialog from '@/components/liff/ConfirmDialog'
 import Toast from '@/components/liff/Toast'
@@ -58,13 +59,13 @@ function formatData(mb: number, unit: string): string {
 }
 
 // 轉贈狀態 pill（收到轉贈 / 等待對方領取）。已轉贈出去改在歷史列顯示「已轉贈給 ○○○」。
-function giftBadge(o: Order): { text: string; bg: string; color: string; kind: 'received' | 'waiting' } | null {
+function giftBadge(o: Order): { fromName: string | null; bg: string; color: string; kind: 'received' | 'waiting' } | null {
   if (o.receivedGift && o.gift?.fromName) {
-    return { text: `由 ${o.gift.fromName} 轉贈`, bg: '#ede9fe', color: '#6d28d9', kind: 'received' }
+    return { fromName: o.gift.fromName, bg: '#ede9fe', color: '#6d28d9', kind: 'received' }
   }
   const g = o.gift
   if (g && !g.claimedAt && !g.cancelledAt && !o.transferredAway && new Date(g.expiresAt) > new Date()) {
-    return { text: '等待領取', bg: '#ffedd5', color: '#c2410c', kind: 'waiting' }
+    return { fromName: null, bg: '#ffedd5', color: '#c2410c', kind: 'waiting' }
   }
   return null
 }
@@ -81,6 +82,7 @@ export default function OrdersPage() {
   const C = useTenantColors()
   const tenant = useTenant()
   const { liff } = useLiff()
+  const { t } = useT()
   const searchParams = useSearchParams()
   const bundleIdParam = searchParams.get('bundleId')
 
@@ -210,9 +212,9 @@ export default function OrdersPage() {
   const handleCancelStuck = () => {
     if (actioning) return
     setDialog({
-      title: `取消 ${buckets.awaitingPayment.length} 筆未完成付款的訂單？`,
-      lines: ['若你剛在 LINE Pay 或銀行頁取消了付款，', '可一鍵清掉這些等待中的訂單。'],
-      confirmLabel: '取消訂單',
+      title: t.orders.cancelStuckTitle(buckets.awaitingPayment.length),
+      lines: [t.orders.cancelStuckLine1, t.orders.cancelStuckLine2],
+      confirmLabel: t.orders.cancelOrder,
       tone: 'danger',
       onConfirm: () => { setDialog(null); doCancelStuck() },
     })
@@ -229,9 +231,9 @@ export default function OrdersPage() {
 
   const handleRedeem = (o: Order) => {
     setDialog({
-      title: '確定要安裝這張 eSIM 嗎？',
-      lines: ['按下後會立即兌換、產生 QR 碼', '兌換後就無法再轉贈'],
-      confirmLabel: '確定安裝',
+      title: t.orders.installConfirmTitle,
+      lines: [t.orders.installConfirmLine1, t.orders.installConfirmLine2],
+      confirmLabel: t.orders.installConfirm,
       tone: 'primary',
       icon: <IconInstall size={24} />,
       onConfirm: () => { setDialog(null); doRedeem(o) },
@@ -243,7 +245,7 @@ export default function OrdersPage() {
     const r = await fetch(`/api/orders/${o.id}/redeem`, { method: 'POST' }).then(x => x.json())
     setActioning(null)
     if (r.error) {
-      setToast({ message: `兌換失敗：${r.error}`, tone: 'error' })
+      setToast({ message: t.orders.redeemFailed(r.error), tone: 'error' })
       return
     }
     // 兌換觸發成功 → 導去詳情頁等 QR
@@ -252,8 +254,8 @@ export default function OrdersPage() {
 
   // 轉贈：點擊直接建立轉贈連結並開 LINE shareTargetPicker（不再有確認彈窗）
   const handleShare = (o: Order) => {
-    if (!liff?.isLoggedIn()) { setToast({ message: '請先登入 LINE', tone: 'error' }); return }
-    if (!liff.isApiAvailable('shareTargetPicker')) { setToast({ message: '您的 LINE 版本不支援分享', tone: 'error' }); return }
+    if (!liff?.isLoggedIn()) { setToast({ message: t.orders.loginFirst, tone: 'error' }); return }
+    if (!liff.isApiAvailable('shareTargetPicker')) { setToast({ message: t.orders.shareUnsupported, tone: 'error' }); return }
     doShare(o)
   }
 
@@ -262,7 +264,7 @@ export default function OrdersPage() {
     setActioning(o.id)
     try {
       const r = await fetch(`/api/orders/${o.id}/gift`, { method: 'POST' }).then(x => x.json())
-      if (!r.ok) { setToast({ message: `轉贈失敗：${r.error}`, tone: 'error' }); setActioning(null); return }
+      if (!r.ok) { setToast({ message: t.orders.giftFailed(r.error), tone: 'error' }); setActioning(null); return }
       const fullUrl = `${window.location.origin}${base}/gift/${r.token}`
       let giftLink = fullUrl
       try { giftLink = await liff.permanentLink.createUrlBy(fullUrl) } catch {}
@@ -273,24 +275,24 @@ export default function OrdersPage() {
       const brandName = tenant?.brandName ?? 'eSIM'
       const flex = {
         type: 'flex' as const,
-        altText: `你收到一張來自「${brandName}」的 eSIM：${planLabel}`,
+        altText: t.orders.shareAlt(brandName, planLabel),
         contents: {
           type: 'bubble' as const,
           body: {
             type: 'box' as const, layout: 'vertical' as const, spacing: 'md',
             contents: [
-              { type: 'text' as const, text: `你收到一張來自「${brandName}」的 eSIM`, weight: 'bold' as const, size: 'lg' as const, color: '#1a1a1a', wrap: true },
+              { type: 'text' as const, text: t.orders.shareTitle(brandName), weight: 'bold' as const, size: 'lg' as const, color: '#1a1a1a', wrap: true },
               { type: 'text' as const, text: planLabel, size: 'md' as const, weight: 'bold' as const, wrap: true, color: C.primaryText },
-              { type: 'text' as const, text: '點下方按鈕領取，即可安裝使用', size: 'sm' as const, color: '#475569', wrap: true },
+              { type: 'text' as const, text: t.orders.shareTap, size: 'sm' as const, color: '#475569', wrap: true },
               { type: 'separator' as const, margin: 'md' as const },
-              { type: 'text' as const, text: '⚠ 連結 7 天內有效，請盡快領取', size: 'xs' as const, color: '#94a3b8', wrap: true },
+              { type: 'text' as const, text: t.orders.shareExpiry, size: 'xs' as const, color: '#94a3b8', wrap: true },
             ],
           },
           footer: {
             type: 'box' as const, layout: 'vertical' as const, spacing: 'sm',
             contents: [
               { type: 'button' as const, style: 'primary' as const, color: C.primaryText,
-                action: { type: 'uri' as const, label: '領取這張 eSIM', uri: giftLink } },
+                action: { type: 'uri' as const, label: t.orders.shareBtn, uri: giftLink } },
             ],
           },
         },
@@ -298,7 +300,7 @@ export default function OrdersPage() {
       await liff.shareTargetPicker([flex])
       await refresh()
     } catch (err) {
-      setToast({ message: err instanceof Error ? err.message : '轉贈失敗', tone: 'error' })
+      setToast({ message: err instanceof Error ? err.message : t.orders.giftFailedGeneric, tone: 'error' })
     }
     setActioning(null)
   }
@@ -312,19 +314,19 @@ export default function OrdersPage() {
   return (
     <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 16px 96px' }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, color: S.ink, margin: '0 0 16px', letterSpacing: '-0.02em' }}>
-        我的 eSIM
+        {t.orders.title}
       </h1>
 
       {/* Bundle 結帳後若整組失敗 → 頂部紅 banner + 重新下單 CTA。 */}
       {bundleAllFailed && (
         <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 16, padding: '18px 20px', marginBottom: 16 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: '#b91c1c', margin: '0 0 6px' }}>付款未完成</p>
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#b91c1c', margin: '0 0 6px' }}>{t.orders.paymentIncomplete}</p>
           <p style={{ fontSize: 13, color: '#dc2626', margin: '0 0 14px', lineHeight: 1.6 }}>
-            {bundleFirstFailureReason ?? '本次結帳的訂單未完成付款，請重新下單再試一次。'}
+            {bundleFirstFailureReason ?? t.orders.bundleFailedBody}
           </p>
           <button onClick={() => router.push(`${base}/products`)}
             style={{ width: '100%', padding: '12px 0', border: 'none', borderRadius: 12, background: C.primary, color: C.onPrimary, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
-            重新下單
+            {t.orders.reorder}
           </button>
         </div>
       )}
@@ -332,10 +334,10 @@ export default function OrdersPage() {
       {!hasAnything && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '48px 0' }}>
           <EmptyOrdersIllustration size={80} />
-          <p style={{ fontSize: 14, color: S.faint }}>目前還沒有訂單</p>
+          <p style={{ fontSize: 14, color: S.faint }}>{t.orders.emptyOrders}</p>
           <button onClick={() => router.push(`${base}/products`)}
             style={{ marginTop: 8, background: C.primary, color: C.onPrimary, border: 'none', borderRadius: 100, padding: '11px 24px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
-            去商城選方案
+            {t.orders.goShop}
           </button>
         </div>
       )}
@@ -349,11 +351,11 @@ export default function OrdersPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #fde68a', borderTopColor: '#d97706', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#a16207' }}>{buckets.awaitingPayment.length} 筆等待付款確認</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#a16207' }}>{t.orders.awaitingCount(buckets.awaitingPayment.length)}</span>
                 </div>
                 <button onClick={handleCancelStuck} disabled={!!actioning}
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 12, color: '#b45309', fontWeight: 700, textDecoration: 'underline', padding: 0 }}>
-                  {actioning === 'bulk_cancel' ? '取消中…' : '全部取消'}
+                  {actioning === 'bulk_cancel' ? t.orders.cancelling : t.orders.cancelAll}
                 </button>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -369,7 +371,7 @@ export default function OrdersPage() {
           {buckets.active.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '0 4px 10px' }}>
-                <h2 style={{ fontSize: 14, fontWeight: 800, color: S.ink, margin: 0 }}>使用中</h2>
+                <h2 style={{ fontSize: 14, fontWeight: 800, color: S.ink, margin: 0 }}>{t.orders.sectionInUse}</h2>
                 <span style={{ fontSize: 11, color: S.faint }}>{buckets.active.length}</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -384,10 +386,10 @@ export default function OrdersPage() {
           {/* ── 分頁籤（sticky）：待安裝 / 歷史 ── */}
           <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#fff', paddingTop: 4, paddingBottom: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, background: '#f1f5f9', borderRadius: 12, padding: 4 }}>
-              {TAB_ORDER.map(t => {
-                const sel = activeTab === t
+              {TAB_ORDER.map(tabKey => {
+                const sel = activeTab === tabKey
                 return (
-                  <button key={t} onClick={() => setTab(t)}
+                  <button key={tabKey} onClick={() => setTab(tabKey)}
                     style={{
                       border: 'none', borderRadius: 9, padding: '9px 4px', cursor: 'pointer',
                       background: sel ? '#fff' : 'transparent',
@@ -396,15 +398,15 @@ export default function OrdersPage() {
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
                       transition: 'background 0.15s',
                     }}>
-                    {TAB_LABEL[t]}
-                    {counts[t] > 0 && (
+                    {tabKey === 'install' ? t.esimStatus.tabInstall : t.esimStatus.tabHistory}
+                    {counts[tabKey] > 0 && (
                       <span style={{
                         fontSize: 11, fontWeight: 700, minWidth: 17, textAlign: 'center',
                         color: sel ? C.onPrimary : S.faint,
                         background: sel ? C.primary : '#e2e8f0',
                         borderRadius: 100, padding: '0 5px', lineHeight: '16px',
                       }}>
-                        {counts[t]}
+                        {counts[tabKey]}
                       </span>
                     )}
                   </button>
@@ -441,7 +443,7 @@ export default function OrdersPage() {
                     onClick={() => router.push(`${base}/orders/${o.id}`)} />
                 ))}
               </div>
-            ) : <TabEmpty text="沒有待安裝的 eSIM" />
+            ) : <TabEmpty text={t.orders.emptyInstall} />
           )}
 
           {activeTab === 'history' && (
@@ -451,7 +453,7 @@ export default function OrdersPage() {
                   <CompactRow key={o.id} order={o} onClick={() => router.push(`${base}/orders/${o.id}`)} />
                 ))}
               </div>
-            ) : <TabEmpty text="沒有歷史紀錄" />
+            ) : <TabEmpty text={t.orders.emptyHistory} />
           )}
         </>
       )}
@@ -460,7 +462,7 @@ export default function OrdersPage() {
         open={!!dialog}
         title={dialog?.title ?? ''}
         lines={dialog?.lines}
-        confirmLabel={dialog?.confirmLabel ?? '確定'}
+        confirmLabel={dialog?.confirmLabel ?? t.common.confirm}
         tone={dialog?.tone}
         icon={dialog?.icon}
         colors={C}
@@ -493,6 +495,7 @@ function UsageBar({ used, total }: { used: number; total: number }) {
 function ActiveCard({ order, usage, primary, onClick }: {
   order: Order; usage: EsimUsage | null | undefined; primary: string; onClick: () => void
 }) {
+  const { t } = useT()
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
   const view = deriveEsimStatus(order)
   const expiring = view.phase === 'expiringSoon'
@@ -509,7 +512,7 @@ function ActiveCard({ order, usage, primary, onClick }: {
       style={{ width: '100%', textAlign: 'left', cursor: 'pointer', background: bg, border: `1px solid ${border}`, borderRadius: 18, padding: '18px 20px', boxShadow: shadow }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: accent, background: '#fff', padding: '4px 10px', borderRadius: 100 }}>
-          {view.label}
+          {t.esimStatus.of(view.phase, view.daysLeft).label}
         </span>
       </div>
 
@@ -519,30 +522,30 @@ function ActiveCard({ order, usage, primary, onClick }: {
       {/* 用量總覽：剩餘流量 + 剩餘天數放大（使用者最常回來看的兩個數字一眼可見） */}
       <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
         <div style={{ flex: 1, background: 'rgba(255,255,255,0.78)', borderRadius: 14, padding: '12px 14px' }}>
-          <p style={{ fontSize: 11, color: subInk, fontWeight: 600, margin: '0 0 3px' }}>剩餘流量</p>
+          <p style={{ fontSize: 11, color: subInk, fontWeight: 600, margin: '0 0 3px' }}>{t.orders.remainingData}</p>
           {usage ? (
             <>
               <p style={{ fontSize: 23, fontWeight: 900, color: deepInk, letterSpacing: '-0.02em', lineHeight: 1, margin: 0 }}>
                 {formatData(usage.remainingData, usage.unit)}
               </p>
               <div style={{ marginTop: 9 }}><UsageBar used={usage.usedData} total={usage.totalData} /></div>
-              <p style={{ fontSize: 10.5, color: subInk, opacity: 0.65, margin: '5px 0 0' }}>共 {formatData(usage.totalData, usage.unit)}</p>
+              <p style={{ fontSize: 10.5, color: subInk, opacity: 0.65, margin: '5px 0 0' }}>{t.orders.totalData(formatData(usage.totalData, usage.unit))}</p>
             </>
           ) : (
             <p style={{ fontSize: 14, fontWeight: 700, color: subInk, opacity: 0.7, margin: '4px 0 0' }}>
-              {order.esimIccid ? '查詢中…' : '安裝後顯示'}
+              {order.esimIccid ? t.orders.querying : t.orders.showAfterInstall}
             </p>
           )}
         </div>
         {view.daysLeft != null && view.daysLeft >= 0 && (
           <div style={{ flex: '0 0 100px', background: 'rgba(255,255,255,0.78)', borderRadius: 14, padding: '12px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-            <p style={{ fontSize: 11, color: subInk, fontWeight: 600, margin: '0 0 3px' }}>剩餘天數</p>
+            <p style={{ fontSize: 11, color: subInk, fontWeight: 600, margin: '0 0 3px' }}>{t.orders.remainingDays}</p>
             <p style={{ fontSize: 23, fontWeight: 900, color: expiring ? accent : deepInk, lineHeight: 1, margin: 0 }}>
-              {view.daysLeft}<span style={{ fontSize: 13, fontWeight: 700, marginLeft: 2 }}>天</span>
+              {view.daysLeft}<span style={{ fontSize: 13, fontWeight: 700, marginLeft: 2 }}>{t.orders.daysUnit}</span>
             </p>
             {order.activationEnd && (
               <p style={{ fontSize: 10.5, color: subInk, opacity: 0.65, margin: '6px 0 0' }}>
-                {new Date(order.activationEnd).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' })} 到期
+                {t.orders.expiresOn(new Date(order.activationEnd).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' }))}
               </p>
             )}
           </div>
@@ -550,7 +553,7 @@ function ActiveCard({ order, usage, primary, onClick }: {
       </div>
 
       <p style={{ fontSize: 11, color: primary, fontWeight: 700, margin: '12px 0 0' }}>
-        查看 QR、流量與安裝資訊 →
+        {t.orders.viewQrEtc}
       </p>
     </button>
   )
@@ -568,6 +571,7 @@ const actionCardSurface = (primary: string) => ({
 })
 
 function InstallableCard({ order, primary, primaryText, onClick }: { order: Order; primary: string; primaryText: string; onClick: () => void }) {
+  const { t } = useT()
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
   return (
@@ -576,13 +580,13 @@ function InstallableCard({ order, primary, primaryText, onClick }: { order: Orde
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ flex: 1 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: `${primary}14`, color: primaryText, padding: '3px 8px', borderRadius: 100 }}>
-            <IconQr size={11} /> QR 已就緒
+            <IconQr size={11} /> {t.orders.qrReady}
           </span>
           <p style={{ fontSize: 15, fontWeight: 700, color: S.ink, margin: '8px 0 2px' }}>
             {productName}
             {dataCapacity && !productName.includes(dataCapacity) && <span style={{ fontSize: 12.5, fontWeight: 600, color: S.muted, marginLeft: 6 }}>· {dataCapacity}</span>}
           </p>
-          <p style={{ fontSize: 11, color: S.muted, margin: 0 }}>點擊查看 QR 與一鍵安裝</p>
+          <p style={{ fontSize: 11, color: S.muted, margin: 0 }}>{t.orders.tapToInstall}</p>
         </div>
         <span style={{ fontSize: 14, color: primary, fontWeight: 700 }}>→</span>
       </div>
@@ -594,6 +598,7 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
   order: Order; primary: string; primaryText: string; onPrimary: string; actioning: boolean; canShare: boolean;
   onRedeem: () => void; onShare: () => void; onClick: () => void
 }) {
+  const { t } = useT()
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
   const dataCapacity = order.orderItems[0]?.product?.dataCapacity
   const gift = giftBadge(order)
@@ -604,11 +609,11 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
       <button onClick={onClick} style={{ background: 'none', border: 'none', padding: 0, width: '100%', textAlign: 'left', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: `${primary}14`, color: primaryText, padding: '3px 10px', borderRadius: 100 }}>
-            <IconSim size={11} /> 可以安裝
+            <IconSim size={11} /> {t.orders.canInstall}
           </span>
           {gift && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, background: gift.bg, color: gift.color, padding: '3px 10px', borderRadius: 100 }}>
-              <GiftBadgeIcon kind={gift.kind} />{gift.text}
+              <GiftBadgeIcon kind={gift.kind} />{gift.kind === 'received' ? t.orders.giftedFrom(gift.fromName ?? '') : t.orders.waitingClaim}
             </span>
           )}
         </div>
@@ -624,12 +629,12 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
       <div style={{ display: 'grid', gridTemplateColumns: (canShare && !isReceived) ? '1fr 1fr' : '1fr', gap: 8 }}>
         <button onClick={onRedeem} disabled={actioning} className="liff-press"
           style={{ background: primary, color: onPrimary, border: 'none', borderRadius: 100, padding: '11px', fontSize: 14, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-          {actioning ? '處理中…' : <><IconInstall size={15} /> 我要安裝</>}
+          {actioning ? t.orders.processing : <><IconInstall size={15} /> {t.orders.install}</>}
         </button>
         {canShare && !isReceived && (
           <button onClick={onShare} disabled={actioning} className="liff-press"
             style={{ background: S.white, color: primaryText, border: `1.5px solid ${primary}33`, borderRadius: 100, padding: '11px', fontSize: 13, fontWeight: 700, cursor: actioning ? 'wait' : 'pointer', opacity: actioning ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-            <IconShare size={14} /> 轉贈
+            <IconShare size={14} /> {t.orders.gift}
           </button>
         )}
       </div>
@@ -642,10 +647,11 @@ function PendingCard({ order, primary, primaryText, onPrimary, actioning, canSha
 function ProcessingRow({ order, stage, boxed, onClick }: {
   order: Order; stage: 'awaiting' | 'ordered' | 'redeeming'; boxed?: boolean; onClick: () => void
 }) {
+  const { t } = useT()
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
-  const text = stage === 'awaiting' ? '等待付款確認中…'
-             : stage === 'ordered'  ? '正在準備 eSIM，請稍候…'
-             :                         '正在生成 QR 碼，請稍候…'
+  const text = stage === 'awaiting' ? t.orders.stageAwaiting
+             : stage === 'ordered'  ? t.orders.stageOrdered
+             :                         t.orders.stageRedeeming
   return (
     <button onClick={onClick}
       style={{
@@ -665,11 +671,12 @@ function ProcessingRow({ order, stage, boxed, onClick }: {
 }
 
 function CompactRow({ order, onClick }: { order: Order; onClick: () => void }) {
+  const { t } = useT()
   const productName = order.orderItems[0]?.productName ?? 'eSIM'
   const gifted = order.transferredAway
-  const giftedTo = order.gift?.toName ?? '朋友'
+  const giftedTo = order.gift?.toName ?? t.orders.friend
   const view = deriveEsimStatus(order)
-  const label = gifted ? `已轉贈給 ${giftedTo}` : view.label
+  const label = gifted ? t.orders.giftedTo(giftedTo) : t.esimStatus.of(view.phase, view.daysLeft).label
   const color = gifted ? '#6d28d9' : view.phase === 'failed' ? '#b91c1c' : view.phase === 'ended' ? '#15803d' : S.faint
   return (
     <button onClick={onClick}

@@ -16,6 +16,7 @@ const zh = {
     retry: '重試',
     loading: '載入中…',
     gotIt: '我知道了',
+    confirm: '確定',
     langAria: '切換語言',
   },
   nav: {
@@ -151,6 +152,80 @@ const zh = {
       cardInfoFailed: '取得卡片資訊失敗',
     },
   },
+  esimStatus: {
+    tabInstall: '待安裝',
+    tabHistory: '歷史',
+    // 依 deriveEsimStatus 的 phase + daysLeft 產生在地化文案；中文與後端原文一致。
+    of: (phase: string, daysLeft: number | null): { label: string; hint: string } => {
+      switch (phase) {
+        case 'awaitingPayment': return { label: '等待付款', hint: '正在確認付款結果' }
+        case 'preparing': return { label: '開卡中', hint: '正在向供應商開卡，約 1–3 分鐘，可先離開稍後再回來' }
+        case 'readyToInstall': return { label: '可以安裝', hint: '點「我要安裝」或轉贈好友' }
+        case 'generatingQr': return { label: '產生 QR 中', hint: '正在生成安裝碼，約 1 分鐘' }
+        case 'installable': return { label: '待安裝', hint: '掃描 QR 或一鍵安裝' }
+        case 'inUse': return { label: '使用中', hint: daysLeft != null ? `剩 ${daysLeft} 天` : '' }
+        case 'expiringSoon': return { label: '即將到期', hint: daysLeft != null && daysLeft <= 0 ? '今天到期' : (daysLeft != null ? `剩 ${daysLeft} 天` : '') }
+        case 'ended': return { label: '已結束', hint: '使用期間已過' }
+        case 'cancelled': return { label: '已取消', hint: '訂單已取消' }
+        case 'failed': return { label: '付款未完成', hint: '此訂單付款失敗' }
+        case 'refunded': return { label: '已退款', hint: '款項已退回' }
+        default: return { label: '', hint: '' }
+      }
+    },
+  },
+  orders: {
+    title: '我的 eSIM',
+    paymentIncomplete: '付款未完成',
+    bundleFailedBody: '本次結帳的訂單未完成付款，請重新下單再試一次。',
+    reorder: '重新下單',
+    emptyOrders: '目前還沒有訂單',
+    goShop: '去商城選方案',
+    awaitingCount: (n: number) => `${n} 筆等待付款確認`,
+    cancelAll: '全部取消',
+    cancelling: '取消中…',
+    sectionInUse: '使用中',
+    emptyInstall: '沒有待安裝的 eSIM',
+    emptyHistory: '沒有歷史紀錄',
+    cancelStuckTitle: (n: number) => `取消 ${n} 筆未完成付款的訂單？`,
+    cancelStuckLine1: '若你剛在 LINE Pay 或銀行頁取消了付款，',
+    cancelStuckLine2: '可一鍵清掉這些等待中的訂單。',
+    cancelOrder: '取消訂單',
+    installConfirmTitle: '確定要安裝這張 eSIM 嗎？',
+    installConfirmLine1: '按下後會立即兌換、產生 QR 碼',
+    installConfirmLine2: '兌換後就無法再轉贈',
+    installConfirm: '確定安裝',
+    redeemFailed: (e: string) => `兌換失敗：${e}`,
+    loginFirst: '請先登入 LINE',
+    shareUnsupported: '您的 LINE 版本不支援分享',
+    giftFailed: (e: string) => `轉贈失敗：${e}`,
+    giftFailedGeneric: '轉贈失敗',
+    remainingData: '剩餘流量',
+    totalData: (x: string) => `共 ${x}`,
+    querying: '查詢中…',
+    showAfterInstall: '安裝後顯示',
+    remainingDays: '剩餘天數',
+    daysUnit: '天',
+    expiresOn: (d: string) => `${d} 到期`,
+    viewQrEtc: '查看 QR、流量與安裝資訊 →',
+    qrReady: 'QR 已就緒',
+    tapToInstall: '點擊查看 QR 與一鍵安裝',
+    canInstall: '可以安裝',
+    install: '我要安裝',
+    processing: '處理中…',
+    gift: '轉贈',
+    stageAwaiting: '等待付款確認中…',
+    stageOrdered: '正在準備 eSIM，請稍候…',
+    stageRedeeming: '正在生成 QR 碼，請稍候…',
+    giftedFrom: (name: string) => `由 ${name} 轉贈`,
+    waitingClaim: '等待領取',
+    giftedTo: (name: string) => `已轉贈給 ${name}`,
+    friend: '朋友',
+    shareAlt: (brand: string, plan: string) => `你收到一張來自「${brand}」的 eSIM：${plan}`,
+    shareTitle: (brand: string) => `你收到一張來自「${brand}」的 eSIM`,
+    shareTap: '點下方按鈕領取，即可安裝使用',
+    shareExpiry: '⚠ 連結 7 天內有效，請盡快領取',
+    shareBtn: '領取這張 eSIM',
+  },
   badges: {
     native: '原生',
   },
@@ -169,6 +244,7 @@ const en: Messages = {
     retry: 'Retry',
     loading: 'Loading…',
     gotIt: 'Got it',
+    confirm: 'Confirm',
     langAria: 'Switch language',
   },
   nav: {
@@ -303,6 +379,79 @@ const en: Messages = {
       linePayInfoFailed: 'Failed to get LINE Pay payment info',
       cardInfoFailed: 'Failed to get card info',
     },
+  },
+  esimStatus: {
+    tabInstall: 'To install',
+    tabHistory: 'History',
+    of: (phase: string, daysLeft: number | null): { label: string; hint: string } => {
+      switch (phase) {
+        case 'awaitingPayment': return { label: 'Awaiting payment', hint: 'Confirming your payment' }
+        case 'preparing': return { label: 'Activating', hint: 'Activating with the provider, ~1–3 min. You can leave and come back.' }
+        case 'readyToInstall': return { label: 'Ready to install', hint: 'Tap "Install" or gift it to a friend' }
+        case 'generatingQr': return { label: 'Generating QR', hint: 'Generating your install code, ~1 min' }
+        case 'installable': return { label: 'To install', hint: 'Scan the QR or one-tap install' }
+        case 'inUse': return { label: 'Active', hint: daysLeft != null ? `${daysLeft} days left` : '' }
+        case 'expiringSoon': return { label: 'Expiring soon', hint: daysLeft != null && daysLeft <= 0 ? 'Expires today' : (daysLeft != null ? `${daysLeft} days left` : '') }
+        case 'ended': return { label: 'Ended', hint: 'The usage period has passed' }
+        case 'cancelled': return { label: 'Cancelled', hint: 'Order cancelled' }
+        case 'failed': return { label: 'Payment failed', hint: 'This order failed to pay' }
+        case 'refunded': return { label: 'Refunded', hint: 'Payment refunded' }
+        default: return { label: '', hint: '' }
+      }
+    },
+  },
+  orders: {
+    title: 'My eSIM',
+    paymentIncomplete: 'Payment incomplete',
+    bundleFailedBody: 'This order was not paid. Please place the order again.',
+    reorder: 'Order again',
+    emptyOrders: 'No orders yet',
+    goShop: 'Browse plans',
+    awaitingCount: (n: number) => `${n} awaiting payment confirmation`,
+    cancelAll: 'Cancel all',
+    cancelling: 'Cancelling…',
+    sectionInUse: 'Active',
+    emptyInstall: 'No eSIM to install',
+    emptyHistory: 'No history',
+    cancelStuckTitle: (n: number) => `Cancel ${n} unpaid order(s)?`,
+    cancelStuckLine1: 'If you just cancelled payment in LINE Pay or your bank,',
+    cancelStuckLine2: 'you can clear these pending orders in one tap.',
+    cancelOrder: 'Cancel order',
+    installConfirmTitle: 'Install this eSIM now?',
+    installConfirmLine1: 'This redeems it and generates the QR code',
+    installConfirmLine2: 'Once redeemed it can no longer be gifted',
+    installConfirm: 'Install',
+    redeemFailed: (e: string) => `Redeem failed: ${e}`,
+    loginFirst: 'Please log in to LINE first',
+    shareUnsupported: 'Your LINE version does not support sharing',
+    giftFailed: (e: string) => `Gift failed: ${e}`,
+    giftFailedGeneric: 'Gift failed',
+    remainingData: 'Data left',
+    totalData: (x: string) => `${x} total`,
+    querying: 'Checking…',
+    showAfterInstall: 'Shown after install',
+    remainingDays: 'Days left',
+    daysUnit: 'd',
+    expiresOn: (d: string) => `Expires ${d}`,
+    viewQrEtc: 'View QR, data & install info →',
+    qrReady: 'QR ready',
+    tapToInstall: 'Tap to view QR & one-tap install',
+    canInstall: 'Ready to install',
+    install: 'Install',
+    processing: 'Processing…',
+    gift: 'Gift',
+    stageAwaiting: 'Confirming payment…',
+    stageOrdered: 'Preparing your eSIM…',
+    stageRedeeming: 'Generating QR code…',
+    giftedFrom: (name: string) => `Gifted by ${name}`,
+    waitingClaim: 'Awaiting claim',
+    giftedTo: (name: string) => `Gifted to ${name}`,
+    friend: 'a friend',
+    shareAlt: (brand: string, plan: string) => `You received an eSIM from "${brand}": ${plan}`,
+    shareTitle: (brand: string) => `You received an eSIM from "${brand}"`,
+    shareTap: 'Tap the button below to claim and install',
+    shareExpiry: '⚠ Link valid for 7 days, please claim soon',
+    shareBtn: 'Claim this eSIM',
   },
   badges: {
     native: 'Native',
