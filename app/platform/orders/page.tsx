@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import RefundConfirmDialog, { type RefundTarget } from '@/components/platform/RefundConfirmDialog'
 import { OrderStatusBadge, ORDER_STATUS_META } from '@/components/platform/OrderStatusBadge'
@@ -43,9 +43,13 @@ function OrdersContent() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [refundTarget, setRefundTarget] = useState<RefundTarget | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [searchInput, setSearchInput] = useState(q)
+  // 外部 q 變動（清除鈕／導頁帶入）時同步回輸入框：用 render 期比對，避免 set-state-in-effect
+  const [prevQ, setPrevQ] = useState(q)
+  if (q !== prevQ) { setPrevQ(q); setSearchInput(q) }
 
   // 保留現有篩選、覆寫指定參數後組成網址（清除某參數傳 undefined；page===1 省略）
-  const buildQS = (over: Record<string, string | number | undefined>) => {
+  const buildQS = useCallback((over: Record<string, string | number | undefined>) => {
     const merged: Record<string, string | number | undefined> = { status: statusFilter, q, page, from: fromParam, to: toParam, companyId, ...over }
     const params = new URLSearchParams()
     for (const [k, v] of Object.entries(merged)) {
@@ -54,7 +58,7 @@ function OrdersContent() {
     }
     const s = params.toString()
     return `/platform/orders${s ? `?${s}` : ''}`
-  }
+  }, [statusFilter, q, page, fromParam, toParam, companyId])
 
   const load = () => {
     setLoading(true); setError(null)
@@ -71,6 +75,14 @@ function OrdersContent() {
       .finally(() => setLoading(false))
   }
   useEffect(load, [page, statusFilter, q, fromParam, toParam, companyId, router])
+
+  // 訂單搜尋防抖：停打 300ms 後才更新網址 q（即打即查、部分比對；比對欄位由 API 決定）
+  useEffect(() => {
+    const term = searchInput.trim()
+    if (term === q) return
+    const h = setTimeout(() => router.push(buildQS({ q: term || undefined, page: 1 })), 300)
+    return () => clearTimeout(h)
+  }, [searchInput, q, buildQS, router])
 
   // 企業下拉選項（一次載入）
   useEffect(() => {
@@ -173,6 +185,13 @@ function OrdersContent() {
             </button>
           ))}
         </div>
+      </div>
+      {/* 訂單搜尋：即打即查（防抖 300ms），比對訂單編號／世界移動訂單號／會員暱稱，部分比對 */}
+      <div className="relative max-w-md">
+        <svg className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+        <input type="search" value={searchInput} onChange={e=>setSearchInput(e.target.value)}
+          placeholder="搜尋訂單編號、世界移動訂單號或會員暱稱…"
+          className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm pl-10 pr-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-400" />
       </div>
       {/* 時間區間篩選（快捷 + 手動）＋ 區間結算總額 */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-center gap-x-4 gap-y-3">
