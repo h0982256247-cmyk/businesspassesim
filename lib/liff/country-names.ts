@@ -1,6 +1,6 @@
 // 國家／地區中文→英文對照（LIFF 英文模式顯示用）。
 // 自動產生：scripts/gen-country-names.mjs 讀 data/country-names.xlsx；請勿手改。
-// 更新方式：替換 data/country-names.xlsx 後重跑 `node scripts/gen-country-names.mjs`。共 260 筆。
+// 更新方式：替換 data/country-names.xlsx 後重跑 `node scripts/gen-country-names.mjs`。共 261 筆。
 export const COUNTRY_NAME_EN: Record<string, string> = {
   "土耳其": "Türkiye",
   "中英": "China & United Kingdom",
@@ -262,6 +262,7 @@ export const COUNTRY_NAME_EN: Record<string, string> = {
   "科科斯（基林）群島": "Cocos (Keeling) Islands",
   "英屬印度洋領地": "British Indian Ocean Territory",
   "南喬治亞與南桑威奇群島": "South Georgia and the South Sandwich Islands",
+  "塞班": "Saipan",
 }
 
 // 英文模式取國名：命中對照表→回英文；未命中→退回傳入的 countryNameEn（若有）→中文原名。
