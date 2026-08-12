@@ -18,6 +18,7 @@ const PUBLIC_API = [
   '/api/webhooks/',
   '/api/payment/tappay/notify',
   '/api/cron/',
+  '/api/receipts/share/',   // 公開收據分享頁（免登入，靠不可猜的 shareToken）
 ]
 
 // 平台後台路由前綴（使用 PLATFORM_COOKIE 驗證）
