@@ -116,10 +116,12 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
   const [notif, setNotif] = useState<{ items: { key: string; label: string; count: number; href: string }[]; total: number }>({ items: [], total: 0 })
   const [notifOpen, setNotifOpen] = useState(false)
 
-  // 頂欄搜尋：像訂單編號（含「-」或 ESM/ORD 開頭）→ 訂單管理；否則 → 會員管理（依暱稱）。
+  // 頂欄搜尋：像訂單編號 → 訂單管理；否則 → 會員管理（依暱稱）。
+  // 訂單編號涵蓋：含「-」、ESM/ORD 開頭，或世界移動訂單號那種「純英數且帶數字、長度≥6」的字串（如 b0001ca2608070003）。
   // term / isOrder 提到 render scope，讓輸入框即時顯示「會搜去哪」的提示。
   const searchTerm = searchQ.trim().replace(/^#/, '')
   const searchIsOrder = searchTerm.includes('-') || /^(esm|ord)/i.test(searchTerm)
+    || (/^[a-z0-9]+$/i.test(searchTerm) && /\d/.test(searchTerm) && searchTerm.length >= 6)
   const onSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (!searchTerm) return

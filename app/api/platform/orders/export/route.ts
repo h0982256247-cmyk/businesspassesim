@@ -40,6 +40,8 @@ export async function GET(req: NextRequest) {
   const searchWhere: Prisma.OrderWhereInput = q ? {
     OR: [
       { orderNumber: { contains: q, mode: 'insensitive' } },
+      { wmOrderId: { contains: q, mode: 'insensitive' } },
+      { wmOrderSn: { contains: q, mode: 'insensitive' } },
       { user: { displayName: { contains: q, mode: 'insensitive' } } },
     ],
   } : {}
