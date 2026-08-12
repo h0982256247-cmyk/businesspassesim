@@ -19,8 +19,10 @@ const PER_DAY_RE = /每\s*[天日]|\/\s*(?:天|日|day)|per[\s-]*day|daily/i
 export function parseCapacityFromName(name: string): string | null {
   if (!name) return null
 
-  // 中文吃到飽 token，先檢查最具體的（鈦金 / 高速）再 fallback 到一般吃到飽
-  if (/鈦金吃到飽/.test(name))                              return '鈦金吃到飽'
+  // 中文吃到飽 token，先檢查最具體的（鈦金 / 高速）再 fallback 到一般吃到飽。
+  // 「鈦金」放寬到只認關鍵字：涵蓋「鈦金吃到飽」「商務鈦金款」「鈦金款」等寫法
+  // （鈦金＝最高階不降速方案，名稱不一定帶「吃到飽」）。
+  if (/鈦金/.test(name))                                    return '鈦金吃到飽'
   if (/高速吃到飽/.test(name))                              return '高速吃到飽'
   if (/(無限量|不限流量|無限流量|吃到飽)/.test(name))       return '無限吃到飽'
 
