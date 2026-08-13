@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requirePlatformAuth } from '@/lib/auth/platform'
-import { getCompanyById, getCompanyMembers, setMemberAdmin, setCompanyActive, deleteCompany } from '@/lib/services/group'
+import { getCompanyById, getCompanyMembers, setMemberAdmin, setCompanyActive, deleteCompany, updateCompanyProfile } from '@/lib/services/group'
 import { AdminRole } from '@prisma/client'
 
 type Params = { params: Promise<{ id: string }> }
@@ -41,6 +41,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   if (typeof body.isActive === 'boolean') {
     await setCompanyActive(id, body.isActive)
     return NextResponse.json({ ok: true })
+  }
+
+  // 編輯企業基本資料（名稱/描述/統編/地址）
+  if (typeof body.name === 'string') {
+    if (!body.name.trim()) return NextResponse.json({ error: '企業名稱必填' }, { status: 400 })
+    if (!/^\d{8}$/.test(String(body.taxId ?? '').trim())) return NextResponse.json({ error: '統一編號需為 8 位數字' }, { status: 400 })
+    if (!String(body.address ?? '').trim()) return NextResponse.json({ error: '公司地址必填' }, { status: 400 })
+    const company = await updateCompanyProfile(id, {
+      name: body.name.trim(),
+      description: typeof body.description === 'string' ? (body.description.trim() || null) : null,
+      taxId: String(body.taxId).trim(),
+      address: String(body.address).trim(),
+    })
+    return NextResponse.json({ company })
   }
 
   return NextResponse.json({ error: '無效請求' }, { status: 400 })

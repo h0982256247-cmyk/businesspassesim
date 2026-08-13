@@ -34,6 +34,27 @@ export async function createCompany(input: CreateCompanyInput) {
   throw new Error('產生邀請碼失敗，請重試')
 }
 
+export interface UpdateCompanyInput {
+  name: string
+  description?: string | null
+  taxId: string
+  address: string
+}
+
+// 編輯企業基本資料（名稱/描述/統編/地址）。不動邀請碼、成員、啟用狀態；
+// 不影響已開立收據（收據存的是開立當下的快照）。
+export async function updateCompanyProfile(groupId: string, input: UpdateCompanyInput) {
+  return prisma.group.update({
+    where: { id: groupId },
+    data: {
+      name: input.name,
+      description: input.description ?? null,
+      taxId: input.taxId,
+      address: input.address,
+    },
+  })
+}
+
 export async function getAllCompanies() {
   return prisma.group.findMany({
     orderBy: { createdAt: 'desc' },
