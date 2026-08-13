@@ -9,6 +9,8 @@ type Company = {
   id: string
   name: string
   description: string | null
+  taxId: string | null
+  address: string | null
   inviteCode: string
   isActive: boolean
   admins: { id: string; displayName: string }[]   // 企業管理員（可多位；列表顯示第一位）
@@ -31,6 +33,8 @@ export default function CompaniesPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newTaxId, setNewTaxId] = useState('')
+  const [newAddress, setNewAddress] = useState('')
   const [creating, setCreating] = useState(false)
   const [assign, setAssign] = useState<Company | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -39,6 +43,12 @@ export default function CompaniesPage() {
   const [del, setDel] = useState<Company | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [delError, setDelError] = useState<string | null>(null)
+  const [edit, setEdit] = useState<Company | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editTaxId, setEditTaxId] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const load = () => {
     setLoading(true); setError(null)
@@ -52,13 +62,15 @@ export default function CompaniesPage() {
 
   const create = async () => {
     if (!newName.trim()) return
+    if (!/^\d{8}$/.test(newTaxId.trim())) { toast.error('統一編號需為 8 位數字'); return }
+    if (!newAddress.trim()) { toast.error('公司地址必填'); return }
     setCreating(true)
     const r = await fetch('/api/admin/groups', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() || undefined }),
+      body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() || undefined, taxId: newTaxId.trim(), address: newAddress.trim() }),
     })
     setCreating(false)
-    if (r.ok) { setNewName(''); setNewDesc(''); setShowCreate(false); load() }
+    if (r.ok) { setNewName(''); setNewDesc(''); setNewTaxId(''); setNewAddress(''); setShowCreate(false); load() }
     else { const d = await r.json().catch(() => ({})); toast.error(d.error ?? '建立失敗') }
   }
 
@@ -100,6 +112,24 @@ export default function CompaniesPage() {
     else { const d = r ? await r.json().catch(() => ({})) : {}; setDelError(d.error ?? '刪除失敗，請稍後再試') }
   }
 
+  const openEdit = (c: Company) => {
+    setEdit(c); setEditName(c.name); setEditDesc(c.description ?? ''); setEditTaxId(c.taxId ?? ''); setEditAddress(c.address ?? '')
+  }
+  const saveEdit = async () => {
+    if (!edit) return
+    if (!editName.trim()) { toast.error('企業名稱必填'); return }
+    if (!/^\d{8}$/.test(editTaxId.trim())) { toast.error('統一編號需為 8 位數字'); return }
+    if (!editAddress.trim()) { toast.error('公司地址必填'); return }
+    setSavingEdit(true)
+    const r = await fetch(`/api/admin/groups/${edit.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: editName.trim(), description: editDesc.trim() || undefined, taxId: editTaxId.trim(), address: editAddress.trim() }),
+    }).catch(() => null)
+    setSavingEdit(false)
+    if (r && r.ok) { setEdit(null); load() }
+    else { const d = r ? await r.json().catch(() => ({})) : {}; toast.error(d.error ?? '儲存失敗') }
+  }
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -118,8 +148,12 @@ export default function CompaniesPage() {
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="描述（選填）"
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <input value={newTaxId} onChange={e => setNewTaxId(e.target.value)} placeholder="統一編號（8 碼數字，必填；開公司收據用）" inputMode="numeric" maxLength={8}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <input value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="公司地址（必填；開公司收據用）"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           <div className="flex gap-2">
-            <button onClick={create} disabled={creating || !newName.trim()} className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white disabled:opacity-50">
+            <button onClick={create} disabled={creating || !newName.trim() || !/^\d{8}$/.test(newTaxId.trim()) || !newAddress.trim()} className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white disabled:opacity-50">
               {creating ? '建立中…' : '建立（自動產生邀請碼）'}
             </button>
             <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">取消</button>
@@ -160,6 +194,7 @@ export default function CompaniesPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex gap-1.5">
+                      <button onClick={() => openEdit(c)} className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg font-medium transition">編輯</button>
                       <button onClick={() => openAssign(c)} className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded-lg font-medium transition">指派管理員</button>
                       <button onClick={() => toggleActive(c)} className={`text-xs px-3 py-1.5 rounded-lg font-medium transition ${c.isActive ? 'bg-orange-50 hover:bg-orange-100 text-orange-700' : 'bg-green-50 hover:bg-green-100 text-green-700'}`}>
                         {c.isActive ? '停權' : '啟用'}
@@ -172,6 +207,34 @@ export default function CompaniesPage() {
             </tbody>
           </table>
           {companies.length === 0 && <div className="text-center py-12"><p className="text-gray-400 text-sm">尚無企業，點右上「建立企業」新增</p></div>}
+        </div>
+      )}
+
+      {/* 編輯企業 modal */}
+      {edit && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => { if (!savingEdit) setEdit(null) }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h2 className="font-bold text-gray-800">編輯企業「{edit.name}」</h2>
+              <p className="text-xs text-gray-400 mt-0.5">統編／地址供開立公司收據使用；修改不影響已開立的收據。</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <input value={editName} onChange={e => setEditName(e.target.value)} placeholder="企業名稱（必填）"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <input value={editDesc} onChange={e => setEditDesc(e.target.value)} placeholder="描述（選填）"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <input value={editTaxId} onChange={e => setEditTaxId(e.target.value)} placeholder="統一編號（8 碼數字，必填）" inputMode="numeric" maxLength={8}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+              <input value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="公司地址（必填）"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+            </div>
+            <div className="px-5 py-3 border-t border-gray-100 flex justify-end gap-2">
+              <button onClick={() => setEdit(null)} disabled={savingEdit} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-50">取消</button>
+              <button onClick={saveEdit} disabled={savingEdit || !editName.trim() || !/^\d{8}$/.test(editTaxId.trim()) || !editAddress.trim()} className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                {savingEdit ? '儲存中…' : '儲存'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

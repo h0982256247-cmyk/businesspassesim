@@ -17,6 +17,8 @@ function genInviteCode(): string {
 export interface CreateCompanyInput {
   name: string
   description?: string
+  taxId: string       // 統一編號（開公司收據用；必填）
+  address: string     // 公司地址（開公司收據用；必填）
 }
 
 export async function createCompany(input: CreateCompanyInput) {
@@ -26,10 +28,31 @@ export async function createCompany(input: CreateCompanyInput) {
     const exists = await prisma.group.findUnique({ where: { inviteCode }, select: { id: true } })
     if (exists) continue
     return prisma.group.create({
-      data: { name: input.name, description: input.description, inviteCode },
+      data: { name: input.name, description: input.description, taxId: input.taxId, address: input.address, inviteCode },
     })
   }
   throw new Error('產生邀請碼失敗，請重試')
+}
+
+export interface UpdateCompanyInput {
+  name: string
+  description?: string | null
+  taxId: string
+  address: string
+}
+
+// 編輯企業基本資料（名稱/描述/統編/地址）。不動邀請碼、成員、啟用狀態；
+// 不影響已開立收據（收據存的是開立當下的快照）。
+export async function updateCompanyProfile(groupId: string, input: UpdateCompanyInput) {
+  return prisma.group.update({
+    where: { id: groupId },
+    data: {
+      name: input.name,
+      description: input.description ?? null,
+      taxId: input.taxId,
+      address: input.address,
+    },
+  })
 }
 
 export async function getAllCompanies() {

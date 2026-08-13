@@ -21,9 +21,16 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   if (auth.role !== 'SUPER_ADMIN') return NextResponse.json({ error: '無權限' }, { status: 403 })
 
-  const { name, description } = await req.json()
-  if (!name?.trim()) return NextResponse.json({ error: 'name 必填' }, { status: 400 })
+  const { name, description, taxId, address } = await req.json()
+  if (!name?.trim()) return NextResponse.json({ error: '企業名稱必填' }, { status: 400 })
+  if (!/^\d{8}$/.test(String(taxId ?? '').trim())) return NextResponse.json({ error: '統一編號需為 8 位數字' }, { status: 400 })
+  if (!address?.trim()) return NextResponse.json({ error: '公司地址必填' }, { status: 400 })
 
-  const company = await createCompany({ name: name.trim(), description })
+  const company = await createCompany({
+    name: name.trim(),
+    description,
+    taxId: String(taxId).trim(),
+    address: String(address).trim(),
+  })
   return NextResponse.json({ company }, { status: 201 })
 }

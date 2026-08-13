@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
         user: { select: { displayName: true, lineUid: true } },
         company: { select: { name: true } },
         orderItems: { select: { productName: true } },
+        receipt: { select: { receiptNumber: true } },
       },
     }),
     prisma.order.count({ where: repWhere }),

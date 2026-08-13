@@ -47,6 +47,8 @@ model Group {
   id          String   @id @default(cuid())
   name        String
   description String?
+  taxId       String?  @map("tax_id")   // 公司統一編號（開公司收據用；建立企業時必填，DB 容 null 供既有資料回填）
+  address     String?  @map("address")  // 公司地址（開公司收據用）
   inviteCode  String   @unique @map("invite_code") // 企業邀請碼
   inviteLink  String?  @map("invite_link")
   isActive    Boolean  @default(true) @map("is_active") // 企業本身啟用/停權（由 Super Admin 控制）
@@ -240,11 +242,47 @@ model Order {
   company      Group?        @relation(fields: [companyId], references: [id])
   orderItems   OrderItem[]
   transfer     EsimTransfer?
+  receipt      Receipt?
 
   @@index([bundleId])
   @@index([companyId])
   @@index([currentOwnerId])
   @@map("orders")
+}
+
+// 消費者收據：一訂單一收據。收據編號 W+西元年後2碼+月+日+L+4碼（購買日＋當日流水）。
+// 抬頭／統編／地址選填，填過即鎖（fieldsLocked）。shareToken 供公開分享頁（免登入）。
+model Receipt {
+  id            String   @id @default(cuid())
+  receiptNumber String   @unique @map("receipt_number")
+  orderId       String   @unique @map("order_id")
+  order         Order    @relation(fields: [orderId], references: [id])
+  issueDate     DateTime @map("issue_date")          // = 購買日
+  seqDate       String   @map("seq_date")            // yyyymmdd（購買日，流水分組用）
+  seq           Int                                  // 當日流水（1 起）
+  type          String   @default("personal")        // personal｜company（公司收據抬頭可為企業名或個人姓名）
+  itemName      String   @map("item_name")           // 固定「出國上網設備及通信費」
+  qty           Int      @default(1)
+  amount        Int                                  // = totalPaid
+  wmOrderId     String?  @map("wm_order_id")          // 世界移動訂單號快照
+  buyerName     String?  @map("buyer_name")           // 抬頭（選填）
+  taxId         String?  @map("tax_id")               // 統一編號（選填）
+  buyerAddress  String?  @map("buyer_address")        // 地址（選填）
+  fieldsLocked  Boolean  @default(false) @map("fields_locked")  // 三欄填過即鎖
+  shareToken    String   @unique @map("share_token")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([seqDate])
+  @@map("receipts")
+}
+
+// 每日收據流水計數器（key = 購買日 yyyymmdd）。以原子 upsert 遞增，避免並發撞號。
+model ReceiptCounter {
+  seqDate String @id @map("seq_date")
+  count   Int    @default(0)
+
+  @@map("receipt_counters")
 }
 
 // eSIM 轉贈：買家把「已備好但未安裝」的 eSIM 分享給好友，好友領取後擁有權轉移。
