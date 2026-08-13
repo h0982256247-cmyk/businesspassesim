@@ -1,6 +1,7 @@
 'use client'
 
-// 收據檢視：套 ReceiptDocument 版型 → 下載 PDF（瀏覽器端）＋ LINE 轉發傳收據圖。
+// 收據檢視：套 ReceiptDocument 版型。下載＝產生收據圖後以彈窗顯示（長按存圖，
+// 因 LINE 內建瀏覽器不支援 a.download blob）；轉發＝產圖上傳後 shareTargetPicker 傳圖。
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { useLiff } from '@/components/liff/LiffProvider'
@@ -8,7 +9,7 @@ import { useTenantColors } from '@/components/liff/TenantContext'
 import PageSkeleton from '@/components/liff/PageSkeleton'
 import { S } from '@/lib/liff/tokens'
 import ReceiptDocument, { type ReceiptData } from '@/components/liff/ReceiptDocument'
-import { downloadReceiptImage, receiptToPngBlob } from '@/lib/liff/receipt-export'
+import { receiptToPngBlob } from '@/lib/liff/receipt-export'
 
 export default function ReceiptViewPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +20,7 @@ export default function ReceiptViewPage() {
   const [notFound, setNotFound] = useState(false)
   const [busy, setBusy] = useState<'img' | 'share' | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [saveUrl, setSaveUrl] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/receipts/${id}`)
@@ -27,24 +29,34 @@ export default function ReceiptViewPage() {
       .catch(() => setNotFound(true))
   }, [id])
 
+  // 產生收據 PNG → 上傳公開 bucket → 回公開網址（下載彈窗與 LINE 轉發共用）。
+  const genAndUpload = async (): Promise<string | null> => {
+    if (!docRef.current) return null
+    const blob = await receiptToPngBlob(docRef.current)
+    const fd = new FormData(); fd.append('file', blob, 'receipt.png')
+    const up = await fetch(`/api/receipts/${id}/share-image`, { method: 'POST', body: fd }).then(r => r.json()).catch(() => null)
+    return up?.url ?? null
+  }
+
   const download = async () => {
-    if (!docRef.current || !receipt || busy) return
+    if (!receipt || busy) return
     setBusy('img'); setMsg(null)
-    try { await downloadReceiptImage(docRef.current, `receipt-${receipt.receiptNumber}.png`) }
-    catch { setMsg('下載失敗，請稍後再試') }
+    try {
+      const url = await genAndUpload()
+      if (!url) throw new Error('gen failed')
+      setSaveUrl(url)
+    } catch { setMsg('產生收據圖失敗，請稍後再試') }
     finally { setBusy(null) }
   }
 
   const share = async () => {
-    if (!docRef.current || !receipt || busy) return
+    if (!receipt || busy) return
     if (!liff?.isApiAvailable?.('shareTargetPicker')) { setMsg('此環境不支援轉發，請改用下載'); return }
     setBusy('share'); setMsg(null)
     try {
-      const blob = await receiptToPngBlob(docRef.current)
-      const fd = new FormData(); fd.append('file', blob, 'receipt.png')
-      const up = await fetch(`/api/receipts/${id}/share-image`, { method: 'POST', body: fd }).then(r => r.json()).catch(() => null)
-      if (!up?.url) throw new Error('upload failed')
-      await liff.shareTargetPicker([{ type: 'image', originalContentUrl: up.url, previewImageUrl: up.url }])
+      const url = await genAndUpload()
+      if (!url) throw new Error('gen failed')
+      await liff.shareTargetPicker([{ type: 'image', originalContentUrl: url, previewImageUrl: url }])
     } catch { setMsg('轉發失敗，請稍後再試') }
     finally { setBusy(null) }
   }
@@ -71,6 +83,17 @@ export default function ReceiptViewPage() {
           <ReceiptDocument receipt={receipt} />
         </div>
       </div>
+
+      {saveUrl && (
+        <div onClick={() => setSaveUrl(null)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: 16 }}>
+          <p style={{ color: '#fff', fontSize: 14, textAlign: 'center', margin: 0 }}>長按圖片存到相簿（電腦可按右鍵另存）</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={saveUrl} alt="收據" onClick={e => e.stopPropagation()} style={{ maxWidth: '100%', maxHeight: '74vh', borderRadius: 8, background: '#fff' }} />
+          <button onClick={() => setSaveUrl(null)}
+            style={{ background: '#fff', color: '#1a1a1a', border: 'none', borderRadius: 10, padding: '10px 26px', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>關閉</button>
+        </div>
+      )}
     </div>
   )
 }
