@@ -335,12 +335,11 @@ export async function batchCreateProducts(
   const supplierIdMap = new Map(allSuppliers.map(s => [s.wmProductId, s.id]))
 
   // ─── Step 5: 抓既有 Product 以便「更新而非新建」───────────────────
-  // 商品的真正身分是 **plan_code（B 欄）**，每個上架方案唯一。
-  // ⚠ A 欄供應商 WM SKU 會「重複」：同一個 WM 批發方案常被拆成多個國家上架
-  //   （中港澳／中國／香港／澳門；南美整區 → 阿根廷／巴西／南美A），它們共用同一個
-  //   SupplierProduct，只有 plan_code 不同。故比對既有商品一律以 plan_code 為鍵；
-  //   沒填 plan_code 的舊資料才退回用 supplier SKU。
-  // （早期用 SKU 當鍵 → 重匯時多國上架只更新得到一筆、其餘變孤兒不再被維護，已修。）
+  // 商品身分鍵 = (國家 + plan_code)。plan_code（B 欄）本身「不」全域唯一：
+  //   ⚠ A 欄供應商 WM SKU 會重複（一個 WM 批發方案拆成多國上架，共用同一個 SupplierProduct）；
+  //   且區域方案常「同一個 plan_code 用在多個國家」（如東南亞一碼用於印尼/泰國/菲律賓… 6 國）。
+  //   只用 plan_code 當鍵 → 多國互相覆蓋、重匯漏更新其餘國家、初次匯入並發還會產生重複。
+  //   故鍵一律帶國家；沒填 plan_code 的舊資料才退回用 (國家 + supplier SKU)。
   const supplierIdsForRows = Array.from(new Set(rows.map(r => supplierIdMap.get(r.supplierSkuId)!).filter(Boolean)))
   const planCodesForRows = Array.from(new Set(
     rows.map(r => r.planCode).filter((c): c is string => !!c)
@@ -352,13 +351,14 @@ export async function batchCreateProducts(
         { supplierSkuId: { in: supplierIdsForRows } },
       ],
     },
-    select: { id: true, planCode: true, supplierSkuId: true },
+    select: { id: true, countryCode: true, planCode: true, supplierSkuId: true },
   })
-  const existingByPlan = new Map<string, string>()        // plan_code → productId（主鍵）
-  const existingBySkuNoPlan = new Map<string, string>()   // supplierSkuId → productId（僅無 plan_code 的舊資料 fallback）
+  // 有 plan_code → (國家|p:plan_code)；無 → (國家|s:supplierSkuId)。與 DB 唯一索引 (country_code, plan_code) 一致。
+  const keyOf = (countryCode: string, planCode: string | null | undefined, supplierSkuId: string) =>
+    planCode ? `${countryCode} p:${planCode}` : `${countryCode} s:${supplierSkuId}`
+  const existingByKey = new Map<string, string>()   // (國家+plan_code) 或 (國家+supplierSku) → productId
   for (const ep of existingProducts) {
-    if (ep.planCode) existingByPlan.set(ep.planCode, ep.id)
-    else             existingBySkuNoPlan.set(ep.supplierSkuId, ep.id)
+    existingByKey.set(keyOf(ep.countryCode, ep.planCode, ep.supplierSkuId), ep.id)
   }
 
   // ─── Step 6: 分流：既有 → bulk SQL update；新的 → createMany ─────
@@ -372,9 +372,7 @@ export async function batchCreateProducts(
     // 匯入完全照 Excel 填的成本/售價（業主定案 2026-08）；福利價 = 成本 × 倍率。
     // 真實成本以 WM 為準的同步，改由「驗證方案」流程處理（見 validate/apply）。
     const data = buildProductData(row, supplierId, { costPrice: row.costPrice, sellPrice: row.sellPrice }, markup)
-    const existingId = row.planCode
-      ? existingByPlan.get(row.planCode)
-      : existingBySkuNoPlan.get(supplierId)
+    const existingId = existingByKey.get(keyOf(row.countryCode, row.planCode, supplierId))
     if (existingId) productUpdates.push({ id: existingId, data })
     else            newProductData.push(data)
   }
@@ -387,7 +385,8 @@ export async function batchCreateProducts(
     const CREATE_BATCH = 500
     for (let i = 0; i < newProductData.length; i += CREATE_BATCH) {
       const chunk = newProductData.slice(i, i + CREATE_BATCH)
-      const result = await prisma.product.createMany({ data: chunk })
+      // skipDuplicates：搭配 DB 唯一索引 (country_code, plan_code)，即使匯入被重複送出/並發也不會再長出重複列
+      const result = await prisma.product.createMany({ data: chunk, skipDuplicates: true })
       created += result.count
     }
   }

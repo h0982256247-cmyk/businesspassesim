@@ -161,6 +161,9 @@ model Product {
   supplierProduct SupplierProduct @relation(fields: [supplierSkuId], references: [id])
   orderItems      OrderItem[]
 
+  // 商品唯一身分 = (國家 + plan_code)；擋住匯入重複送出/並發產生重複列。
+  // plan_code 可空（僅極少數舊資料）；Postgres 允許多個 NULL，不影響現有唯一約束。
+  @@unique([countryCode, planCode])
   @@map("products")
 }
 
