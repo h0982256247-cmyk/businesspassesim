@@ -473,6 +473,8 @@ export default function ClassicShop({
           const bestPrice = hasDiscount ? p.benefitPrice! : p.sellPrice
           const inCart = cart.has(p.id)
           const tier = TIER_COLOR[d.tier]
+          // 卡片只顯示「電信商」那行（流量已是標題、效期等其餘條列略過；完整內容在商品詳情頁）
+          const carrier = p.description?.split(/\r?\n/).map(l => l.replace(/^[-\s]+/, '').trim()).find(l => l.startsWith('電信商')) ?? null
           return (
             <div
               key={p.id}
@@ -524,12 +526,12 @@ export default function ClassicShop({
                       <NetworkBadge networkType={p.networkType} />
                       <NativeSimBadge isNative={p.isNativeSim} />
                     </div>
-                    {p.description && (
+                    {carrier && (
                       <p style={{
                         fontSize: 11, color: S.muted, margin: '4px 0 0', fontWeight: 500,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
-                        {p.description}
+                        {carrier}
                       </p>
                     )}
                   </div>
