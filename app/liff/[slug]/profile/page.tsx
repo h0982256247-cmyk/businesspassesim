@@ -34,6 +34,15 @@ function IconEdit() {
   )
 }
 
+function IconReceipt() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={S.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z" />
+      <path d="M8 7h8M8 11h8M8 15h5" />
+    </svg>
+  )
+}
+
 function IconGroup() {
   return (
     <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={S.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -91,6 +100,7 @@ export default function ProfilePage() {
 
   const menuItems: { label: string; sub: string; icon: React.ReactNode; href: string; external?: boolean }[] = [
     { label: t.profile.itemProfile, sub: t.profile.itemProfileSub, icon: <IconEdit />, href: `${base}/profile/setup` },
+    { label: t.profile.itemReceipt, sub: t.profile.itemReceiptSub, icon: <IconReceipt />, href: `${base}/receipts` },
     { label: t.profile.itemCompany, sub: groupLabel,               icon: <IconGroup />, href: `${base}/company` },
     { label: t.profile.itemSupport, sub: t.profile.itemSupportSub,  icon: <IconSupport />, href: `${base}/support` },
     // 聯繫客服：直開後台「系統設定 → 客服 / LINE OA 連結」；未設定則不顯示（與 support 頁同防呆）
