@@ -17,6 +17,8 @@ function genInviteCode(): string {
 export interface CreateCompanyInput {
   name: string
   description?: string
+  taxId: string       // 統一編號（開公司收據用；必填）
+  address: string     // 公司地址（開公司收據用；必填）
 }
 
 export async function createCompany(input: CreateCompanyInput) {
@@ -26,7 +28,7 @@ export async function createCompany(input: CreateCompanyInput) {
     const exists = await prisma.group.findUnique({ where: { inviteCode }, select: { id: true } })
     if (exists) continue
     return prisma.group.create({
-      data: { name: input.name, description: input.description, inviteCode },
+      data: { name: input.name, description: input.description, taxId: input.taxId, address: input.address, inviteCode },
     })
   }
   throw new Error('產生邀請碼失敗，請重試')

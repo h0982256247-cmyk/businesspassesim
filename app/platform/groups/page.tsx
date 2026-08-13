@@ -31,6 +31,8 @@ export default function CompaniesPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
+  const [newTaxId, setNewTaxId] = useState('')
+  const [newAddress, setNewAddress] = useState('')
   const [creating, setCreating] = useState(false)
   const [assign, setAssign] = useState<Company | null>(null)
   const [members, setMembers] = useState<Member[]>([])
@@ -52,13 +54,15 @@ export default function CompaniesPage() {
 
   const create = async () => {
     if (!newName.trim()) return
+    if (!/^\d{8}$/.test(newTaxId.trim())) { toast.error('統一編號需為 8 位數字'); return }
+    if (!newAddress.trim()) { toast.error('公司地址必填'); return }
     setCreating(true)
     const r = await fetch('/api/admin/groups', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() || undefined }),
+      body: JSON.stringify({ name: newName.trim(), description: newDesc.trim() || undefined, taxId: newTaxId.trim(), address: newAddress.trim() }),
     })
     setCreating(false)
-    if (r.ok) { setNewName(''); setNewDesc(''); setShowCreate(false); load() }
+    if (r.ok) { setNewName(''); setNewDesc(''); setNewTaxId(''); setNewAddress(''); setShowCreate(false); load() }
     else { const d = await r.json().catch(() => ({})); toast.error(d.error ?? '建立失敗') }
   }
 
@@ -118,8 +122,12 @@ export default function CompaniesPage() {
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           <input value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="描述（選填）"
             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <input value={newTaxId} onChange={e => setNewTaxId(e.target.value)} placeholder="統一編號（8 碼數字，必填；開公司收據用）" inputMode="numeric" maxLength={8}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+          <input value={newAddress} onChange={e => setNewAddress(e.target.value)} placeholder="公司地址（必填；開公司收據用）"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
           <div className="flex gap-2">
-            <button onClick={create} disabled={creating || !newName.trim()} className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white disabled:opacity-50">
+            <button onClick={create} disabled={creating || !newName.trim() || !/^\d{8}$/.test(newTaxId.trim()) || !newAddress.trim()} className="px-4 py-2 rounded-xl text-sm font-medium bg-blue-600 text-white disabled:opacity-50">
               {creating ? '建立中…' : '建立（自動產生邀請碼）'}
             </button>
             <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-xl text-sm text-gray-500 hover:bg-gray-50">取消</button>
