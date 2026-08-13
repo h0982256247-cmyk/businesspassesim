@@ -8,7 +8,7 @@ import { useTenantColors } from '@/components/liff/TenantContext'
 import PageSkeleton from '@/components/liff/PageSkeleton'
 import { S } from '@/lib/liff/tokens'
 import ReceiptDocument, { type ReceiptData } from '@/components/liff/ReceiptDocument'
-import { downloadReceiptPdf, receiptToPngBlob } from '@/lib/liff/receipt-export'
+import { downloadReceiptImage, receiptToPngBlob } from '@/lib/liff/receipt-export'
 
 export default function ReceiptViewPage() {
   const { id } = useParams<{ id: string }>()
@@ -17,7 +17,7 @@ export default function ReceiptViewPage() {
   const docRef = useRef<HTMLDivElement>(null)
   const [receipt, setReceipt] = useState<ReceiptData | null>(null)
   const [notFound, setNotFound] = useState(false)
-  const [busy, setBusy] = useState<'pdf' | 'share' | null>(null)
+  const [busy, setBusy] = useState<'img' | 'share' | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
 
   useEffect(() => {
@@ -29,8 +29,8 @@ export default function ReceiptViewPage() {
 
   const download = async () => {
     if (!docRef.current || !receipt || busy) return
-    setBusy('pdf'); setMsg(null)
-    try { await downloadReceiptPdf(docRef.current, `receipt-${receipt.receiptNumber}.pdf`) }
+    setBusy('img'); setMsg(null)
+    try { await downloadReceiptImage(docRef.current, `receipt-${receipt.receiptNumber}.png`) }
     catch { setMsg('下載失敗，請稍後再試') }
     finally { setBusy(null) }
   }
@@ -57,7 +57,7 @@ export default function ReceiptViewPage() {
       <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
         <button onClick={download} disabled={!!busy}
           style={{ flex: 1, padding: '12px', borderRadius: 12, background: C.primary, color: C.onPrimary, border: 'none', fontSize: 14, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>
-          {busy === 'pdf' ? '處理中…' : '下載 PDF'}
+          {busy === 'img' ? '處理中…' : '下載'}
         </button>
         <button onClick={share} disabled={!!busy}
           style={{ flex: 1, padding: '12px', borderRadius: 12, background: S.white, color: C.primaryText, border: `1px solid ${C.primary}44`, fontSize: 14, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>

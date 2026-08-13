@@ -70,10 +70,11 @@ export default function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
           </tr>
           <tr>
             <td style={cell} /><td style={cell} /><td style={cell} /><td style={cell} />
-            {/* 單一 rowSpan 儲存格：無內部橫線，店章疊於其上、底部留白 */}
-            <td style={{ ...cell, position: 'relative' }} rowSpan={leftEmptyRows}>
+            {/* 單一 rowSpan 儲存格：無內部橫線；店章以「流內圖片」置中，儲存格自動撐高、
+                不會蓋到上方的品名/備註與「營業人蓋用」文字 */}
+            <td style={{ ...cell, textAlign: 'center', verticalAlign: 'middle' }} rowSpan={leftEmptyRows}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/receipt/seal.png" alt="" style={{ position: 'absolute', right: 14, bottom: 12, width: 168, opacity: 0.95 }} />
+              <img src="/receipt/seal.png" alt="" style={{ width: 150, opacity: 0.95, display: 'inline-block', verticalAlign: 'middle' }} />
             </td>
           </tr>
           {Array.from({ length: leftEmptyRows - 1 }).map((_, i) => (
