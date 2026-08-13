@@ -3,6 +3,7 @@ import { encryptEsimFields, decryptEsimFields } from '@/lib/utils/esim-crypto'
 import { OrderStatus, PaymentMethod, PriceTier, Prisma } from '@prisma/client'
 import { getProductById } from './product'
 import { isApprovedMember } from './group'
+import { ensureReceiptForOrder } from './receipt'
 
 // ─── 訂單號生成 ───────────────────────────────────────────────────
 // 格式：ESM-YYMMDD-XXXXXX（去除易混淆字元 I/O/0/1）
@@ -289,7 +290,7 @@ export async function markBundleOrdersProcessing(bundleId: string, anchorOrderId
 }
 
 export async function markOrderPaid(orderId: string, tapPayRecTradeId: string) {
-  return prisma.order.update({
+  const order = await prisma.order.update({
     where: { id: orderId },
     data: {
       status: OrderStatus.PAID,
@@ -297,6 +298,9 @@ export async function markOrderPaid(orderId: string, tapPayRecTradeId: string) {
       paidAt: new Date(),
     },
   })
+  // 付款完成即自動產生空白收據（非阻斷：失敗不影響付款/發卡；已建則略過）
+  try { await ensureReceiptForOrder(orderId) } catch (e) { console.error('[receipt] autocreate failed', orderId, e) }
+  return order
 }
 
 export async function markBundlePaid(bundleId: string, tapPayRecTradeId: string) {
@@ -313,6 +317,8 @@ export async function markBundlePaid(bundleId: string, tapPayRecTradeId: string)
     select: { id: true, userId: true, totalPaid: true, orderItems: { select: { productName: true }, take: 1 } },
     orderBy: { bundleSeq: 'asc' },
   })
+  // 付款完成即自動產生空白收據（每筆一張；非阻斷）
+  try { await Promise.all(orders.map(o => ensureReceiptForOrder(o.id))) } catch (e) { console.error('[receipt] bundle autocreate failed', bundleId, e) }
   return orders
 }
 
