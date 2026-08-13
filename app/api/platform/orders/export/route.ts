@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
       user: { select: { displayName: true, email: true, phone: true } },
       company: { select: { name: true } },
       orderItems: { select: { productName: true, qty: true, unitCost: true } },
+      receipt: { select: { receiptNumber: true } },
     },
   })
 
@@ -83,7 +84,7 @@ export async function GET(req: NextRequest) {
   const HEADER = [
     '訂單編號', '結帳批次', '建立時間', '付款時間', '狀態', '會員名稱', '會員Email', '會員電話',
     '會員身分', '價格別', '商品', '數量(張)', '小計(含稅)', '稅額', '實付金額', '已退金額',
-    '成本', '毛利', '付款方式', '金流交易號', '世界移動訂單號', 'eSIM狀態', '到期日',
+    '成本', '毛利', '付款方式', '金流交易號', '世界移動訂單號', 'eSIM狀態', '到期日', '收據編號',
   ]
 
   const rows: (string | number)[][] = []
@@ -138,6 +139,7 @@ export async function GET(req: NextRequest) {
       concat(g.map(c => c.wmOrderId)),
       esimStatus,
       concat(g.map(c => fmtDate(c.activationEnd))),
+      rep.receipt?.receiptNumber ?? '',
     ])
   }
 
@@ -161,7 +163,7 @@ export async function GET(req: NextRequest) {
     ...rows,
   ]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
-  ws['!cols'] = [18, 22, 17, 17, 11, 12, 24, 14, 14, 9, 24, 9, 12, 9, 12, 12, 10, 10, 10, 22, 22, 16, 12].map(wch => ({ wch }))
+  ws['!cols'] = [18, 22, 17, 17, 11, 12, 24, 14, 14, 9, 24, 9, 12, 9, 12, 12, 10, 10, 10, 22, 22, 16, 12, 18].map(wch => ({ wch }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '訂單報表')
   // NextResponse 的 body 不吃 Node Buffer，包成 Uint8Array（合法 BodyInit）

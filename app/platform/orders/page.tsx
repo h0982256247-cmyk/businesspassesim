@@ -13,6 +13,7 @@ type Order = {
   bundleId: string | null; esimCount: number; bundleTotal: number
   user: { displayName: string }
   orderItems: { productName: string }[]
+  receipt: { receiptNumber: string } | null
 }
 // 「待付款」filter 同時涵蓋 PENDING 與 PROCESSING（金流送出、收到 notify 前皆顯示待付款），
 // 故 filter 不另列 PROCESSING；ESIM_PENDING 已自流程移除，亦不列入 filter。
@@ -243,6 +244,7 @@ function OrdersContent() {
                         {o.esimCount>1&&<span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full whitespace-nowrap">合購 {o.esimCount} 張</span>}
                       </div>
                       <p className="text-xs text-gray-600 mt-0.5">{o.orderItems[0]?.productName??'—'}</p>
+                      {o.receipt && <p className="text-[11px] text-emerald-600 mt-0.5">收據 {o.receipt.receiptNumber}</p>}
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
