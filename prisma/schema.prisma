@@ -47,6 +47,8 @@ model Group {
   id          String   @id @default(cuid())
   name        String
   description String?
+  taxId       String?  @map("tax_id")   // 公司統一編號（開公司收據用；建立企業時必填，DB 容 null 供既有資料回填）
+  address     String?  @map("address")  // 公司地址（開公司收據用）
   inviteCode  String   @unique @map("invite_code") // 企業邀請碼
   inviteLink  String?  @map("invite_link")
   isActive    Boolean  @default(true) @map("is_active") // 企業本身啟用/停權（由 Super Admin 控制）
@@ -258,6 +260,7 @@ model Receipt {
   issueDate     DateTime @map("issue_date")          // = 購買日
   seqDate       String   @map("seq_date")            // yyyymmdd（購買日，流水分組用）
   seq           Int                                  // 當日流水（1 起）
+  type          String   @default("personal")        // personal｜company（公司收據抬頭可為企業名或個人姓名）
   itemName      String   @map("item_name")           // 固定「出國上網設備及通信費」
   qty           Int      @default(1)
   amount        Int                                  // = totalPaid
