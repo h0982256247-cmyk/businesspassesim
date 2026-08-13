@@ -27,6 +27,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     include: {
       user: { select: { displayName: true, lineUid: true, phone: true, email: true } },
       orderItems: true,
+      receipt: { select: { receiptNumber: true } },
     },
   })
 
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest, { params }: Params) {
       paidAt: order.paidAt,
       createdAt: order.createdAt,
       tapPayRecTradeId: order.tapPayRecTradeId,
+      receiptNumber: order.receipt?.receiptNumber ?? null,
     },
     // eSIM 憑證欄位在 DB 加密；後台客服需要看明文（補發、對帳），解密後回傳。
     esims: esims.map(decryptEsimFields),

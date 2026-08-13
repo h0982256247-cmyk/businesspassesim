@@ -31,7 +31,7 @@ type Detail = {
   bundleId: string | null
   focusedId: string
   user: { displayName: string; lineUid: string; phone: string | null; email: string | null }
-  payment: { paymentMethod: string; paidAt: string | null; createdAt: string; tapPayRecTradeId: string | null }
+  payment: { paymentMethod: string; paidAt: string | null; createdAt: string; tapPayRecTradeId: string | null; receiptNumber: string | null }
   esims: Esim[]
 }
 
@@ -350,6 +350,17 @@ export default function PlatformOrderDetail() {
                 <KV label="付款方式">{payment.paymentMethod === 'CREDIT_CARD' ? '信用卡' : 'LINE Pay'}</KV>
                 <KV label="付款時間">{dt(payment.paidAt)}</KV>
                 <KV label="建立時間">{dt(payment.createdAt)}</KV>
+                {payment.receiptNumber ? (
+                  <div className="flex justify-between gap-3 items-start">
+                    <span className="text-xs text-gray-400 flex-shrink-0">收據編號</span>
+                    <span className="flex items-center gap-1 min-w-0">
+                      <span className="font-mono text-xs text-gray-700 break-all text-right">{payment.receiptNumber}</span>
+                      <CopyBtn text={payment.receiptNumber} />
+                    </span>
+                  </div>
+                ) : (
+                  <KV label="收據編號"><Muted>尚未開立</Muted></KV>
+                )}
                 {payment.tapPayRecTradeId && (
                   <div className="flex justify-between gap-3 items-start">
                     <span className="text-xs text-gray-400 flex-shrink-0">TapPay 交易號</span>
