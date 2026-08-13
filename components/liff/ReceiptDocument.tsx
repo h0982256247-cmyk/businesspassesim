@@ -65,9 +65,6 @@ export default function ReceiptDocument({ receipt }: { receipt: ReceiptData }) {
             <td style={cell}>{receipt.wmOrderId ?? ''}</td>
           </tr>
           <tr>
-            <td style={cell} /><td style={cell} /><td style={cell} /><td style={cell} /><td style={cell} />
-          </tr>
-          <tr>
             <td style={cell} /><td style={cell} /><td style={cell} /><td style={cell} />
             <td style={cell}>營業人蓋用統一發票專用章</td>
           </tr>
