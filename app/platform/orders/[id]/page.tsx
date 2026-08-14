@@ -31,7 +31,7 @@ type Detail = {
   bundleId: string | null
   focusedId: string
   user: { displayName: string; lineUid: string; phone: string | null; email: string | null }
-  payment: { paymentMethod: string; paidAt: string | null; createdAt: string; tapPayRecTradeId: string | null; receiptNumber: string | null }
+  payment: { paymentMethod: string; paidAt: string | null; createdAt: string; tapPayRecTradeId: string | null; receiptNumber: string | null; processingFee: number | null }
   esims: Esim[]
 }
 
@@ -348,6 +348,7 @@ export default function PlatformOrderDetail() {
               <SecLabel>付款</SecLabel>
               <div className="space-y-2">
                 <KV label="付款方式">{payment.paymentMethod === 'CREDIT_CARD' ? '信用卡' : 'LINE Pay'}</KV>
+                <KV label="金流手續費">{payment.processingFee != null ? `NT$${payment.processingFee.toLocaleString()}` : <Muted>—</Muted>}</KV>
                 <KV label="付款時間">{dt(payment.paidAt)}</KV>
                 <KV label="建立時間">{dt(payment.createdAt)}</KV>
                 {payment.receiptNumber ? (

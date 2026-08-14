@@ -5,6 +5,7 @@ import { Prisma, OrderStatus } from '@prisma/client'
 import * as XLSX from 'xlsx'
 import { safeDecrypt } from '@/lib/utils/crypto'
 import { deriveEsimStatus } from '@/lib/esimStatus'
+import { processingFee } from '@/lib/utils/payment-fee'
 import { ORDER_STATUS_META } from '@/components/platform/OrderStatusBadge'
 
 // GET /api/platform/orders/export —— 依「目前畫面篩選」匯出訂單 Excel（.xlsx）
@@ -84,11 +85,11 @@ export async function GET(req: NextRequest) {
   const HEADER = [
     '訂單編號', '結帳批次', '建立時間', '付款時間', '狀態', '會員名稱', '會員Email', '會員電話',
     '會員身分', '價格別', '商品', '數量(張)', '小計(含稅)', '稅額', '實付金額', '已退金額',
-    '成本', '毛利', '付款方式', '金流交易號', '世界移動訂單號', 'eSIM狀態', '到期日', '收據編號',
+    '成本', '毛利', '付款方式', '金流手續費', '金流交易號', '世界移動訂單號', 'eSIM狀態', '到期日', '收據編號',
   ]
 
   const rows: (string | number)[][] = []
-  let paidGross = 0, paidCount = 0, refundTotal = 0, netRevenue = 0, totalCards = 0
+  let paidGross = 0, paidCount = 0, refundTotal = 0, netRevenue = 0, totalCards = 0, feeTotal = 0
 
   for (const group of groups.values()) {
     const g = [...group].sort((a, b) => (a.bundleSeq ?? 1) - (b.bundleSeq ?? 1))
@@ -115,6 +116,11 @@ export async function GET(req: NextRequest) {
       activationEnd: c.activationEnd?.toISOString() ?? null,
     }).label))
 
+    // 金流手續費：以本次結帳實付總額計（一次結帳＝一筆 TapPay 交易）；未付款回 null → 顯示空白。
+    // 發卡國別尚未擷取，信用卡暫以國內 2.2% 計。
+    const fee = processingFee({ paymentMethod: rep.paymentMethod, totalPaid: paid, paidAt: rep.paidAt })
+    if (fee != null) feeTotal += fee
+
     // 摘要統計：已付款/完成計入實收；淨收入＝實付−已退（含已退款訂單沖銷後的實際留存）
     if (rep.status === OrderStatus.PAID || rep.status === OrderStatus.COMPLETED) { paidGross += paid; paidCount += 1 }
     refundTotal += refunded
@@ -135,6 +141,7 @@ export async function GET(req: NextRequest) {
       n,
       subtotal, tax, paid, refunded, cost, paid - cost,
       rep.paymentMethod === 'CREDIT_CARD' ? '信用卡' : 'LINE Pay',
+      fee ?? '',
       concat(g.map(c => c.tapPayRecTradeId)),
       concat(g.map(c => c.wmOrderId)),
       esimStatus,
@@ -158,12 +165,13 @@ export async function GET(req: NextRequest) {
     [],
     ['結帳筆數', groups.size, '', '已付款/完成筆數', paidCount, '', '已付款金額(NT$)', paidGross],
     ['eSIM 張數', totalCards, '', '退款總額(NT$)', refundTotal, '', '淨收入(NT$)', netRevenue],
+    ['金流手續費(NT$)', feeTotal],
     [],
     HEADER,
     ...rows,
   ]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
-  ws['!cols'] = [18, 22, 17, 17, 11, 12, 24, 14, 14, 9, 24, 9, 12, 9, 12, 12, 10, 10, 10, 22, 22, 16, 12, 18].map(wch => ({ wch }))
+  ws['!cols'] = [18, 22, 17, 17, 11, 12, 24, 14, 14, 9, 24, 9, 12, 9, 12, 12, 10, 10, 10, 12, 22, 22, 16, 12, 18].map(wch => ({ wch }))
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, '訂單報表')
   // NextResponse 的 body 不吃 Node Buffer，包成 Uint8Array（合法 BodyInit）
