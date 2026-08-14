@@ -5,6 +5,7 @@ import { safeDecrypt } from '@/lib/utils/crypto'
 import { decryptEsimFields } from '@/lib/utils/esim-crypto'
 import { retryEsimActivation } from '@/lib/services/esim'
 import { tapPayRefund } from '@/lib/services/tappay'
+import { processingFee } from '@/lib/utils/payment-fee'
 import { OrderStatus } from '@prisma/client'
 
 // 退款可生效的狀態（已實際扣款者）
@@ -61,6 +62,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       createdAt: order.createdAt,
       tapPayRecTradeId: order.tapPayRecTradeId,
       receiptNumber: order.receipt?.receiptNumber ?? null,
+      // 金流手續費（未付款回 null → 前端顯示「—」）。信用卡發卡國別尚未擷取，暫以國內 2.2% 計。
+      processingFee: processingFee({ paymentMethod: order.paymentMethod, totalPaid: order.totalPaid, paidAt: order.paidAt }),
     },
     // eSIM 憑證欄位在 DB 加密；後台客服需要看明文（補發、對帳），解密後回傳。
     esims: esims.map(decryptEsimFields),
