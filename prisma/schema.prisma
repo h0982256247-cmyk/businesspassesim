@@ -203,10 +203,11 @@ model Order {
   bundleSeq Int?    @map("bundle_seq")
 
   // 金流
-  paymentMethod    PaymentMethod @map("payment_method")
-  tapPayOrderId    String?       @unique @map("tappay_order_id")
-  tapPayRecTradeId String?       @map("tappay_rec_trade_id")
-  paidAt           DateTime?     @map("paid_at")
+  paymentMethod     PaymentMethod @map("payment_method")
+  tapPayOrderId     String?       @unique @map("tappay_order_id")
+  tapPayRecTradeId  String?       @map("tappay_rec_trade_id")
+  paidAt            DateTime?     @map("paid_at")
+  cardIssuerCountry String?       @map("card_issuer_country") // 發卡國別（信用卡才有）：後台手續費 國內2.2%/國外2.8% 判斷
 
   // 世界移動
   wmOrderId   String? @unique @map("wm_order_id")

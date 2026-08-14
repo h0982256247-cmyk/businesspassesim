@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true, orderNumber: true, status: true,
       subtotal: true, totalPaid: true, taxAmount: true, refundedAmount: true,
-      priceTier: true, paymentMethod: true, tapPayRecTradeId: true, wmOrderId: true,
+      priceTier: true, paymentMethod: true, tapPayRecTradeId: true, wmOrderId: true, cardIssuerCountry: true,
       paidAt: true, createdAt: true, bundleId: true, bundleSeq: true,
       activationEnd: true, redeemedAt: true, activatedAt: true,
       esimRcode: true, esimQrcode: true, // 僅供 deriveEsimStatus 推導狀態，不輸出
@@ -117,8 +117,8 @@ export async function GET(req: NextRequest) {
     }).label))
 
     // 金流手續費：以本次結帳實付總額計（一次結帳＝一筆 TapPay 交易）；未付款回 null → 顯示空白。
-    // 發卡國別尚未擷取，信用卡暫以國內 2.2% 計。
-    const fee = processingFee({ paymentMethod: rep.paymentMethod, totalPaid: paid, paidAt: rep.paidAt })
+    // 信用卡依發卡國別 國內2.2%/國外2.8%；擷取不到發卡國者（含舊訂單）當國內 2.2%。
+    const fee = processingFee({ paymentMethod: rep.paymentMethod, totalPaid: paid, paidAt: rep.paidAt, cardIssuerCountry: rep.cardIssuerCountry })
     if (fee != null) feeTotal += fee
 
     // 摘要統計：已付款/完成計入實收；淨收入＝實付−已退（含已退款訂單沖銷後的實際留存）

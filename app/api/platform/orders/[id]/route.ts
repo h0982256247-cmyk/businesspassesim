@@ -62,8 +62,8 @@ export async function GET(req: NextRequest, { params }: Params) {
       createdAt: order.createdAt,
       tapPayRecTradeId: order.tapPayRecTradeId,
       receiptNumber: order.receipt?.receiptNumber ?? null,
-      // 金流手續費（未付款回 null → 前端顯示「—」）。信用卡發卡國別尚未擷取，暫以國內 2.2% 計。
-      processingFee: processingFee({ paymentMethod: order.paymentMethod, totalPaid: order.totalPaid, paidAt: order.paidAt }),
+      // 金流手續費（未付款回 null → 前端顯示「—」）。信用卡依發卡國別 國內2.2%/國外2.8%；未擷取到者當國內。
+      processingFee: processingFee({ paymentMethod: order.paymentMethod, totalPaid: order.totalPaid, paidAt: order.paidAt, cardIssuerCountry: order.cardIssuerCountry }),
     },
     // eSIM 憑證欄位在 DB 加密；後台客服需要看明文（補發、對帳），解密後回傳。
     esims: esims.map(decryptEsimFields),

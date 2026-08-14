@@ -257,8 +257,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ─── Sync success: mark paid and fan out downstream ─────────────────
+  // 發卡國別（信用卡才有；LINE Pay 為 undefined）→ 存進訂單供後台手續費 國內2.2%/國外2.8% 判斷
   if (isBundle) {
-    const orders = await markBundlePaid(bundleId!, charge.recTradeId)
+    const orders = await markBundlePaid(bundleId!, charge.recTradeId, charge.cardInfo?.country)
     for (const o of orders) {
       fireAndLog('triggerEsimActivation', o.id, triggerEsimActivation(o.id))
     }
@@ -266,7 +267,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, bundleId, orderIds: orders.map(o => o.id) })
   }
 
-  await markOrderPaid(anchor.id, charge.recTradeId)
+  await markOrderPaid(anchor.id, charge.recTradeId, charge.cardInfo?.country)
   fireAndLog('triggerEsimActivation', anchor.id, triggerEsimActivation(anchor.id))
   fireAndLog('notifyOrderPaid', session.userId, notifyOrderPaid(session.userId, paidItems, amount))
 

@@ -46,7 +46,7 @@ export type TapPayChargeResult =
       // 記憶卡號：remember=true 時，TapPay 在 pay-by-prime「第一段回應」回 card_secret，
       // 須在扣款路由存起來（backend_notify 不帶這個）。
       cardSecret?: { cardKey: string; cardToken: string }
-      cardInfo?: { lastFour?: string; type?: number; funding?: number; expiryDate?: string }
+      cardInfo?: { lastFour?: string; type?: number; funding?: number; expiryDate?: string; country?: string }
     }
   | { ok: false; message: string }
 
@@ -164,7 +164,7 @@ export async function tapPayCharge(input: TapPayChargeInput): Promise<TapPayChar
 
   // 記憶卡號：remember=true 時這裡會有 card_secret / card_info（只在第一段回應）
   const cs = data.card_secret as { card_key?: string; card_token?: string } | undefined
-  const ci = data.card_info as { last_four?: string; type?: number; funding?: number; expiry_date?: string } | undefined
+  const ci = data.card_info as { last_four?: string; type?: number; funding?: number; expiry_date?: string; country_code?: string; country?: string } | undefined
 
   return {
     ok: true,
@@ -172,7 +172,7 @@ export async function tapPayCharge(input: TapPayChargeInput): Promise<TapPayChar
     bankTransactionId: data.bank_transaction_id ?? '',
     ...(data.payment_url ? { paymentUrl: data.payment_url as string } : {}),
     ...(cs?.card_key && cs?.card_token ? { cardSecret: { cardKey: cs.card_key, cardToken: cs.card_token } } : {}),
-    ...(ci ? { cardInfo: { lastFour: ci.last_four, type: ci.type, funding: ci.funding, expiryDate: ci.expiry_date } } : {}),
+    ...(ci ? { cardInfo: { lastFour: ci.last_four, type: ci.type, funding: ci.funding, expiryDate: ci.expiry_date, country: ci.country_code ?? ci.country } } : {}),
   }
 }
 
@@ -209,7 +209,7 @@ export async function tapPayChargeByToken(input: TapPayTokenChargeInput): Promis
 
   // 記憶卡號：remember=true 時這裡會有 card_secret / card_info（只在第一段回應）
   const cs = data.card_secret as { card_key?: string; card_token?: string } | undefined
-  const ci = data.card_info as { last_four?: string; type?: number; funding?: number; expiry_date?: string } | undefined
+  const ci = data.card_info as { last_four?: string; type?: number; funding?: number; expiry_date?: string; country_code?: string; country?: string } | undefined
 
   return {
     ok: true,
@@ -217,7 +217,7 @@ export async function tapPayChargeByToken(input: TapPayTokenChargeInput): Promis
     bankTransactionId: data.bank_transaction_id ?? '',
     ...(data.payment_url ? { paymentUrl: data.payment_url as string } : {}),
     ...(cs?.card_key && cs?.card_token ? { cardSecret: { cardKey: cs.card_key, cardToken: cs.card_token } } : {}),
-    ...(ci ? { cardInfo: { lastFour: ci.last_four, type: ci.type, funding: ci.funding, expiryDate: ci.expiry_date } } : {}),
+    ...(ci ? { cardInfo: { lastFour: ci.last_four, type: ci.type, funding: ci.funding, expiryDate: ci.expiry_date, country: ci.country_code ?? ci.country } } : {}),
   }
 }
 
@@ -230,7 +230,7 @@ export async function tapPayQueryTrade(
   recTradeId: string,
   gateway: string = 'tappay_credit',
 ): Promise<
-  | { ok: true; amount: number; orderNumber: string; recordStatus: number; raw: unknown }
+  | { ok: true; amount: number; orderNumber: string; recordStatus: number; cardCountry?: string; raw: unknown }
   | { ok: false; message: string; raw?: unknown }
 > {
   if (!recTradeId) return { ok: false, message: 'no rec_trade_id' }
@@ -254,11 +254,14 @@ export async function tapPayQueryTrade(
   const records: Array<Record<string, unknown>> = Array.isArray(data.trade_records) ? data.trade_records : []
   const rec = records.find(r => String(r.rec_trade_id) === recTradeId) ?? records[0]
   if (!rec) return { ok: false, message: `trade record not found (query status ${data.status} ${data.msg ?? ''})`, raw: data }
+  // 發卡國別（信用卡才有；用於後台手續費 國內2.2%/國外2.8% 判斷）
+  const rci = rec.card_info as { country_code?: string; country?: string } | undefined
   return {
     ok: true,
     amount: Number(rec.amount),
     orderNumber: String(rec.order_number ?? ''),
     recordStatus: Number(rec.record_status),
+    cardCountry: rci?.country_code ?? rci?.country,
     raw: rec,
   }
 }
