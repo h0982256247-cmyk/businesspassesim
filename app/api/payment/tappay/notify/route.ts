@@ -131,11 +131,12 @@ export async function POST(req: NextRequest) {
 
   // Mark paid — fan out across the bundle if applicable.
   let paidOrderIds: string[]
+  // 發卡國別（信用卡才有；LINE Pay 為 undefined）→ 存進訂單供後台手續費 國內2.2%/國外2.8% 判斷
   if (bundleId) {
-    const paidOrders = await markBundlePaid(bundleId, recTradeId)
+    const paidOrders = await markBundlePaid(bundleId, recTradeId, verify.cardCountry)
     paidOrderIds = paidOrders.map(o => o.id)
   } else {
-    await markOrderPaid(order.id, recTradeId)
+    await markOrderPaid(order.id, recTradeId, verify.cardCountry)
     paidOrderIds = [order.id]
   }
   console.log('[tappay-notify] marked PAID ✅', { order_number: tapPayOrderId, paidOrderIds })

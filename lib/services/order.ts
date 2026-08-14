@@ -289,13 +289,15 @@ export async function markBundleOrdersProcessing(bundleId: string, anchorOrderId
   })
 }
 
-export async function markOrderPaid(orderId: string, tapPayRecTradeId: string) {
+export async function markOrderPaid(orderId: string, tapPayRecTradeId: string, cardIssuerCountry?: string | null) {
   const order = await prisma.order.update({
     where: { id: orderId },
     data: {
       status: OrderStatus.PAID,
       tapPayRecTradeId,
       paidAt: new Date(),
+      // 發卡國別（信用卡才有）：供後台手續費 國內2.2%/國外2.8% 判斷；LINE Pay 為 undefined 不寫入
+      ...(cardIssuerCountry ? { cardIssuerCountry } : {}),
     },
   })
   // 付款完成即自動產生空白收據（非阻斷：失敗不影響付款/發卡；已建則略過）
@@ -303,14 +305,15 @@ export async function markOrderPaid(orderId: string, tapPayRecTradeId: string) {
   return order
 }
 
-export async function markBundlePaid(bundleId: string, tapPayRecTradeId: string) {
+export async function markBundlePaid(bundleId: string, tapPayRecTradeId: string, cardIssuerCountry?: string | null) {
   // Fan out the anchor's PAID status (and the shared recTradeId) to every
   // sibling in the bundle. Returns the affected order ids so the caller can
   // trigger eSIM activation per-order.
   const paidAt = new Date()
   await prisma.order.updateMany({
     where: { bundleId, status: { in: [OrderStatus.PENDING, OrderStatus.PROCESSING] } },
-    data: { status: OrderStatus.PAID, tapPayRecTradeId, paidAt },
+    // 發卡國別（信用卡才有）：供後台手續費判斷；LINE Pay 為 undefined 不寫入
+    data: { status: OrderStatus.PAID, tapPayRecTradeId, paidAt, ...(cardIssuerCountry ? { cardIssuerCountry } : {}) },
   })
   const orders = await prisma.order.findMany({
     where: { bundleId },
