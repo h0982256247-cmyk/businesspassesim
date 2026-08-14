@@ -396,17 +396,24 @@ export async function batchCreateProducts(
   // OrderItem.productId 是 FK，砍掉被買過的商品會破壞訂單歷史；下架可保留關聯且可還原。
   let deactivated = 0
   if (opts?.replaceAll) {
-    // 本次匯入涵蓋的商品（新建＋更新皆已寫入 DB，可由 plan_code / 無 plan_code 的 SKU 撈回）
-    const kept = await prisma.product.findMany({
+    // 「本次檔案真的有的」商品鍵集合 = (國家 + plan_code)。
+    // ⚠ 只比對 plan_code 會漏：區域方案同一 plan_code 常只列在某幾國，舊匯入把它
+    //   指到別國的 ghost 列 plan_code 仍在檔案內 → 會被誤留、永遠下不了架（孤兒）。
+    const fileKeys = new Set(rows.map(r => keyOf(r.countryCode, r.planCode, supplierIdMap.get(r.supplierSkuId)!)))
+    // 候選：plan_code 或（無 plan_code 時）SKU 有在檔案的既有商品（含剛更新/新建）
+    const candidates = await prisma.product.findMany({
       where: {
         OR: [
           { planCode: { in: planCodesForRows } },
           { AND: [{ planCode: null }, { supplierSkuId: { in: supplierIdsForRows } }] },
         ],
       },
-      select: { id: true },
+      select: { id: true, countryCode: true, planCode: true, supplierSkuId: true },
     })
-    const keptIds = kept.map(k => k.id)
+    // 只留「檔案真的有這個國家+方案」的；指錯國家的 ghost 不在 fileKeys → 會被下架
+    const keptIds = candidates
+      .filter(c => fileKeys.has(keyOf(c.countryCode, c.planCode, c.supplierSkuId)))
+      .map(c => c.id)
     // 防呆：撈不到任何本次商品時不動作，避免誤把全部下架
     if (keptIds.length > 0) {
       // 重匯先前被下架的方案 → 重新上架
