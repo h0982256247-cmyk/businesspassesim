@@ -19,19 +19,25 @@ export function isForeignCard(cardIssuerCountry: string | null | undefined): boo
 
 // 單筆（或單次結帳）金流手續費，四捨五入到整數。
 // 未付款（paidAt 為空）回 null → 前端/報表顯示「—」（未實際扣款、無手續費）。
+// 退款把手續費一起退回、不收取：全額退款（status=REFUNDED）手續費為 0；
+//   部分退款則以「實際留存 = 實付 − 已退」計（退掉部分的手續費也一併退回）。
 export function processingFee(input: {
   paymentMethod: PaymentMethod
   totalPaid: number
   paidAt: Date | string | null | undefined
   cardIssuerCountry?: string | null
+  status?: string | null            // 'REFUNDED' = 全額退款 → 手續費 0
+  refundedAmount?: number | null    // 累計已退金額（部分退款）
 }): number | null {
   if (!input.paidAt) return null
+  const retained = input.status === 'REFUNDED' ? 0 : Math.max(0, input.totalPaid - (input.refundedAmount ?? 0))
+  if (retained <= 0) return 0
   const bp =
     input.paymentMethod === 'LINE_PAY'
       ? FEE_BP.LINE_PAY
       : isForeignCard(input.cardIssuerCountry)
         ? FEE_BP.CREDIT_FOREIGN
         : FEE_BP.CREDIT_DOMESTIC
-  // 整數運算：實付 × 基點 為整數，再 /10000 得最多四位小數，Math.round 四捨五入到整數。
-  return Math.round((input.totalPaid * bp) / 10000)
+  // 整數運算：留存金額 × 基點 為整數，再 /10000 得最多四位小數，Math.round 四捨五入到整數。
+  return Math.round((retained * bp) / 10000)
 }
