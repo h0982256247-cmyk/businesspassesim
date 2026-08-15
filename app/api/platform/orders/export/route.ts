@@ -116,9 +116,9 @@ export async function GET(req: NextRequest) {
       activationEnd: c.activationEnd?.toISOString() ?? null,
     }).label))
 
-    // 金流手續費：以本次結帳實付總額計（一次結帳＝一筆 TapPay 交易）；未付款回 null → 顯示空白。
+    // 金流手續費：以本次結帳實付計（一次結帳＝一筆 TapPay 交易）；未付款→空白、全退→0、部分退→以留存計。
     // 信用卡依發卡國別 國內2.2%/國外2.8%；擷取不到發卡國者（含舊訂單）當國內 2.2%。
-    const fee = processingFee({ paymentMethod: rep.paymentMethod, totalPaid: paid, paidAt: rep.paidAt, cardIssuerCountry: rep.cardIssuerCountry })
+    const fee = processingFee({ paymentMethod: rep.paymentMethod, totalPaid: paid, paidAt: rep.paidAt, cardIssuerCountry: rep.cardIssuerCountry, status: rep.status, refundedAmount: refunded })
     if (fee != null) feeTotal += fee
 
     // 摘要統計：已付款/完成計入實收；淨收入＝實付−已退（含已退款訂單沖銷後的實際留存）
