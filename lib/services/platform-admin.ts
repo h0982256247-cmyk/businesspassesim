@@ -4,6 +4,11 @@ import { Prisma, AdminRole, MemberStatus } from '@prisma/client'
 
 // ─── 登入驗證 ─────────────────────────────────────────────────────
 
+// 帳號查無時拿來對比的假 hash（cost 12，與真實 hash 同成本）。
+// 目的：無論帳號存不存在都跑一次 bcrypt.compare，讓「帳號不存在」與「密碼錯誤」
+// 耗時一致，避免以回應時間枚舉出哪些 email 是管理員（timing-based user enumeration）。
+const DUMMY_HASH = '$2b$12$ycLmRrEsmHlcS3lUanRjKefvGR.t9okYij1gf1E50t7w8u8C7fvYi'
+
 export async function verifyAdminCredentials(email: string, password: string) {
   const admin = await prisma.adminUser.findFirst({
     // email 大小寫不敏感 + 去前後空白：避免自動填入帶了大寫／空白時，
@@ -12,10 +17,10 @@ export async function verifyAdminCredentials(email: string, password: string) {
     select: { id: true, email: true, passwordHash: true, name: true, role: true, isActive: true },
   })
 
-  if (!admin || !admin.isActive) return null
+  // 一律跑一次 bcrypt.compare（帳號查無時對比假 hash）→ 時序對齊，防帳號枚舉。
+  const valid = await bcrypt.compare(password, admin?.passwordHash ?? DUMMY_HASH)
 
-  const valid = await bcrypt.compare(password, admin.passwordHash)
-  if (!valid) return null
+  if (!admin || !admin.isActive || !valid) return null
 
   return { id: admin.id, email: admin.email, name: admin.name, role: admin.role }
 }

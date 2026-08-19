@@ -5,14 +5,30 @@
 // 抽出的原因：兩頁原本各寫一份幾乎相同的表單，導致「記住我」天數等文案漂移
 // （曾一邊寫 30 天、一邊寫 7 天）。表單欄位、記住我文案、登入 API 與成功導向都以此檔為準。
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+
+const REMEMBER_EMAIL_KEY = 'admin-remember-email'
 
 export default function AdminLoginForm() {
   const router = useRouter()
-  const [rememberMe, setRememberMe] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const emailRef = useRef<HTMLInputElement>(null)
+  const rememberRef = useRef<HTMLInputElement>(null)
+
+  // 勾過「記住我」的話，下次自動帶入 email（僅 email，非機密；密碼交給瀏覽器密碼管理員）。
+  // 全部用 ref 直接設值（不進 React state）：避免 hydration 不一致與 set-state-in-effect，
+  // 也與下方「送出時直接讀表單值」的做法一致。email 只在欄位還空時填，不蓋掉瀏覽器自動填入。
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_EMAIL_KEY)
+      if (saved) {
+        if (emailRef.current && !emailRef.current.value) emailRef.current.value = saved
+        if (rememberRef.current) rememberRef.current.checked = true
+      }
+    } catch { /* localStorage 不可用（無痕等）→ 略過 */ }
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -24,6 +40,7 @@ export default function AdminLoginForm() {
     const fd = new FormData(e.currentTarget)
     const email = String(fd.get('email') ?? '').trim()
     const password = String(fd.get('password') ?? '')
+    const rememberMe = fd.get('rememberMe') != null   // checkbox 勾選時才會出現在 FormData
 
     let r: { admin?: { role?: string }; error?: string } = {}
     try {
@@ -44,6 +61,11 @@ export default function AdminLoginForm() {
       setError(r.error ?? '登入失敗')
       return
     }
+    // 記住我：存 email 供下次自動帶入；取消勾選則清除。密碼一律不存（安全）。
+    try {
+      if (rememberMe) localStorage.setItem(REMEMBER_EMAIL_KEY, email)
+      else localStorage.removeItem(REMEMBER_EMAIL_KEY)
+    } catch { /* localStorage 不可用 → 略過 */ }
     // 平台/社群管理員（SUPER_ADMIN 等）一律進 /platform，後台再依角色顯示功能。
     router.replace('/platform')
   }
@@ -53,6 +75,7 @@ export default function AdminLoginForm() {
       <div>
         <label className="text-sm text-gray-600 block mb-1">電子郵件</label>
         <input
+          ref={emailRef}
           type="email"
           name="email"
           required
@@ -74,10 +97,11 @@ export default function AdminLoginForm() {
 
       <div className="flex items-center gap-2">
         <input
+          ref={rememberRef}
           id="rememberMe"
+          name="rememberMe"
           type="checkbox"
-          checked={rememberMe}
-          onChange={e => setRememberMe(e.target.checked)}
+          defaultChecked={false}
           className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
         />
         <label htmlFor="rememberMe" className="text-sm text-gray-600 cursor-pointer select-none">
