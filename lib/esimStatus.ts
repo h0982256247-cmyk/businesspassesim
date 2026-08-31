@@ -29,6 +29,10 @@ export interface EsimStatusInput {
   status: string
   esimRcode?: string | null
   esimQrcode?: string | null
+  // 轉贈後原買家拿到的訂單憑證欄位會被遮成 null（P0-5），但「有沒有」仍是進度資訊，
+  // 由 API 另外附上布林值，狀態推導才不會把已完成的卡誤判成「開卡中」。
+  hasEsimRcode?: boolean
+  hasEsimQrcode?: boolean
   redeemedAt?: string | null
   activatedAt?: string | null
   activationEnd?: string | null
@@ -75,12 +79,12 @@ export function deriveEsimStatus(o: EsimStatusInput): EsimStatusView {
     return v('inUse', '使用中', daysLeft !== null ? `剩 ${daysLeft} 天` : '', 'active')
   }
 
-  // 未激活：依 esim 欄位推進度（順序對應流程）
-  if (o.esimQrcode)
+  // 未激活：依 esim 欄位推進度（順序對應流程）。憑證被遮蔽時改看布林旗標。
+  if (o.esimQrcode || o.hasEsimQrcode)
     return v('installable', '待安裝', '掃描 QR 或一鍵安裝', 'action', true)
   if (o.redeemedAt)
     return v('generatingQr', '產生 QR 中', '正在生成安裝碼，約 1 分鐘', 'wait')
-  if (o.esimRcode && o.status === 'COMPLETED')
+  if ((o.esimRcode || o.hasEsimRcode) && o.status === 'COMPLETED')
     return v('readyToInstall', '可以安裝', '點「我要安裝」或轉贈好友', 'action', true)
   if (o.status === 'PROCESSING')
     return v('awaitingPayment', '等待付款', '正在確認付款結果', 'wait')

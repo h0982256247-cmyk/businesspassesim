@@ -5,24 +5,31 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // 早退，絕不可再次觸發發卡 / 分潤 / 發券（重送重複發卡是金流系統最不可接受的 bug）。
 // 被測單元是整個 POST handler，故 mock 它 import 的所有 service + prisma；
 // 不 mock '@prisma/client'，讓 OrderStatus enum 用真值。
-vi.mock('@/lib/db/prisma', () => ({ prisma: { order: { findFirst: vi.fn() } } }))
+vi.mock('@/lib/db/prisma', () => ({ prisma: { order: { findFirst: vi.fn(), updateMany: vi.fn(async () => ({ count: 1 })) } } }))
 vi.mock('@/lib/services/order', () => ({
-  markOrderPaid: vi.fn(), markBundlePaid: vi.fn(), markOrderFailed: vi.fn(),
-  markBundleFailed: vi.fn(), markOrderRefunded: vi.fn(), markOrderCancelled: vi.fn(),
+  markOrderPaid: vi.fn(async () => ({ ok: true })), markBundlePaid: vi.fn(async () => ({ orders: [], changed: 0 })),
+  markOrderFailed: vi.fn(async () => ({ ok: true })), markBundleFailed: vi.fn(async () => ({ count: 1 })),
+  markOrderRefunded: vi.fn(async () => ({ ok: true })), markBundleRefunded: vi.fn(async () => ({ count: 1 })),
+  markOrderCancelled: vi.fn(async () => ({ ok: true })),
   isOrderExpired: vi.fn(() => false),
 }))
 vi.mock('@/lib/services/esim', () => ({ triggerEsimActivation: vi.fn() }))
 vi.mock('@/lib/services/notification', () => ({ notifyOrderPaid: vi.fn() }))
 vi.mock('@/lib/services/alert', () => ({ recordAlert: vi.fn() }))
 vi.mock('@/lib/utils/fire-and-log', () => ({ fireAndLog: vi.fn() }))
-vi.mock('@/lib/services/tappay', () => ({ tapPayRefund: vi.fn(), tapPayQueryTrade: vi.fn() }))
+vi.mock('@/lib/services/tappay', () => ({
+  tapPayRefund: vi.fn(),
+  tapPayGatewayFor: vi.fn((m: string) => m === 'LINE_PAY' ? 'tappay_linepay' : 'tappay_credit'),
+  verifyTapPayTransactionForOrder: vi.fn(),
+  verifyTapPayFailureForOrder: vi.fn(),
+}))
 vi.mock('@/lib/services/tappay-failure-reason', () => ({ mapTapPayFailureReason: vi.fn(() => 'x') }))
 
 import { POST } from '@/app/api/payment/tappay/notify/route'
 import { prisma } from '@/lib/db/prisma'
 import { triggerEsimActivation } from '@/lib/services/esim'
 import { markOrderPaid, markOrderRefunded } from '@/lib/services/order'
-import { tapPayQueryTrade, tapPayRefund } from '@/lib/services/tappay'
+import { verifyTapPayTransactionForOrder, tapPayRefund } from '@/lib/services/tappay'
 
 const makeReq = (body: unknown) => ({ json: async () => body }) as Parameters<typeof POST>[0]
 
@@ -43,7 +50,7 @@ describe('TapPay notify — 重送冪等（不重複發卡）', () => {
     // 核心不變量：早退路徑完全不碰交付 side effect、也不重打 Record API
     expect(triggerEsimActivation).not.toHaveBeenCalled()
     expect(markOrderPaid).not.toHaveBeenCalled()
-    expect(tapPayQueryTrade).not.toHaveBeenCalled()
+    expect(verifyTapPayTransactionForOrder).not.toHaveBeenCalled()
   })
 
   it('已 COMPLETED 的訂單同樣早退、不重複發卡', async () => {
@@ -63,6 +70,8 @@ describe('TapPay notify — 取消訂單收到晚到的成功 notify → 退款�
 
   it('CANCELLED 訂單 + status=0（扣款成功）→ 立即退款、markOrderRefunded，絕不發卡/分潤/發券', async () => {
     vi.mocked(prisma.order.findFirst).mockResolvedValue(orderRow('CANCELLED') as never)
+    // P0-2：退款前先驗真（交易↔訂單綁定）。此處驗真通過，測的是通過後的退款行為。
+    vi.mocked(verifyTapPayTransactionForOrder).mockResolvedValue({ ok: true, recordStatus: 0 } as never)
     vi.mocked(tapPayRefund).mockResolvedValue({ ok: true } as never)
 
     const res = await POST(makeReq({ order_number: 'ESM-3', status: 0, rec_trade_id: 'R3' }))

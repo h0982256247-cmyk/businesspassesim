@@ -13,10 +13,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   if (!order) return NextResponse.json({ error: '訂單不存在' }, { status: 404 })
 
-  // 懶取消：PENDING 超過 30 分鐘靜默取消
+  // 懶取消：PENDING 超過 30 分鐘靜默取消。讀到 PENDING 之後、寫入之前訂單仍可能
+  // 剛付款成功（TOCTOU），故以條件式轉移的結果為準：擋下來就照實回原狀態，
+  // 不可回一個沒有真的寫進 DB 的 CANCELLED 給前端。
   if (order.status === OrderStatus.PENDING && isOrderExpired(order.createdAt)) {
-    await markOrderCancelled(id)
-    return NextResponse.json({ order: { ...order, status: 'CANCELLED' } })
+    const cancelled = await markOrderCancelled(id)
+    if (cancelled.ok) return NextResponse.json({ order: { ...order, status: 'CANCELLED' } })
   }
 
   return NextResponse.json({ order })

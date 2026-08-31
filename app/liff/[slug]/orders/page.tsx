@@ -34,6 +34,9 @@ type Order = {
   esimRcode: string | null
   esimQrcode: string | null
   esimIccid: string | null
+  // 轉贈後原買家的憑證欄位會被 server 遮成 null（P0-5），進度改看這兩個布林值
+  hasEsimRcode?: boolean
+  hasEsimQrcode?: boolean
   activationStart: string | null
   activationEnd: string | null
   redeemedAt: string | null

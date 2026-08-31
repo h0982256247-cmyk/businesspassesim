@@ -40,3 +40,25 @@ export function encryptEsimFields<T extends MaybeSecrets>(data: T): T {
 export function decryptEsimFields<T extends MaybeSecrets>(order: T): T {
   return mapSecrets(order, safeDecrypt)
 }
+
+// ─── 擁有權遮蔽（P0-5）────────────────────────────────────────────
+// 「授權」看的欄位比「加密」多一個 esimRcode：它因為要當查詢鍵所以維持明文不加密，
+// 但它是世界移動的兌換碼——拿到就能去 WM 把這張卡兌換掉，權限上與 QR/LPA 同級。
+// 兩份清單刻意放在一起，避免日後只改其中一份而漂移。
+const ESIM_CREDENTIAL_FIELDS = [...ESIM_SECRET_FIELDS, 'esimRcode'] as const
+
+type EsimCredentialField = (typeof ESIM_CREDENTIAL_FIELDS)[number]
+type MaybeCredentials = Partial<Record<EsimCredentialField, string | null | undefined>>
+
+/**
+ * 非目前擁有者（例如轉贈後的原購買者）拿到的訂單一律經過這裡：
+ * 可直接安裝／兌換／控制 eSIM 的欄位全部改成 null，其餘歷史 metadata 原樣保留。
+ * 必須在 server 端做——前端隱藏不算數，response 本身就不能帶出去。
+ */
+export function redactEsimCredentials<T extends MaybeCredentials>(order: T): T {
+  const out: MaybeCredentials = { ...order }
+  for (const f of ESIM_CREDENTIAL_FIELDS) {
+    if (f in out) out[f] = null
+  }
+  return out as T
+}

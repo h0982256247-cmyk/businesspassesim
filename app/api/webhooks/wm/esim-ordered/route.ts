@@ -4,6 +4,9 @@ import { fetchEsimCodes } from '@/lib/services/esim'
 import { markOrderCompleted } from '@/lib/services/order'
 import { OrderStatus } from '@prisma/client'
 
+// 這支會同步呼叫世界移動 2.3 回查，預設 10 秒上限不夠 → 逾時會讓 WM 反覆重送
+export const maxDuration = 60
+
 // POST /api/webhooks/wm/esim-ordered
 // 世界移動「2.2 eSIM 下單 callback（systemMail=false 時）」
 // WM 後台設定路徑：設定 → eSIM下單 API Callback URL
@@ -77,8 +80,16 @@ export async function POST(req: NextRequest) {
     return new NextResponse('0', { status: 503 })
   }
 
-  // 注意：此階段尚無 QR/LPA，要等用戶按「我要安裝」觸發 3.1 之後 3.2 callback 才有
-  await markOrderCompleted(order.id, verified)
+  // 注意：此階段尚無 QR/LPA，要等用戶按「我要安裝」觸發 3.1 之後 3.2 callback 才有。
+  // 上面的退款/取消守門是讀取當下的判斷，回查（fetchEsimCodes）期間狀態仍可能改變；
+  // markOrderCompleted 是條件式轉移，擋下來就不寫入。已 COMPLETED 則是重送的
+  // callback（already）→ 冪等，同樣回 "1" 讓 WM 停止重送，不當成錯誤。
+  const completed = await markOrderCompleted(order.id, verified)
+  if (!completed.ok && completed.result === 'invalid') {
+    console.warn('[wm-esim-ordered/2.2] 訂單已為終態，不寫入兌換碼', {
+      orderId: order.id, currentStatus: completed.current,
+    })
+  }
 
   return new NextResponse('1', { status: 200 })
 }

@@ -20,10 +20,14 @@ import { getUserById } from '@/lib/services/user'
 import { notifyOrderPaid } from '@/lib/services/notification'
 import { upsertSavedCard } from '@/lib/services/saved-card'
 import { fireAndLog } from '@/lib/utils/fire-and-log'
+import { recordAlert } from '@/lib/services/alert'
 import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { prisma } from '@/lib/db/prisma'
 import { decrypt, safeDecrypt } from '@/lib/utils/crypto'
 import { OrderStatus } from '@prisma/client'
+
+// 整捆同步付款成功時會依序等待 N 筆供應商下單完成，比照 cron 拉高執行上限避免逾時
+export const maxDuration = 60
 
 // POST /api/payment/tappay
 // Body: { orderId?, bundleId?, prime?, useToken?, remember?, returnUrl?, method? }
@@ -223,8 +227,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (!charge.ok) {
-    if (isBundle) await markBundleFailed(bundleId!)
-    else await markOrderFailed(anchor.id)
+    if (isBundle) {
+      await markBundleFailed(bundleId!)
+    } else {
+      const failed = await markOrderFailed(anchor.id)
+      // 我們這一端判定失敗，但訂單已被（先抵達的）notify 標成 PAID／COMPLETED：
+      // 狀態機擋下這次覆蓋，避免「已扣款卻顯示付款失敗」。兩邊結果相反 → 轉人工。
+      if (!failed.ok && failed.result === 'invalid') {
+        await recordAlert('payment_failure_transition_conflict', {
+          orderId: anchor.id, currentStatus: failed.current,
+          reason: charge.message ?? null, level: 'error',
+        })
+      }
+    }
     return NextResponse.json({ error: charge.message }, { status: 402 })
   }
 
@@ -257,19 +272,54 @@ export async function POST(req: NextRequest) {
   }
 
   // ─── Sync success: mark paid and fan out downstream ─────────────────
+  // 開卡必須 await 完成才回應（與 notify route 同作法）：供應商下單前會先寫入
+  // supplierOrderClaimedAt 搶佔（P0-3），若這裡維持 fire-and-forget，Vercel 在回應後
+  // 凍結函式可能讓流程停在「已 claim、還沒下單」——那張訂單會被排除在自動重試之外、
+  // 只能人工處理。await 讓 claim 與下單在同一個生命週期內走完。
   // 發卡國別（信用卡才有；LINE Pay 為 undefined）→ 存進訂單供後台手續費 國內2.2%/國外2.8% 判斷
   if (isBundle) {
-    const orders = await markBundlePaid(bundleId!, charge.recTradeId, charge.cardInfo?.country)
+    // 只拿真的處在 PAID 的訂單；整組都轉不進 PAID 代表期間已被取消／退款
+    const { orders } = await markBundlePaid(bundleId!, charge.recTradeId, charge.cardInfo?.country)
+    if (orders.length === 0) return paidTransitionConflict(anchor.id, bundleId!, charge.recTradeId)
     for (const o of orders) {
-      fireAndLog('triggerEsimActivation', o.id, triggerEsimActivation(o.id))
+      try {
+        await triggerEsimActivation(o.id)
+      } catch (e) {
+        console.error('[pay] triggerEsimActivation failed', o.id, e)
+        await recordAlert('esim_activation_failed', { orderId: o.id, error: e instanceof Error ? e.message : String(e) })
+      }
     }
     fireAndLog('notifyOrderPaid', session.userId, notifyOrderPaid(session.userId, paidItems, amount))
     return NextResponse.json({ ok: true, bundleId, orderIds: orders.map(o => o.id) })
   }
 
-  await markOrderPaid(anchor.id, charge.recTradeId, charge.cardInfo?.country)
-  fireAndLog('triggerEsimActivation', anchor.id, triggerEsimActivation(anchor.id))
+  const paid = await markOrderPaid(anchor.id, charge.recTradeId, charge.cardInfo?.country)
+  // already ＝ 先抵達的 notify 已標記 PAID（同一筆交易），照常往下走；
+  // 其餘失敗代表訂單期間被取消／退款，款項已扣但不可標 PAID、更不可發卡。
+  if (!paid.ok && paid.result !== 'already') {
+    return paidTransitionConflict(anchor.id, null, charge.recTradeId)
+  }
+  try {
+    await triggerEsimActivation(anchor.id)
+  } catch (e) {
+    console.error('[pay] triggerEsimActivation failed', anchor.id, e)
+    await recordAlert('esim_activation_failed', { orderId: anchor.id, error: e instanceof Error ? e.message : String(e) })
+  }
   fireAndLog('notifyOrderPaid', session.userId, notifyOrderPaid(session.userId, paidItems, amount))
 
   return NextResponse.json({ ok: true, orderId: anchor.id })
+}
+
+// 扣款成功、但訂單已無法轉入 PAID（期間被逾時取消／退款）。不可把終態蓋回 PAID，
+// 也不可發卡；款項是否退回需人工判斷 → 記告警轉對帳，回 409 讓使用者聯絡客服。
+// 這裡刻意不自動退款：自動退款是新的業務行為，需先確認政策（見 P0-6 報告 Race B）。
+async function paidTransitionConflict(orderId: string, bundleId: string | null, recTradeId: string) {
+  console.warn('[pay] 扣款成功但訂單已不可轉 PAID，不發卡', { orderId, bundleId })
+  await recordAlert('order_paid_transition_conflict', {
+    orderId, bundleId, recTradeId, source: 'sync_charge', level: 'error',
+  })
+  return NextResponse.json(
+    { error: '付款已送出，但此訂單已取消或退款，未完成開卡。款項處理請聯絡客服。' },
+    { status: 409 },
+  )
 }

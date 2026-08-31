@@ -54,8 +54,15 @@ export async function POST(req: NextRequest) {
   const useS = body.useSDate ? new Date(Number(body.useSDate)) : null
   const useE = body.useEDate ? new Date(Number(body.useEDate)) : null
 
-  await prisma.order.update({
-    where: { id: order.id },
+  // 條件式寫入：上面的冪等與退款守門是「讀當下」的判斷，讀到寫之間狀態仍可能改變。
+  // 帶 activatedAt: null 讓重播的 callback 不會覆蓋首次時間戳，帶狀態條件讓期間被
+  // 退款／取消的訂單不會被寫上激活時間。
+  await prisma.order.updateMany({
+    where: {
+      id: order.id,
+      activatedAt: null,
+      status: { notIn: [OrderStatus.REFUNDED, OrderStatus.CANCELLED] },
+    },
     data: {
       activatedAt: new Date(),
       ...(useS && !isNaN(useS.getTime()) ? { activationStart: useS } : {}),
