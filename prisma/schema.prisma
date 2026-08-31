@@ -213,6 +213,12 @@ model Order {
   wmOrderId   String? @unique @map("wm_order_id")
   wmOrderSn   String? @map("wm_order_sn")
   wmOrderTime String? @map("wm_order_time")
+  // 供應商下單原子搶佔（P0-3）：呼叫世界移動「之前」以條件式更新寫入，只有搶到的
+  // worker 能下單。三種狀態組合：
+  //   claimedAt = NULL, wmOrderId = NULL → 尚未下單（或前次確定失敗已釋放）→ 可下單
+  //   claimedAt ≠ NULL, wmOrderId = NULL → 下單中／結果未知 → 一律不可自動再下單
+  //   wmOrderId ≠ NULL                   → 已下單（供應商訂單編號已取得）
+  supplierOrderClaimedAt DateTime? @map("supplier_order_claimed_at")
 
   // eSIM 啟動碼（明文存 DB，嚴禁寫入 log）
   esimRcode       String?   @map("esim_rcode")
