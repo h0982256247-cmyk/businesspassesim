@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/db/prisma'
-import { encryptEsimFields, decryptEsimFields } from '@/lib/utils/esim-crypto'
+import { encryptEsimFields, decryptEsimFields, redactEsimCredentials } from '@/lib/utils/esim-crypto'
 import { OrderStatus, PaymentMethod, PriceTier, Prisma } from '@prisma/client'
 import { getProductById } from './product'
 import { isApprovedMember } from './group'
 import { ensureReceiptForOrder } from './receipt'
+import { transitionOrderStatus, allowedFromFor } from './order-transition'
 
 // ─── 訂單號生成 ───────────────────────────────────────────────────
 // 格式：ESM-YYMMDD-XXXXXX（去除易混淆字元 I/O/0/1）
@@ -262,14 +263,15 @@ export function isOrderExpired(createdAt: Date): boolean {
 
 // ─── 訂單狀態更新 ─────────────────────────────────────────────────
 
-// 只把 PENDING → PROCESSING（條件式 updateMany）。回傳是否真的取得鎖：
-// 兩個並發付款請求只有一個會 count===1，另一個 count===0 → 呼叫端中止，避免重複扣款。
+// 狀態變更一律走 order-transition 的條件式更新（compare-and-set）：合法前狀態
+// 與寫入在同一句 SQL，count===1 才算轉移成功。呼叫端要看回傳值決定後續動作，
+// 不可假設「呼叫過就一定改到了」——這正是舊 worker 覆蓋新終態的來源。
+
+// 只把 PENDING → PROCESSING。回傳是否真的取得鎖：兩個並發付款請求只有一個
+// 會拿到 ok，另一個回 false → 呼叫端中止，避免重複扣款。
 export async function markOrderProcessing(orderId: string, tapPayOrderId: string): Promise<boolean> {
-  const r = await prisma.order.updateMany({
-    where: { id: orderId, status: OrderStatus.PENDING },
-    data: { status: OrderStatus.PROCESSING, tapPayOrderId },
-  })
-  return r.count === 1
+  const r = await transitionOrderStatus(orderId, OrderStatus.PROCESSING, { tapPayOrderId })
+  return r.ok
 }
 
 export async function markBundleOrdersProcessing(bundleId: string, anchorOrderId: string, tapPayOrderId: string): Promise<boolean> {
@@ -277,32 +279,32 @@ export async function markBundleOrdersProcessing(bundleId: string, anchorOrderId
   // 以 anchor 的條件式更新當作整組的鎖：搶不到 anchor 就整組中止。
   return prisma.$transaction(async tx => {
     const anchor = await tx.order.updateMany({
-      where: { id: anchorOrderId, status: OrderStatus.PENDING },
+      where: { id: anchorOrderId, status: { in: allowedFromFor(OrderStatus.PROCESSING) } },
       data: { status: OrderStatus.PROCESSING, tapPayOrderId },
     })
     if (anchor.count !== 1) return false
     await tx.order.updateMany({
-      where: { bundleId, id: { not: anchorOrderId }, status: OrderStatus.PENDING },
+      where: { bundleId, id: { not: anchorOrderId }, status: { in: allowedFromFor(OrderStatus.PROCESSING) } },
       data: { status: OrderStatus.PROCESSING },
     })
     return true
   })
 }
 
+// 標記付款成功。合法前狀態見 order-transition：PENDING / PROCESSING / FAILED
+// （FAILED 只在 Record API 回查驗真後才可能走到，是修正錯誤的 FAILED）。
+// 已取消／已退款／已完成一律擋下 → 回 ok:false，呼叫端必須改走對帳路徑。
 export async function markOrderPaid(orderId: string, tapPayRecTradeId: string, cardIssuerCountry?: string | null) {
-  const order = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: OrderStatus.PAID,
-      tapPayRecTradeId,
-      paidAt: new Date(),
-      // 發卡國別（信用卡才有）：供後台手續費 國內2.2%/國外2.8% 判斷；LINE Pay 為 undefined 不寫入
-      ...(cardIssuerCountry ? { cardIssuerCountry } : {}),
-    },
+  const r = await transitionOrderStatus(orderId, OrderStatus.PAID, {
+    tapPayRecTradeId,
+    paidAt: new Date(),
+    // 發卡國別（信用卡才有）：供後台手續費 國內2.2%/國外2.8% 判斷；LINE Pay 為 undefined 不寫入
+    ...(cardIssuerCountry ? { cardIssuerCountry } : {}),
   })
+  if (!r.ok) return r
   // 付款完成即自動產生空白收據（非阻斷：失敗不影響付款/發卡；已建則略過）
   try { await ensureReceiptForOrder(orderId) } catch (e) { console.error('[receipt] autocreate failed', orderId, e) }
-  return order
+  return r
 }
 
 export async function markBundlePaid(bundleId: string, tapPayRecTradeId: string, cardIssuerCountry?: string | null) {
@@ -310,34 +312,37 @@ export async function markBundlePaid(bundleId: string, tapPayRecTradeId: string,
   // sibling in the bundle. Returns the affected order ids so the caller can
   // trigger eSIM activation per-order.
   const paidAt = new Date()
-  await prisma.order.updateMany({
-    where: { bundleId, status: { in: [OrderStatus.PENDING, OrderStatus.PROCESSING] } },
+  const changed = await prisma.order.updateMany({
+    where: { bundleId, status: { in: allowedFromFor(OrderStatus.PAID) } },
     // 發卡國別（信用卡才有）：供後台手續費判斷；LINE Pay 為 undefined 不寫入
     data: { status: OrderStatus.PAID, tapPayRecTradeId, paidAt, ...(cardIssuerCountry ? { cardIssuerCountry } : {}) },
   })
+  // 只回「現在確實是 PAID」的訂單：已被單張退款／逾時取消的 sibling 不會被帶進
+  // 發卡與通知流程，整組都進不了 PAID 時回空陣列，呼叫端據此走對帳路徑。
   const orders = await prisma.order.findMany({
-    where: { bundleId },
+    where: { bundleId, status: OrderStatus.PAID },
     select: { id: true, userId: true, totalPaid: true, orderItems: { select: { productName: true }, take: 1 } },
     orderBy: { bundleSeq: 'asc' },
   })
   // 付款完成即自動產生空白收據（每筆一張；非阻斷）
   try { await Promise.all(orders.map(o => ensureReceiptForOrder(o.id))) } catch (e) { console.error('[receipt] bundle autocreate failed', bundleId, e) }
-  return orders
+  // changed 是「這一次呼叫真的轉移了幾筆」。orders 會包含先前就已 PAID 的訂單，
+  // 所以並發的第二個 worker 也拿得到非空清單——要靠 changed===0 才分得出「我是後手」，
+  // 據此不重複推播（發卡另有 supplierOrderClaimedAt 搶佔把關）。
+  return { orders, changed: changed.count }
 }
 
+// 付款失敗只允許從 PENDING / PROCESSING 進入：已 PAID/COMPLETED 的訂單不可被
+// 晚到（或本地逾時誤判）的失敗結果打回 FAILED。
 export async function markOrderFailed(orderId: string, reason?: string) {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: OrderStatus.FAILED,
-      ...(reason ? { failureReason: reason } : {}),
-    },
+  return transitionOrderStatus(orderId, OrderStatus.FAILED, {
+    ...(reason ? { failureReason: reason } : {}),
   })
 }
 
 export async function markBundleFailed(bundleId: string, reason?: string) {
   return prisma.order.updateMany({
-    where: { bundleId, status: { in: [OrderStatus.PENDING, OrderStatus.PROCESSING] } },
+    where: { bundleId, status: { in: allowedFromFor(OrderStatus.FAILED) } },
     data: {
       status: OrderStatus.FAILED,
       ...(reason ? { failureReason: reason } : {}),
@@ -346,18 +351,20 @@ export async function markBundleFailed(bundleId: string, reason?: string) {
 }
 
 export async function markOrderCancelled(orderId: string, reason?: string) {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: OrderStatus.CANCELLED,
-      ...(reason ? { cancelReason: reason } : {}),
-    },
+  return transitionOrderStatus(orderId, OrderStatus.CANCELLED, {
+    ...(reason ? { cancelReason: reason } : {}),
   })
 }
 
+// 退款位階最高（只在供應商端真的退款成功後才呼叫），從任何非 REFUNDED 狀態都
+// 進得去；已是 REFUNDED 則回 already（冪等，不是錯誤）。
 export async function markOrderRefunded(orderId: string) {
-  return prisma.order.update({
-    where: { id: orderId },
+  return transitionOrderStatus(orderId, OrderStatus.REFUNDED)
+}
+
+export async function markBundleRefunded(bundleId: string) {
+  return prisma.order.updateMany({
+    where: { bundleId, status: { in: allowedFromFor(OrderStatus.REFUNDED) } },
     data: { status: OrderStatus.REFUNDED },
   })
 }
@@ -370,7 +377,8 @@ export async function cancelExpiredPendingOrders(): Promise<number> {
 
   const result = await prisma.order.updateMany({
     where: {
-      status: { in: [OrderStatus.PENDING, OrderStatus.PROCESSING] },
+      // 合法前狀態同單筆取消：已付款／已完成／已退款的訂單絕不會被 cron 掃掉
+      status: { in: allowedFromFor(OrderStatus.CANCELLED) },
       createdAt: { lt: cutoff },
     },
     data: { status: OrderStatus.CANCELLED, cancelReason: '逾時自動取消（30 分鐘未完成付款）' },
@@ -378,6 +386,9 @@ export async function cancelExpiredPendingOrders(): Promise<number> {
   return result.count
 }
 
+// 發卡完成。只允許從 PAID / ESIM_PENDING 進入：已退款／已取消的訂單不可被晚到的
+// 供應商 callback 或重試 worker 復活成 COMPLETED（Race A）；重複的完成通知會拿到
+// already（冪等），既不報錯也不會用同一份憑證重寫一次（重寫會換掉密文 IV）。
 export async function markOrderCompleted(orderId: string, esimData: {
   wmOrderId?: string
   wmOrderSn?: string
@@ -395,14 +406,8 @@ export async function markOrderCompleted(orderId: string, esimData: {
   activationStart?: Date
   activationEnd?: Date
 }) {
-  return prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: OrderStatus.COMPLETED,
-      // 憑證欄位加密後才落地（單一來源見 lib/utils/esim-crypto）
-      ...encryptEsimFields(esimData),
-    },
-  })
+  // 憑證欄位加密後才落地（單一來源見 lib/utils/esim-crypto）
+  return transitionOrderStatus(orderId, OrderStatus.COMPLETED, encryptEsimFields(esimData))
 }
 
 // ─── 查詢 ─────────────────────────────────────────────────────────
@@ -449,8 +454,13 @@ export async function getUserOrders(userId: string) {
     },
   })
   return orders.map(({ currentOwnerId, transfer, ...o }) => ({
-    // 憑證欄位在 DB 為密文，回前端前解密（safeDecrypt 相容舊明文）
-    ...decryptEsimFields(o),
+    // 憑證欄位在 DB 為密文，回前端前解密（safeDecrypt 相容舊明文）；
+    // 但只有目前擁有者能拿到值——轉贈出去之後原買家只剩歷史 metadata（P0-5）。
+    ...decryptEsimFields(currentOwnerId === userId ? o : redactEsimCredentials(o)),
+    // 憑證「有沒有」是進度資訊、不是憑證本身：deriveEsimStatus 只用得到布林值，
+    // 遮蔽後仍要能正確顯示「這張卡進行到哪一步」。
+    hasEsimRcode: !!o.esimRcode,
+    hasEsimQrcode: !!o.esimQrcode,
     transferredAway: o.userId === userId && currentOwnerId !== userId,   // 我買的、已轉贈出去
     receivedGift: currentOwnerId === userId && o.userId !== userId,      // 我收到的轉贈
     gift: transfer ? {
@@ -519,10 +529,15 @@ export async function getOrderByIdForUser(orderId: string, userId: string) {
   })
   if (!o) return null
   const { currentOwnerId, transfer, ...rest } = o
+  const isCurrentOwner = currentOwnerId === userId
   return {
-    // 憑證欄位在 DB 為密文，回前端前解密（safeDecrypt 相容舊明文）
-    ...decryptEsimFields(rest),
-    isCurrentOwner: currentOwnerId === userId,                           // 只有目前擁有者可安裝/轉贈
+    // 憑證欄位在 DB 為密文，回前端前解密（safeDecrypt 相容舊明文）；
+    // 只有目前擁有者拿得到值，轉贈後原買家一律遮蔽（P0-5）。一鍵安裝網址由 esimLpa
+    // 在前端組出來，因此遮掉 esimLpa 等同連 derived install URL 一起拿掉。
+    ...decryptEsimFields(isCurrentOwner ? rest : redactEsimCredentials(rest)),
+    hasEsimRcode: !!rest.esimRcode,
+    hasEsimQrcode: !!rest.esimQrcode,
+    isCurrentOwner,                                                      // 只有目前擁有者可安裝/轉贈
     transferredAway: rest.userId === userId && currentOwnerId !== userId,
     receivedGift: currentOwnerId === userId && rest.userId !== userId,
     gift: transfer ? {

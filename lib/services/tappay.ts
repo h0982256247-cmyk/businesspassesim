@@ -2,6 +2,7 @@
 
 // 金鑰一律經 tenant-config service 解密讀取（單一來源，route/service 不各寫一套）
 import { getPaymentConfig } from '@/lib/services/tenant-config'
+import type { PaymentMethod } from '@prisma/client'
 
 export interface TapPayChargeInput {
   prime: string
@@ -230,11 +231,23 @@ export async function tapPayQueryTrade(
   recTradeId: string,
   gateway: string = 'tappay_credit',
 ): Promise<
-  | { ok: true; amount: number; orderNumber: string; recordStatus: number; cardCountry?: string; raw: unknown }
+  | {
+      ok: true
+      recTradeId: string
+      amount: number
+      currency?: string
+      orderNumber: string
+      recordStatus: number
+      merchantId?: string
+      /** 這次查詢所用 gateway 的商店代號（我方設定值），供 merchant identity 比對 */
+      queriedMerchantId: string
+      cardCountry?: string
+      raw: unknown
+    }
   | { ok: false; message: string; raw?: unknown }
 > {
   if (!recTradeId) return { ok: false, message: 'no rec_trade_id' }
-  const { partnerKey, baseUrl } = await getConfig(gateway)
+  const { partnerKey, merchantId: queriedMerchantId, baseUrl } = await getConfig(gateway)
 
   const res = await fetch(`${baseUrl}/transaction/query`, {
     method: 'POST',
@@ -252,27 +265,179 @@ export async function tapPayQueryTrade(
   //   正常標記、不是錯誤。所以不能用 data.status 判斷成敗，要直接看 trade_records
   //   裡有沒有對應 rec_trade_id 的那筆。
   const records: Array<Record<string, unknown>> = Array.isArray(data.trade_records) ? data.trade_records : []
-  const rec = records.find(r => String(r.rec_trade_id) === recTradeId) ?? records[0]
+  // 只認 rec_trade_id 完全相符的那筆。舊寫法在找不到時退回 records[0]，等於「filter 沒
+  // 生效時改用 TapPay 隨便回的一筆交易來驗真」——那正是要防的張冠李戴（P0-1）。
+  const rec = records.find(r => String(r.rec_trade_id) === recTradeId)
   if (!rec) return { ok: false, message: `trade record not found (query status ${data.status} ${data.msg ?? ''})`, raw: data }
   // 發卡國別（信用卡才有；用於後台手續費 國內2.2%/國外2.8% 判斷）
   const rci = rec.card_info as { country_code?: string; country?: string } | undefined
   return {
     ok: true,
+    recTradeId: String(rec.rec_trade_id),
     amount: Number(rec.amount),
+    currency: rec.currency == null ? undefined : String(rec.currency),
     orderNumber: String(rec.order_number ?? ''),
     recordStatus: Number(rec.record_status),
+    merchantId: rec.merchant_id == null ? undefined : String(rec.merchant_id),
+    queriedMerchantId,
     cardCountry: rci?.country_code ?? rci?.country,
     raw: rec,
   }
 }
 
+// ─── 交易 ↔ 本地訂單綁定驗真（P0-1 / P0-2）──────────────────────────
+// TapPay notify 是無簽章的公開 endpoint，body（order_number / rec_trade_id / status）
+// 完全由呼叫端決定。只確認「這個 rec_trade_id 查得到、金額對」不足以證明這筆交易是
+// 「這張訂單」的付款：兩張同金額訂單之間可以互相冒用。任何會讓訂單進入 PAID /
+// FAILED / REFUND 的流程都必須走這裡，期望值一律由呼叫端從 DB 取
+// （server-side authoritative），不可用 webhook body 當期望值。
+//
+// 綁定核心只有一份（bindTapPayTradeToOrder），兩個對外函式差在「綁定成立之後，
+// provider 端的交易狀態必須是成功還是不成功」：
+//   verifyTapPayTransactionForOrder → 承認付款 / 退款前用（必須成功且金額相符）
+//   verifyTapPayFailureForOrder     → 承認付款失敗前用（必須確實不是成功狀態）
+export type TapPayVerifyFailure =
+  | 'missing_expected'
+  | 'trade_not_found'
+  | 'rec_trade_id_mismatch'
+  | 'order_number_mismatch'
+  | 'amount_mismatch'
+  | 'currency_mismatch'
+  | 'merchant_mismatch'
+  | 'record_status_not_paid'
+  | 'record_status_not_failed'
+
+export interface TapPayTransactionBinding {
+  /** 正在處理的交易編號（webhook body 或 DB 既存值） */
+  recTradeId: string
+  /** 期望的 TapPay order_number＝Order.tapPayOrderId（DB 值，非 webhook body） */
+  orderNumber: string
+  /** 期望的付款方式（DB 值）→ 決定 gateway 與商店代號 */
+  paymentMethod: PaymentMethod
+}
+
+export interface TapPayExpectedTransaction extends TapPayTransactionBinding {
+  /** 期望的應付金額（bundle＝整組加總；DB 值） */
+  amount: number
+}
+
+export type TapPayVerifyResult =
+  | { ok: true; recordStatus: number; cardCountry?: string }
+  | { ok: false; reason: TapPayVerifyFailure; detail: Record<string, unknown> }
+
+// 付款方式 → TapPay gateway（PaymentConfig.gateway）。查詢與退款都必須用「該訂單
+// 實際付款的那個商店」設定，故放在這裡當單一來源，不要在各 route 自己寫三元式。
+export function tapPayGatewayFor(paymentMethod: PaymentMethod): string {
+  return paymentMethod === 'LINE_PAY' ? 'tappay_linepay' : 'tappay_credit'
+}
+
+// record_status（TapPay Record API）：
+//   0 = 已授權未請款（信用卡；TapPay 會在 cap_millis 自動請款）
+//   1 = 交易完成／已請款（LINE Pay 即時請款）
+// 兩者都代表「款項已成立」；其餘（-1 錯誤／2,3 退款／4 待付款／5 取消）都不是。
+const PAID_RECORD_STATUS = [0, 1]
+
+type TapPayQueriedTrade = Extract<Awaited<ReturnType<typeof tapPayQueryTrade>>, { ok: true }>
+
+// 綁定核心：證明「這筆 provider 交易屬於這張本地訂單」。不判斷付款成功與否。
+async function bindTapPayTradeToOrder(
+  expected: TapPayTransactionBinding,
+): Promise<{ ok: true; trade: TapPayQueriedTrade; gateway: string } | { ok: false; reason: TapPayVerifyFailure; detail: Record<string, unknown> }> {
+  if (!expected.recTradeId || !expected.orderNumber) {
+    // 期望值不齊全就不可能完成綁定比對（例如 webhook 沒帶 rec_trade_id、或訂單
+    // 還沒寫入 tapPayOrderId）→ 一律不放行，不猜。
+    return { ok: false, reason: 'missing_expected', detail: { hasRecTradeId: !!expected.recTradeId, hasOrderNumber: !!expected.orderNumber } }
+  }
+
+  const gateway = tapPayGatewayFor(expected.paymentMethod)
+  const trade = await tapPayQueryTrade(expected.recTradeId, gateway)
+  if (!trade.ok) {
+    return { ok: false, reason: 'trade_not_found', detail: { gateway, message: trade.message } }
+  }
+
+  // 交易編號：Record API 回來的必須就是我們正在處理的那筆
+  if (trade.recTradeId !== expected.recTradeId) {
+    return { ok: false, reason: 'rec_trade_id_mismatch', detail: { gateway } }
+  }
+
+  // ★ 綁定核心：provider 端記錄的 order_number 必須等於這張訂單的 tapPayOrderId。
+  //   少了這一條，任何一筆合法交易都能拿去付（或退）「別張訂單」。
+  if (trade.orderNumber !== expected.orderNumber) {
+    return {
+      ok: false,
+      reason: 'order_number_mismatch',
+      detail: { gateway, expectedOrderNumber: expected.orderNumber, gotOrderNumber: trade.orderNumber },
+    }
+  }
+
+  // Merchant identity：LINE Pay 與信用卡在 TapPay 後台是不同商店代號，比對商店等於
+  // 同時確認 gateway 沒被張冠李戴（partner_key 兩者可能共用，擋不住）。採「有回才比」
+  // ——env fallback 下兩個 gateway 可能設同一個 merchant_id。
+  if (trade.merchantId && trade.merchantId !== trade.queriedMerchantId) {
+    return { ok: false, reason: 'merchant_mismatch', detail: { gateway } }
+  }
+
+  return { ok: true, trade, gateway }
+}
+
+// 承認「這筆交易是這張訂單的成功付款」——標記 PAID 與退款前都必須先過這關。
+export async function verifyTapPayTransactionForOrder(
+  expected: TapPayExpectedTransaction,
+): Promise<TapPayVerifyResult> {
+  if (!(expected.amount > 0)) {
+    return { ok: false, reason: 'missing_expected', detail: { amount: expected.amount } }
+  }
+
+  const bound = await bindTapPayTradeToOrder(expected)
+  if (!bound.ok) return bound
+  const { trade, gateway } = bound
+
+  if (trade.amount !== expected.amount) {
+    return { ok: false, reason: 'amount_mismatch', detail: { gateway, expectedAmount: expected.amount, gotAmount: trade.amount } }
+  }
+
+  // 幣別：金額比對要同幣別才有意義。TapPay 未回該欄位時不作為否決依據（欄位缺漏
+  // 不應讓正常付款全數卡住），其餘綁定條件已足以擋掉張冠李戴。
+  if (trade.currency && trade.currency !== 'TWD') {
+    return { ok: false, reason: 'currency_mismatch', detail: { gateway, gotCurrency: trade.currency } }
+  }
+
+  if (!PAID_RECORD_STATUS.includes(trade.recordStatus)) {
+    return { ok: false, reason: 'record_status_not_paid', detail: { gateway, recordStatus: trade.recordStatus } }
+  }
+
+  return { ok: true, recordStatus: trade.recordStatus, cardCountry: trade.cardCountry }
+}
+
+// 承認「這筆交易是這張訂單的失敗／取消」——標記 FAILED 前必須先過這關。
+// 不比對金額：授權失敗的交易 provider 端金額不一定等於應付金額（可能是 0）。
+// 反向守門同樣重要：webhook 說失敗、但 provider 顯示已成功付款時一律不放行，
+// 避免把真的付掉的訂單標成 FAILED。
+export async function verifyTapPayFailureForOrder(
+  expected: TapPayTransactionBinding,
+): Promise<TapPayVerifyResult> {
+  const bound = await bindTapPayTradeToOrder(expected)
+  if (!bound.ok) return bound
+  const { trade, gateway } = bound
+
+  if (PAID_RECORD_STATUS.includes(trade.recordStatus)) {
+    return { ok: false, reason: 'record_status_not_failed', detail: { gateway, recordStatus: trade.recordStatus } }
+  }
+
+  return { ok: true, recordStatus: trade.recordStatus }
+}
+
 // ─── 退款 ──────────────────────────────────────────────────────────
 
+// gateway 為必填：退款一定要用「該訂單實際付款的那個商店」設定（見 tapPayGatewayFor）。
+// 過去寫死 tappay_credit，LINE Pay 訂單會拿信用卡的 partner_key / merchant_id 去退款
+// （退款失敗或退到錯的商店）。留預設值等於把這個 bug 留成預設行為，故不給預設值。
 export async function tapPayRefund(
   recTradeId: string,
   amount: number,
+  gateway: string,
 ): Promise<{ ok: boolean; message?: string }> {
-  const { partnerKey, baseUrl } = await getConfig('tappay_credit')
+  const { partnerKey, baseUrl } = await getConfig(gateway)
 
   const res = await fetch(`${baseUrl}/transaction/refund`, {
     method: 'POST',

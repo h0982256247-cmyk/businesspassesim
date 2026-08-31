@@ -102,7 +102,16 @@ const ALERT_LABEL: Record<string, string> = {
   wm_order_no_item:              '訂單缺品項',
   esim_activation_exhausted:     '開卡多次重試仍失敗（需人工）',
   esim_retry_exception:          '開卡自動重試異常',
+  wm_order_unknown_outcome:      '供應商下單結果未知（需人工對帳，系統不會自動重下單）',
+  wm_order_claim_stuck:          '供應商下單佔用中未解（需人工對帳）',
+  wm_redeemed_verify_failed:     '兌換憑證驗真失敗（疑似偽造 callback）',
+  wm_redeemed_query_unverified:  '兌換憑證未經回查確認（已照 callback 寫入，建議抽查）',
+  esim_redeem_owner_changed:     '兌換期間擁有者已變更（需人工確認卡歸屬）',
   payment_verify_failed:         '金流驗真失敗',
+  refund_verify_failed:          '退款驗真失敗（交易與訂單不符）',
+  refund_failed:                 '退款打款失敗（款項未退回，需人工處理）',
+  refund_claim_conflict:         '退款重複觸發（已擋下，不重複打款）',
+  payment_failure_verify_failed: '付款失敗通知驗真失敗',
   notifyOrderPaid:               '付款通知失敗',
 }
 

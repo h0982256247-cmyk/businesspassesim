@@ -51,7 +51,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       data: { status: OrderStatus.CANCELLED, cancelReason: reason },
     })
   } else {
-    await markOrderCancelled(order.id, reason)
+    // 上面的狀態檢查與這次寫入之間，付款仍可能成功（TOCTOU）。條件式轉移擋下來
+    // 就回 409，不可回 ok 讓使用者以為已取消（實際已付款）。
+    const cancelled = await markOrderCancelled(order.id, reason)
+    if (!cancelled.ok && cancelled.result !== 'already') {
+      return NextResponse.json(
+        { error: '訂單狀態已變更（可能付款已完成），無法取消' },
+        { status: 409 },
+      )
+    }
   }
 
   return NextResponse.json({ ok: true })

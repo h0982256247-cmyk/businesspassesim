@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const order = await getOrderForOwner(id, auth.userId, { id: true })
   if (!order) return NextResponse.json({ error: '訂單不存在' }, { status: 404 })
 
-  const r = await triggerEsimRedemption(id)
+  const r = await triggerEsimRedemption(id, auth.userId)
   if (!r.ok) return NextResponse.json({ error: r.reason }, { status: 422 })
 
   return NextResponse.json({ ok: true })

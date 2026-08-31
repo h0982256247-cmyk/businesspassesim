@@ -7,7 +7,7 @@ import crypto from 'crypto'
 //   回應 itemList[0].redemptionCode → esimRcode（曾經整套寫錯導致補發永遠 404 空轉）。
 vi.mock('@/lib/db/prisma', () => ({ prisma: { order: { findUnique: vi.fn() } } }))
 vi.mock('@/lib/services/tenant-config', () => ({ getEsimConfig: vi.fn() }))
-vi.mock('@/lib/services/order', () => ({ markOrderCompleted: vi.fn() }))
+vi.mock('@/lib/services/order', () => ({ markOrderCompleted: vi.fn(async () => ({ ok: true })) }))
 vi.mock('@/lib/services/notification', () => ({ notifyEsimPending: vi.fn(() => Promise.resolve()) }))
 vi.mock('@/lib/services/alert', () => ({ recordAlert: vi.fn(() => Promise.resolve()) }))
 

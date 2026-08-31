@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/lib/db/prisma', () => ({
   prisma: { order: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() } },
 }))
-vi.mock('@/lib/services/order', () => ({ markOrderCompleted: vi.fn() }))
+vi.mock('@/lib/services/order', () => ({ markOrderCompleted: vi.fn(async () => ({ ok: true })) }))
 vi.mock('@/lib/services/notification', () => ({
   notifyEsimReady: vi.fn(() => Promise.resolve()),
   notifyEsimPending: vi.fn(() => Promise.resolve()),
