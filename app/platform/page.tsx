@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { OrderStatusBadge } from '@/components/platform/OrderStatusBadge'
 
-type MonthlyRevenue = { month: string; revenue: number; grossProfit: number }
+type MonthlyRevenue = { month: string; revenue: number; cost: number; grossProfit: number }
 
 type RecentOrder = {
   id: string
@@ -109,10 +109,13 @@ function TrendChart({ data }: { data: MonthlyRevenue[] }) {
   )
 }
 
-function MetricCard({ icon, tint, label, value, change, spark, sparkColor, foot }: {
+function MetricCard({ icon, tint, label, value, change, upIsGood = true, spark, sparkColor, foot, months }: {
   icon: React.ReactNode; tint: string; label: string; value: string
-  change?: number | null; spark?: number[] | null; sparkColor?: string; foot?: string
+  change?: number | null; upIsGood?: boolean; spark?: number[] | null; sparkColor?: string; foot?: string
+  months?: { label: string; value: string }[]
 }) {
+  // 成本上升是壞事 → upIsGood=false 時把漲跌配色反過來，避免紅綠誤導。
+  const changeGood = change != null && (change >= 0) === upIsGood
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center gap-2.5">
@@ -122,7 +125,7 @@ function MetricCard({ icon, tint, label, value, change, spark, sparkColor, foot 
       <p className="text-2xl font-extrabold text-gray-800 mt-3 leading-none">{value}</p>
       <div className="flex items-end justify-between mt-2 h-[30px]">
         {change != null ? (
-          <span className={`text-xs font-medium ${change >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+          <span className={`text-xs font-medium ${changeGood ? 'text-green-600' : 'text-red-500'}`}>
             較上月 {change >= 0 ? '↑' : '↓'} {Math.abs(change)}%
           </span>
         ) : foot ? (
@@ -130,6 +133,16 @@ function MetricCard({ icon, tint, label, value, change, spark, sparkColor, foot 
         ) : <span />}
         {spark && spark.length > 1 && <Sparkline values={spark} color={sparkColor ?? '#3b82f6'} />}
       </div>
+      {months && (
+        <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-gray-100">
+          {months.map(m => (
+            <div key={m.label}>
+              <p className="text-[11px] text-gray-400 whitespace-nowrap">{m.label}</p>
+              <p className="text-sm font-bold text-gray-700 mt-0.5 whitespace-nowrap">{m.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -198,9 +211,18 @@ export default function PlatformDashboard() {
   const revPrev = mr.at(-2)?.revenue ?? 0
   const proThis = mr.at(-1)?.grossProfit ?? 0
   const proPrev = mr.at(-2)?.grossProfit ?? 0
+  const costThis = mr.at(-1)?.cost ?? 0
+  const costPrev = mr.at(-2)?.cost ?? 0
   const pct = (cur: number, prev: number) => prev === 0 ? null : Math.round(((cur - prev) / Math.abs(prev)) * 100)
   const revChange = pct(revThis, revPrev)
   const proChange = pct(proThis, proPrev)
+  const costChange = pct(costThis, costPrev)
+
+  // 卡片內的近三個月拆分（當月／上月／上上月）；毛利可能為負，負號放在 NT$ 前面。
+  const money = (v: number) => `${v < 0 ? '-' : ''}NT$${Math.abs(v).toLocaleString()}`
+  const monthCells = (pick: (m: MonthlyRevenue) => number) =>
+    ([['當月', mr.at(-1)], ['上月', mr.at(-2)], ['上上月', mr.at(-3)]] as [string, MonthlyRevenue | undefined][])
+      .map(([name, m]) => ({ label: m ? `${name} · ${m.month}` : name, value: m ? money(pick(m)) : '—' }))
 
   const today = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
 
@@ -219,14 +241,24 @@ export default function PlatformDashboard() {
         </Link>
       </div>
 
-      {/* KPI metric cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      {/* 財務 KPI：累計值 + 近三個月拆分（當月／上月／上上月）*/}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard tint="bg-blue-50 text-blue-600" label="累計營收"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 9v1m0-10c1.11 0 2.08.402 2.599 1M9.4 15c.52.6 1.49 1 2.6 1" /></svg>}
-          value={`NT$${stats.totalRevenue.toLocaleString()}`} change={revChange} spark={mr.map(d => d.revenue)} sparkColor="#3b82f6" />
+          value={`NT$${stats.totalRevenue.toLocaleString()}`} change={revChange} spark={mr.map(d => d.revenue)} sparkColor="#3b82f6"
+          months={monthCells(m => m.revenue)} />
         <MetricCard tint="bg-emerald-50 text-emerald-600" label="累計毛利"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 7h-5m5 0v5" /></svg>}
-          value={`NT$${stats.grossProfit.toLocaleString()}`} change={proChange} spark={mr.map(d => Math.max(d.grossProfit, 0))} sparkColor="#10b981" />
+          value={`NT$${stats.grossProfit.toLocaleString()}`} change={proChange} spark={mr.map(d => Math.max(d.grossProfit, 0))} sparkColor="#10b981"
+          months={monthCells(m => m.grossProfit)} />
+        <MetricCard tint="bg-rose-50 text-rose-600" label="累計成本"
+          icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7l6 6 4-4 8 8" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 17h-5m5 0v-5" /></svg>}
+          value={`NT$${stats.totalCost.toLocaleString()}`} change={costChange} upIsGood={false} spark={mr.map(d => d.cost)} sparkColor="#f43f5e"
+          months={monthCells(m => m.cost)} />
+      </div>
+
+      {/* 營運 KPI */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <MetricCard tint="bg-violet-50 text-violet-600" label="訂單總數"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
           value={stats.totalOrders.toLocaleString()} foot={stats.esimPendingOrders > 0 ? `待發卡 ${stats.esimPendingOrders} 張` : '全部已處理'} />
@@ -261,7 +293,6 @@ export default function PlatformDashboard() {
             <QuickStat href="/platform/orders?status=PAID" label="付款成功・待發卡" value={`${stats.esimPendingOrders} 張`} tone={stats.esimPendingOrders > 0 ? 'text-red-500' : 'text-gray-700'} />
             <QuickStat href="/platform/groups" label="待審核成員" value={`${stats.pendingMembers} 人`} tone={stats.pendingMembers > 0 ? 'text-amber-600' : 'text-gray-700'} />
             <QuickStat href="/platform/groups" label="企業數" value={`${stats.totalCompanies} 家`} tone="text-gray-700" />
-            <QuickStat label="累計成本" value={`NT$${stats.totalCost.toLocaleString()}`} tone="text-gray-700" />
           </div>
         </div>
       </div>

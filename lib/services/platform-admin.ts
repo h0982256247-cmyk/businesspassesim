@@ -241,7 +241,7 @@ export async function getDashboardStats() {
 
   // Recent 6 months: revenue + grossProfit
   const now = new Date()
-  const monthlyRevenue: { month: string; revenue: number; grossProfit: number }[] = []
+  const monthlyRevenue: { month: string; revenue: number; cost: number; grossProfit: number }[] = []
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const nextD = new Date(now.getFullYear(), now.getMonth() - i + 1, 1)
@@ -256,6 +256,8 @@ export async function getDashboardStats() {
     monthlyRevenue.push({
       month: `${d.getMonth() + 1}月`,
       revenue: agg._sum.totalPaid ?? 0,
+      // 成本與毛利同基準（僅納入品項有成本快照的訂單），與 totalCost / grossProfit 一致。
+      cost: m.cost,
       grossProfit: m.grossProfit,
     })
   }
