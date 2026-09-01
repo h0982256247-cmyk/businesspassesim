@@ -135,8 +135,8 @@ function MetricCard({ icon, tint, label, value, change, upIsGood = true, spark, 
       </div>
       {months && (
         <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-gray-100">
-          {months.map(m => (
-            <div key={m.label}>
+          {months.map((m, i) => (
+            <div key={i}>
               <p className="text-[11px] text-gray-400 whitespace-nowrap">{m.label}</p>
               <p className="text-sm font-bold text-gray-700 mt-0.5 whitespace-nowrap">{m.value}</p>
             </div>
@@ -218,11 +218,10 @@ export default function PlatformDashboard() {
   const proChange = pct(proThis, proPrev)
   const costChange = pct(costThis, costPrev)
 
-  // 卡片內的近三個月拆分（當月／上月／上上月）；毛利可能為負，負號放在 NT$ 前面。
+  // 卡片內的近三個月拆分（由近到遠，只標月份）；毛利可能為負，負號放在 NT$ 前面。
   const money = (v: number) => `${v < 0 ? '-' : ''}NT$${Math.abs(v).toLocaleString()}`
   const monthCells = (pick: (m: MonthlyRevenue) => number) =>
-    ([['當月', mr.at(-1)], ['上月', mr.at(-2)], ['上上月', mr.at(-3)]] as [string, MonthlyRevenue | undefined][])
-      .map(([name, m]) => ({ label: m ? `${name} · ${m.month}` : name, value: m ? money(pick(m)) : '—' }))
+    [mr.at(-1), mr.at(-2), mr.at(-3)].map(m => ({ label: m?.month ?? '—', value: m ? money(pick(m)) : '—' }))
 
   const today = new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
 
@@ -241,19 +240,19 @@ export default function PlatformDashboard() {
         </Link>
       </div>
 
-      {/* 財務 KPI：累計值 + 近三個月拆分（當月／上月／上上月）*/}
+      {/* 財務 KPI：本月值 + 近三個月拆分（當月／上月／上上月）*/}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard tint="bg-blue-50 text-blue-600" label="累計營收"
+        <MetricCard tint="bg-blue-50 text-blue-600" label="本月營收"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 9v1m0-10c1.11 0 2.08.402 2.599 1M9.4 15c.52.6 1.49 1 2.6 1" /></svg>}
-          value={`NT$${stats.totalRevenue.toLocaleString()}`} change={revChange} spark={mr.map(d => d.revenue)} sparkColor="#3b82f6"
+          value={money(revThis)} change={revChange} spark={mr.map(d => d.revenue)} sparkColor="#3b82f6"
           months={monthCells(m => m.revenue)} />
-        <MetricCard tint="bg-emerald-50 text-emerald-600" label="累計毛利"
+        <MetricCard tint="bg-emerald-50 text-emerald-600" label="本月毛利"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 17l6-6 4 4 8-8" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 7h-5m5 0v5" /></svg>}
-          value={`NT$${stats.grossProfit.toLocaleString()}`} change={proChange} spark={mr.map(d => Math.max(d.grossProfit, 0))} sparkColor="#10b981"
+          value={money(proThis)} change={proChange} spark={mr.map(d => Math.max(d.grossProfit, 0))} sparkColor="#10b981"
           months={monthCells(m => m.grossProfit)} />
-        <MetricCard tint="bg-rose-50 text-rose-600" label="累計成本"
+        <MetricCard tint="bg-rose-50 text-rose-600" label="本月成本"
           icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7l6 6 4-4 8 8" /><path strokeLinecap="round" strokeLinejoin="round" d="M21 17h-5m5 0v-5" /></svg>}
-          value={`NT$${stats.totalCost.toLocaleString()}`} change={costChange} upIsGood={false} spark={mr.map(d => d.cost)} sparkColor="#f43f5e"
+          value={money(costThis)} change={costChange} upIsGood={false} spark={mr.map(d => d.cost)} sparkColor="#f43f5e"
           months={monthCells(m => m.cost)} />
       </div>
 
