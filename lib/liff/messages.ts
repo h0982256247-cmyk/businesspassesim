@@ -314,6 +314,8 @@ const zh = {
     itemSupportSub: '問題回報與聯絡',
     itemLineOa: '聯繫客服',
     itemLineOaSub: 'LINE 官方帳號線上諮詢',
+    itemPrivacy: '隱私權政策',
+    itemPrivacySub: '個人資料蒐集與使用說明',
     incompleteTitle: '個人資料未填寫',
     incompleteSub: '填寫後才能完成結帳',
     setupSubtitleFilled: '更新你的基本資料',
@@ -368,6 +370,72 @@ const zh = {
       { q: '啟動碼多久會寄出？', a: '通常付款後 5 分鐘內完成。若超過 30 分鐘，請聯繫 LINE 客服。' },
       { q: '可以退款嗎？', a: '啟動碼尚未使用前，可聯繫客服申請退款。已安裝使用的 eSIM 恕不退款。' },
     ],
+  },
+  // 隱私權政策（內容來源：「商務通 隱私政策」文件）
+  privacy: {
+    title: '隱私權政策',
+    intro: '非常歡迎您光臨「商務通網站」（以下簡稱本網站），為了讓您能夠安心使用本網站的各項服務與資訊，特此向您說明本網站的隱私權保護政策，以保障您的權益，請您詳閱下列內容：',
+    sections: [
+      {
+        h: '一、隱私權保護政策的適用範圍',
+        body: ['隱私權保護政策內容，包括本網站如何處理在您使用網站服務時收集到的個人識別資料。隱私權保護政策不適用於本網站以外的相關連結網站，也不適用於非本網站所委託或參與管理的人員。'],
+        items: [] as string[],
+      },
+      {
+        h: '二、個人資料的蒐集、處理及利用方式',
+        body: [
+          '當您造訪本網站或使用本網站所提供之功能服務時，我們將視該服務功能性質，請您提供必要的個人資料，並在該特定目的範圍內處理及利用您的個人資料；非經您書面同意，本網站不會將個人資料用於其他用途。',
+          '本網站在您使用服務信箱、問卷調查等互動性功能時，會保留您所提供的姓名、電子郵件地址、聯絡方式及使用時間等。',
+          '於一般瀏覽時，伺服器會自行記錄相關行徑，包括您使用連線設備的IP位址、使用時間、使用的瀏覽器、瀏覽及點選資料記錄等，做為我們增進網站服務的參考依據，此記錄為內部應用，決不對外公佈。',
+          '為提供精確的服務，我們會將收集的問卷調查內容進行統計與分析，分析結果之統計數據或說明文字呈現，除供內部研究外，我們會視需要公佈統計數據及說明文字，但不涉及特定個人之資料。',
+          '您可以隨時向我們提出請求，以更正或刪除您的帳戶或本網站所蒐集的個人資料等隱私資訊。聯繫方式請見最下方聯繫管道。',
+        ],
+        items: [],
+      },
+      {
+        h: '三、資料之保護',
+        body: [
+          '本網站主機均設有防火牆、防毒系統等相關的各項資訊安全設備及必要的安全防護措施，加以保護網站及您的個人資料採用嚴格的保護措施，只由經過授權的人員才能接觸您的個人資料，相關處理人員皆簽有保密合約，如有違反保密義務者，將會受到相關的法律處分。',
+          '如因業務需要有必要委託其他單位提供服務時，本網站亦會嚴格要求其遵守保密義務，並且採取必要檢查程序以確定其將確實遵守。',
+        ],
+        items: [],
+      },
+      {
+        h: '四、網站對外的相關連結',
+        body: ['本網站的網頁提供其他網站的網路連結，您也可經由本網站所提供的連結，點選進入其他網站。但該連結網站不適用本網站的隱私權保護政策，您必須參考該連結網站中的隱私權保護政策。'],
+        items: [],
+      },
+      {
+        h: '五、與第三人共用個人資料之政策',
+        body: [
+          '本網站絕不會提供、交換、出租或出售任何您的個人資料給其他個人、團體、私人企業或公務機關，但有法律依據或合約義務者，不在此限。',
+          '前項但書之情形包括不限於：',
+        ],
+        items: [
+          '經由您書面同意。',
+          '法律明文規定。',
+          '為免除您生命、身體、自由或財產上之危險。',
+          '與公務機關或學術研究機構合作，基於公共利益為統計或學術研究而有必要，且資料經過提供者處理或蒐集者依其揭露方式無從識別特定之當事人。',
+          '當您在網站的行為，違反服務條款或可能損害或妨礙網站與其他使用者權益或導致任何人遭受損害時，經網站管理單位研析揭露您的個人資料是為了辨識、聯絡或採取法律行動所必要者。',
+          '有利於您的權益。',
+          '本網站委託廠商協助蒐集、處理或利用您的個人資料時，將對委外廠商或個人善盡監督管理之責。',
+        ],
+      },
+      {
+        h: '六、Cookie之使用',
+        body: ['為了提供您最佳的服務，本網站會在您的電腦中放置並取用我們的Cookie，若您不願接受Cookie的寫入，您可在您使用的瀏覽器功能項中設定隱私權等級為高，即可拒絕Cookie的寫入，但可能會導致網站某些功能無法正常執行。'],
+        items: [],
+      },
+      {
+        h: '七、隱私權保護政策之修正',
+        body: ['本網站隱私權保護政策將因應需求隨時進行修正，修正後的條款將刊登於網站上。'],
+        items: [],
+      },
+    ],
+    contactTitle: '聯繫管道',
+    contactBody: '如需更正或刪除個人資料，或對本政策有任何疑問，請透過以下管道與我們聯繫。',
+    contactLine: 'LINE 官方帳號客服',
+    contactSupport: '前往客服中心',
   },
   badges: {
     native: '原生',
@@ -684,6 +752,8 @@ const en: Messages = {
     itemSupportSub: 'Report issues & contact us',
     itemLineOa: 'Contact support',
     itemLineOaSub: 'Chat via LINE official account',
+    itemPrivacy: 'Privacy policy',
+    itemPrivacySub: 'How we collect and use your data',
     incompleteTitle: 'Profile incomplete',
     incompleteSub: 'Complete it before checkout',
     setupSubtitleFilled: 'Update your basic info',
@@ -738,6 +808,71 @@ const en: Messages = {
       { q: 'How soon is the activation code sent?', a: 'Usually within 5 minutes of payment. If it takes longer than 30 minutes, please contact LINE support.' },
       { q: 'Can I get a refund?', a: 'Before the activation code is used, you can contact support to request a refund. Installed or used eSIMs are non-refundable.' },
     ],
+  },
+  privacy: {
+    title: 'Privacy policy',
+    intro: 'Welcome to the Business Pass website (the "Site"). To help you use the services and information on the Site with peace of mind, we describe our privacy protection policy below to safeguard your rights. Please read it carefully.',
+    sections: [
+      {
+        h: '1. Scope',
+        body: ['This policy covers how the Site handles personally identifiable information collected when you use its services. It does not apply to linked websites outside the Site, nor to persons not engaged or involved in managing the Site.'],
+        items: [],
+      },
+      {
+        h: '2. Collection, processing and use of personal data',
+        body: [
+          'When you visit the Site or use its features, we may ask you to provide personal data necessary for that service, and will process and use it only within that specific purpose. Without your written consent, the Site will not use your personal data for any other purpose.',
+          'When you use interactive features such as the service mailbox or surveys, the Site retains the name, email address, contact details and time of use you provide.',
+          'During normal browsing, our servers automatically log related activity, including your device IP address, time of use, browser, and browsing and click records. These records are used internally to improve our services and are never made public.',
+          'To provide accurate services, we may compile statistics and analyses from survey responses. Beyond internal research, we may publish statistical figures and explanatory text as needed, but these will not involve any specific individual.',
+          'You may at any time ask us to correct or delete your account or the personal data collected by the Site. See the contact channels at the bottom of this page.',
+        ],
+        items: [],
+      },
+      {
+        h: '3. Data protection',
+        body: [
+          'The Site\'s servers are equipped with firewalls, antivirus systems and other necessary information security measures. Your personal data is strictly protected and only authorized personnel can access it; all such personnel have signed confidentiality agreements, and any breach will be subject to legal action.',
+          'Where we need to engage other parties to provide services, the Site will strictly require them to comply with confidentiality obligations and will take the necessary steps to verify their compliance.',
+        ],
+        items: [],
+      },
+      {
+        h: '4. External links',
+        body: ['The Site may contain links to other websites. Those linked websites are not covered by this policy; please refer to their own privacy policies.'],
+        items: [],
+      },
+      {
+        h: '5. Sharing personal data with third parties',
+        body: [
+          'The Site will never provide, exchange, rent or sell your personal data to any other individual, group, private company or government agency, except where required by law or contractual obligation.',
+          'Such exceptions include, but are not limited to:',
+        ],
+        items: [
+          'With your written consent.',
+          'Where expressly required by law.',
+          'To prevent danger to your life, body, freedom or property.',
+          'In cooperation with government agencies or academic research institutions, where necessary for statistics or academic research in the public interest, and the data has been processed or disclosed in a way that cannot identify a specific individual.',
+          'Where your conduct on the Site violates the terms of service, or may damage or interfere with the rights of the Site or other users, or cause harm to anyone, and the Site\'s management determines that disclosure is necessary to identify, contact or take legal action.',
+          'Where it is in your interest.',
+          'When the Site engages vendors to help collect, process or use your personal data, it will properly supervise those vendors or individuals.',
+        ],
+      },
+      {
+        h: '6. Use of cookies',
+        body: ['To provide you with the best service, the Site places and accesses cookies on your device. If you do not wish to accept cookies, you can set your browser\'s privacy level to high to refuse them, but some features of the Site may not work properly.'],
+        items: [],
+      },
+      {
+        h: '7. Changes to this policy',
+        body: ['This policy may be revised at any time as needed; revised terms will be published on the Site.'],
+        items: [],
+      },
+    ],
+    contactTitle: 'Contact us',
+    contactBody: 'To correct or delete your personal data, or if you have any questions about this policy, please contact us through the channels below.',
+    contactLine: 'LINE official account support',
+    contactSupport: 'Go to support center',
   },
   badges: {
     native: 'Native',
