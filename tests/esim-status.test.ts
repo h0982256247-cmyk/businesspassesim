@@ -32,6 +32,21 @@ describe('deriveEsimStatus', () => {
     expect(v.phase).toBe('ended')
   })
 
+  it('剛過期、未滿 24 小時 → 仍是 ended 且歸到 history', () => {
+    // 迴歸測試：daysLeftOf 原本單用 Math.ceil，這段區間會算出 -0，而 -0 < 0 為
+    // false，已斷網的卡會整整一天顯示「即將到期／今天到期」並釘在「使用中」。
+    const v = deriveEsimStatus({ status: 'COMPLETED', activatedAt: 'x', activationEnd: iso(NOW - DAY / 12) })
+    expect(v).toMatchObject({ phase: 'ended', tone: 'ended' })
+    expect(groupOf(v.phase)).toBe('history')
+    // 列表卡的倒數框以 daysLeft >= 0 為顯示條件，必須是負數才不會顯示「0 天」
+    expect(v.daysLeft).toBeLessThan(0)
+  })
+
+  it('到期時刻正好等於現在 → ended', () => {
+    const v = deriveEsimStatus({ status: 'COMPLETED', activatedAt: 'x', activationEnd: iso(NOW) })
+    expect(v.phase).toBe('ended')
+  })
+
   it('已激活、無到期日 → inUse，daysLeft null', () => {
     const v = deriveEsimStatus({ status: 'COMPLETED', activatedAt: 'x' })
     expect(v.phase).toBe('inUse')
