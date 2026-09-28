@@ -71,6 +71,14 @@ function IconHeadset() {
   )
 }
 
+function IconShield() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={S.muted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  )
+}
+
 export default function ProfilePage() {
   const router = useRouter()
   const base = useLiffBase()
@@ -107,6 +115,7 @@ export default function ProfilePage() {
     ...(tenant?.lineOaUrl
       ? [{ label: t.profile.itemLineOa, sub: t.profile.itemLineOaSub, icon: <IconHeadset />, href: tenant.lineOaUrl, external: true }]
       : []),
+    { label: t.profile.itemPrivacy, sub: t.profile.itemPrivacySub, icon: <IconShield />, href: `${base}/privacy` },
   ]
 
   return (
