@@ -50,12 +50,17 @@ export interface EsimStatusView {
 const DAY = 86_400_000
 const EXPIRING_DAYS = 3
 
-/** 距離到期還有幾天（無條件進位）；沒有到期日回 null */
+/** 距離到期還有幾天（無條件進位）；已到期回負數；沒有到期日回 null */
 export function daysLeftOf(activationEnd?: string | null): number | null {
   if (!activationEnd) return null
   const end = new Date(activationEnd).getTime()
   if (Number.isNaN(end)) return null
-  return Math.ceil((end - Date.now()) / DAY)
+  const remain = end - Date.now()
+  // 已到期一律回負數。原本單用 Math.ceil，過期未滿 24 小時會算出 -0，而 JS 的
+  // -0 < 0 是 false → deriveEsimStatus 漏掉 ended 分支，已斷網的卡會整整一天
+  // 被判成 expiringSoon（文案「今天到期」）並繼續釘在「使用中」。
+  if (remain <= 0) return Math.min(-1, Math.floor(remain / DAY))
+  return Math.ceil(remain / DAY)
 }
 
 export function deriveEsimStatus(o: EsimStatusInput): EsimStatusView {
